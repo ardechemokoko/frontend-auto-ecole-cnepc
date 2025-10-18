@@ -23,3 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 
+# IDE / éditeurs
+.vscode/
+.cursor/
+.idea/
+
+# dépendances et builds
+node_modules/
+dist/
+build/

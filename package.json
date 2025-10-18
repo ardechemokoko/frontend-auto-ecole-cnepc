@@ -17,7 +17,13 @@
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "react-router-dom": "^6.20.0",
-    "axios": "^1.6.2"
+    "axios": "^1.6.2",
+    "zustand": "^4.4.7",
+    "react-hot-toast": "^2.6.0",
+    "react-hook-form": "^7.65.0",
+    "zod": "^4.1.12",
+    "@hookform/resolvers": "^5.2.2",
+    "daisyui": "^4.4.19"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",
