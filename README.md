@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-Application React.js + TypeScript pour la gestion des auto-écoles DGTT avec des services mockés pour le développement.
+Application React.js + TypeScript pour la gestion des dossiers d'auto-écoles validées par le ministère du transport. Plateforme destinée aux auto-écoles pour la gestion de leurs élèves et la transmission des dossiers au CNEPC.
 
 ## Architecture
 
@@ -54,8 +54,10 @@ src/
 ## Utilisation
 
 ### **Connexion**
-- Email : `admin@dgtt.com` ou `instructeur@dgtt.com`
-- Mot de passe : `password123`
+- **Administrateur DGTT** : `admin@dgtt.com` / `password123`
+- **Auto-École du Centre** : `autoecole.centre@email.com` / `password123`
+- **Auto-École du Nord** : `autoecole.nord@email.com` / `password123`
+- **Auto-École du Sud** : `autoecole.sud@email.com` / `password123`
 
 ### **Navigation**
 - Dashboard : Vue d'ensemble avec cartes de navigation

@@ -10,6 +10,12 @@ export default {
         primary: '#50C786',
         success: '#50C786',
       },
+      fontFamily: {
+        'sans': ['Roboto', 'system-ui', 'Avenir', 'Helvetica', 'Arial', 'sans-serif'],
+        'display': ['Oswald', 'system-ui', 'Avenir', 'Helvetica', 'Arial', 'sans-serif'],
+        'serif': ['Libertinus Serif Display', 'Georgia', 'serif'],
+        'smooch': ['Smooch Sans', 'system-ui', 'Avenir', 'Helvetica', 'Arial', 'sans-serif'],
+      },
     },
   },
   plugins: [require("daisyui")],

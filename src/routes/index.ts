@@ -36,7 +36,7 @@ const AppRoutes: React.FC = () => {
       element: React.createElement(ProtectedRoute, null, React.createElement(ValidationPage)) 
     }),
     React.createElement(Route, { 
-      path: ROUTES.ELEVES, 
+      path: ROUTES.ELEVES + "/*", 
       element: React.createElement(ProtectedRoute, null, React.createElement(ElevesPage)) 
     }),
     React.createElement(Route, { 

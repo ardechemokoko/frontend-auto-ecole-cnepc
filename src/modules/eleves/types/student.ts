@@ -9,6 +9,8 @@ export interface Student {
   address: string;
   birthDate: string;
   nationality: string;
+  lieuNaissance: string;
+  nationaliteEtrangere?: string;
   status: 'incomplete' | 'complete' | 'validated';
   documentsCount: number;
   createdAt: string;
@@ -23,6 +25,8 @@ export interface StudentFormData {
   address: string;
   birthDate: string;
   nationality: string;
+  lieuNaissance: string;
+  nationaliteEtrangere?: string;
 }
 
 export interface Document {
@@ -52,6 +56,8 @@ export interface PersonalInfo {
   address: string;
   birthDate: string;
   nationality: string;
+  lieuNaissance: string;
+  nationaliteEtrangere?: string;
 }
 
 export interface RequiredDocument {

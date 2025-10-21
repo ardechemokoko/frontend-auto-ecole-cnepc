@@ -12,7 +12,6 @@ import {
   IconButton
 } from '@mui/material';
 import { 
-  Dashboard as DashboardIcon,
   School as SchoolIcon,
   CheckCircle as CheckCircleIcon,
   Send as SendIcon,
@@ -33,22 +32,22 @@ const DashboardPage: React.FC = () => {
 
   const menuItems = [
     {
-      title: 'Élèves',
-      description: 'Gérer les élèves et leurs dossiers',
+      title: 'Gestion des Élèves',
+      description: 'Inscrire et gérer les dossiers des élèves',
       icon: React.createElement(SchoolIcon, { sx: { fontSize: 40 } }),
       path: ROUTES.ELEVES,
       color: '#1976d2'
     },
     {
-      title: 'Validation',
-      description: 'Valider les dossiers des élèves',
+      title: 'Validation des Dossiers',
+      description: 'Valider les dossiers complets des élèves',
       icon: React.createElement(CheckCircleIcon, { sx: { fontSize: 40 } }),
       path: ROUTES.VALIDATION,
       color: '#388e3c'
     },
     {
-      title: 'CNEPC',
-      description: 'Envoyer les dossiers au CNEPC',
+      title: 'Envoi CNEPC',
+      description: 'Transmettre les dossiers validés au CNEPC',
       icon: React.createElement(SendIcon, { sx: { fontSize: 40 } }),
       path: ROUTES.CNEPC,
       color: '#f57c00'
@@ -58,11 +57,23 @@ const DashboardPage: React.FC = () => {
   return (
     <Box sx={{ flexGrow: 1 }}>
       {/* Barre de navigation */}
-      <AppBar position="static" sx={{ backgroundColor: '#50C786' }}>
+      <AppBar position="static" sx={{ 
+        background: 'linear-gradient(90deg, #50C786 0%, #FFD700 50%, #1E90FF 100%)'
+      }}>
         <Toolbar>
-          <DashboardIcon sx={{ mr: 2 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            DGTT Auto-École
+          <Box
+            component="img"
+            src="/src/assets/img/mtt.png"
+            alt="Ministère des Transports"
+            sx={{ 
+              height: 40, 
+              width: 'auto', 
+              mr: 2,
+              objectFit: 'contain'
+            }}
+          />
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }} className="uppercase">
+            Portail National des Auto-Écoles
           </Typography>
           <Typography variant="body2" sx={{ mr: 2 }}>
             Bonjour, {user?.name || 'Utilisateur'}
@@ -77,10 +88,10 @@ const DashboardPage: React.FC = () => {
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Box sx={{ mb: 4 }}>
           <Typography variant="h4" component="h1" gutterBottom>
-            Tableau de bord
+            Tableau de bord Auto-École
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Bienvenue sur le tableau de bord de l'application DGTT Auto-École.
+            Bienvenue sur la plateforme DGTT pour la gestion des dossiers d'auto-école.
           </Typography>
         </Box>
 
@@ -130,14 +141,14 @@ const DashboardPage: React.FC = () => {
         {/* Statistiques rapides */}
         <Box sx={{ mt: 4 }}>
           <Typography variant="h5" gutterBottom>
-            Statistiques rapides
+            Statistiques de l'auto-école
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={4}>
               <Card>
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
-                    Élèves en attente
+                    Dossiers en cours
                   </Typography>
                   <Typography variant="h4">
                     12
@@ -161,7 +172,7 @@ const DashboardPage: React.FC = () => {
               <Card>
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
-                    Envoyés au CNEPC
+                    Transmis au CNEPC
                   </Typography>
                   <Typography variant="h4">
                     8

@@ -4,7 +4,6 @@ export { default as documentService } from './documentService';
 
 // Exemples d'utilisation
 export { default as StudentServiceExample } from './StudentServiceExample';
-export { default as DocumentServiceExample } from './DocumentServiceExample';
 
 // Types
 export * from './types';

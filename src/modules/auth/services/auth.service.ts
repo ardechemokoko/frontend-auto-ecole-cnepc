@@ -1,21 +1,35 @@
 // Service d'authentification avec mocks
 import { User, LoginRequest, AuthResponse } from './types';
 
-// Mock des utilisateurs
+// Mock des auto-écoles validées par le ministère du transport
 const mockUsers: User[] = [
   {
     id: '1',
     email: 'admin@dgtt.com',
-    name: 'Administrateur',
+    name: 'Administrateur DGTT',
     role: 'admin',
     createdAt: new Date('2024-01-01'),
   },
   {
     id: '2',
-    email: 'instructeur@dgtt.com',
-    name: 'Instructeur',
+    email: 'autoecole.centre@email.com',
+    name: 'Auto-École du Centre',
     role: 'instructor',
     createdAt: new Date('2024-01-02'),
+  },
+  {
+    id: '3',
+    email: 'autoecole.nord@email.com',
+    name: 'Auto-École du Nord',
+    role: 'instructor',
+    createdAt: new Date('2024-01-03'),
+  },
+  {
+    id: '4',
+    email: 'autoecole.sud@email.com',
+    name: 'Auto-École du Sud',
+    role: 'instructor',
+    createdAt: new Date('2024-01-04'),
   },
 ];
 
