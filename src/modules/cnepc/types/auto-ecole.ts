@@ -197,11 +197,14 @@ export interface CandidatListResponse {
 export interface FormationFormData {
   auto_ecole_id: string;
   type_permis_id: string;
-  nom: string;
-  description: string;
-  prix: number;
-  duree_jours: number;
+  montant: number;
+  description?: string;
+  session_id: string;
   statut: boolean;
+  // Champs optionnels pour compatibilité
+  nom?: string;
+  prix?: number;
+  duree_jours?: number;
 }
 
 export interface DossierFormData {
