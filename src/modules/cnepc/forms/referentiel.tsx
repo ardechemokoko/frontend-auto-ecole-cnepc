@@ -23,7 +23,8 @@ import {
   Visibility as VisibilityIcon,
   Edit as EditIcon,
   Schedule as ScheduleIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  Delete
 } from '@mui/icons-material';
 import { Referentiel, ReferentielFormulaire } from '../../../shared/model/referentiel';
 import { referentielService } from '../../auth/services/referentiel.services';
@@ -54,7 +55,10 @@ import {
 const PageReferenciel: React.FC = () => {
   const [referentiels, setReferentiels] = useState<Referentiel[]>([]);
   const [statut, setStatut] = useState<boolean>(true);
+   const [update, setUpdate] = useState<boolean>(true);
   const [errors, setErrors] = useState<Partial<ReferentielFormulaire>>({});
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const [formData, setFormData] = useState<ReferentielFormulaire>({ code: '', libelle: '', statut: true, type_ref: '', description: '' });
   useEffect(() => {
     getReferentiel();
@@ -63,7 +67,7 @@ const PageReferenciel: React.FC = () => {
   const getReferentiel = async () => {
     try {
       const res = await referentielService.getReferentiels();
-      console.log(res)
+
       // On vérifie que res contient bien un tableau
       if (Array.isArray(res)) {
         setReferentiels(res);
@@ -86,25 +90,38 @@ const PageReferenciel: React.FC = () => {
     }
   };
   function onViewreferentiel(referentiel: Referentiel): void {
-    throw new Error('Function not implemented.');
+    setFormData({ code: referentiel.code, libelle: referentiel.libelle, statut: true, type_ref: referentiel.type_ref, description: referentiel.description })
+    showFormulaire();
+
+    setUpdate(true)
   }
 
   function showFormulaire(): void {
     setStatut((prev) => !prev);
+  
   }
 
   const creationDeRef = async (event: React.FormEvent) => {
     event.preventDefault();
-
-    console.log(formData);
     try {
-      referentielService.saveReferentiels({
+      const res = await referentielService.saveReferentiels({
         libelle: formData.libelle,
         code: formData.code,
         type_ref: formData.type_ref,
         description: formData.description,
         statut: true,
       })
+      if (res) {
+        // showFormulaire()
+        getReferentiel();
+        setFormData({ code: '', libelle: '', statut: true, type_ref: '', description: '' })
+        setMessage({ type: 'success', text: 'Sauvegarde réussie !' });
+
+        setTimeout(() => {
+          showFormulaire()
+        }, 100);
+      }
+
     } catch (e) {
       console.log(e)
     }
@@ -118,6 +135,15 @@ const PageReferenciel: React.FC = () => {
     }
   };
 
+  function ondeleteferentiel(referentiel: Referentiel): void {
+    try {
+      referentielService.deleteReferentiels(referentiel);
+      setMessage({ type: 'success', text: 'Suppression réussie !' });
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
   return (
     <><Box>
       <Button
@@ -127,6 +153,15 @@ const PageReferenciel: React.FC = () => {
       </Button>
     </Box>
       <br />
+      {message && (
+        <Alert
+          severity={message.type}
+          sx={{ mb: 2 }}
+          onClose={() => setMessage(null)}
+        >
+          {message.text}
+        </Alert>
+      )}
       {statut ? <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -135,8 +170,8 @@ const PageReferenciel: React.FC = () => {
               <TableCell>Code</TableCell>
               <TableCell>Type de Referentiel</TableCell>
               <TableCell>Description</TableCell>
-              <TableCell>Statut</TableCell>
 
+              <TableCell></TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -183,21 +218,22 @@ const PageReferenciel: React.FC = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <ScheduleIcon sx={{ mr: 0.5, fontSize: 14, color: 'success.main' }} />
                         <Typography variant="body2" className="font-primary">
-                          {referentiel.statut}P
+                          {referentiel.statut}
                         </Typography>
                       </Box>
                     </Box>
                   </TableCell>
+
 
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
                       <Tooltip title="Voir le referentiel">
                         <IconButton
                           size="small"
-                          onClick={() => onViewreferentiel(referentiel)}
+                          onClick={() => ondeleteferentiel(referentiel)}
                           color="primary"
                         >
-                          <VisibilityIcon fontSize="small" />
+                          <Delete fontSize="small" />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Gérer le referentiel">
@@ -228,6 +264,15 @@ const PageReferenciel: React.FC = () => {
         </Table>
       </TableContainer> : <Card>
         <CardContent>
+          {message && (
+            <Alert
+              severity={message.type}
+              sx={{ mb: 2 }}
+              onClose={() => setMessage(null)}
+            >
+              {message.text}
+            </Alert>
+          )}
           <form onSubmit={creationDeRef}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1.5, sm: 2 } }}>
               <TextField
@@ -287,7 +332,7 @@ const PageReferenciel: React.FC = () => {
                   py: { xs: 1.5, sm: 2 }
                 }}
               >
-                Creation
+            {  update ? "Modifier Referentiel":"Creation de Referentiel"}
               </Button>
             </Box>
           </form>
