@@ -16,6 +16,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     setSidebarOpen(!sidebarOpen);
   };
 
+  // Maintenir la sidebar ouverte sur desktop
+  React.useEffect(() => {
+    if (!isMobile) {
+      setSidebarOpen(true);
+    }
+  }, [isMobile]);
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', flexDirection: 'column' }}>
       {/* Sidebar - au-dessus du header */}

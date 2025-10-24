@@ -13,6 +13,10 @@ import ElevesPage from './ElevesPage';
 import CNEPCPage from './CNEPCPage';
 import PageUpdateAutoecole from '../modules/cnepc/forms/updateinfoAutoEcole'
 
+// Import des pages Settings
+import SettingsPage from '../modules/settings/pages/SettingsPage';
+import UserManagementPage from '../modules/settings/pages/UserManagementPage';
+
 // Composant de protection des routes
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAppStore();
@@ -28,8 +32,6 @@ const AppRoutes: React.FC = () => {
     }),
     // Route de connexion
     React.createElement(Route, { path: ROUTES.LOGIN, element: React.createElement(LoginPage) }),
-
-        React.createElement(Route, { path: ROUTES.UPDATE, element: React.createElement(PageUpdateAutoecole) }),
     // Routes protégées avec layout
     React.createElement(Route, { 
       path: ROUTES.DASHBOARD, 
@@ -53,6 +55,25 @@ const AppRoutes: React.FC = () => {
       path: ROUTES.CNEPC, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(CNEPCPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.UPDATE, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(PageUpdateAutoecole))
+      ) 
+    }),
+    // Routes Settings
+    React.createElement(Route, { 
+      path: ROUTES.SETTINGS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(SettingsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.USER_MANAGEMENT, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(UserManagementPage))
       ) 
     }),
     // Route 404
