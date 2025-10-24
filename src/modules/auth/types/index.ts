@@ -17,4 +17,7 @@ export interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  access_token:string | null
+  refresh_token:string | null
+
 }

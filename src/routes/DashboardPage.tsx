@@ -14,6 +14,7 @@ import {
   Send as PaperAirplaneIcon,
   BarChart as ChartBarIcon,
 } from '@mui/icons-material';
+import tokenService from '../modules/auth/services/tokenService';
 
 const DashboardPage: React.FC = () => {
   const [stats, setStats] = useState({
@@ -21,7 +22,7 @@ const DashboardPage: React.FC = () => {
     dossiersValides: 0,
     transmisCNEPC: 0
   });
-
+const [user, setUser]= useState();
   useEffect(() => {
     // Simuler le chargement des statistiques
     setStats({
@@ -29,6 +30,7 @@ const DashboardPage: React.FC = () => {
       dossiersValides: 89,
       transmisCNEPC: 23
     });
+    setUser(tokenService.getUser())
   }, []);
 
   return (
