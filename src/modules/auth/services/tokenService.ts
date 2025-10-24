@@ -1,6 +1,10 @@
+import { User } from "../types";
+
 class TokenService {
   private readonly TOKEN_KEY = 'auth_token';
   private readonly REFRESH_TOKEN_KEY = 'refresh_token';
+   private readonly  USER_KEY = "user";
+ private readonly  TOKEN_KEYApi = "access_token";
 
   setToken(token: string): void {
     localStorage.setItem(this.TOKEN_KEY, token);
@@ -39,9 +43,30 @@ class TokenService {
     }
   }
 
+   // ✅ Sauvegarde du token et de l'utilisateur
+  setAuthData(token: any, user: User) {
+  localStorage.setItem(this.TOKEN_KEYApi, token);
+  localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+  }
+   // ✅ Récupération du token
+  getTokenApi() {
+    return localStorage.getItem(this.TOKEN_KEYApi);
+  }
+
   clearAll(): void {
     this.removeToken();
     this.removeRefreshToken();
+  }
+
+   // ✅ Récupération des infos utilisateur
+  getUser() {
+    const user = localStorage.getItem(this.USER_KEY);
+    return user ? JSON.parse(user) : null;
+  }
+
+   // ✅ Vérifie si un utilisateur est connecté
+  isAuthenticated(){
+    return !!localStorage.getItem(this.TOKEN_KEY);
   }
 }
 

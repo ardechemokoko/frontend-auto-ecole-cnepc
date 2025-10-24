@@ -29,6 +29,8 @@ import {
   ExpandMore as ChevronDownIcon,
 } from '@mui/icons-material';
 import { ROUTES } from '../constants';
+import tokenService from '../../modules/auth/services/tokenService';
+import { authService } from '../../modules/auth/services/authService';
 
 interface AppSidebarProps {
   open: boolean;
@@ -47,6 +49,12 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       icon: HomeIcon,
       path: ROUTES.DASHBOARD,
       description: 'Vue d\'ensemble de l\'application'
+    },
+    {
+      title: 'Modifier Vos informations personnelles',
+      icon: HomeIcon,
+      path: ROUTES.UPDATE,
+      description: 'modifier les informations de l\' auto-école'
     },
     {
       title: 'Gestion des Candidats',
@@ -91,8 +99,14 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
   };
 
   const handleLogout = () => {
-    logout();
-    navigate(ROUTES.LOGIN);
+    try {
+      authService.logoutBackEnd();
+      tokenService.clearAll()
+      logout();
+      navigate(ROUTES.LOGIN);
+    } catch (e) {
+
+    }
   };
 
   const isActive = (path: string) => {
@@ -166,7 +180,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
               const IconComponent = item.icon;
               const active = isActive(item.path);
               const isCandidatsItem = item.title === 'Gestion des Candidats';
-              
+
               return (
                 <React.Fragment key={item.path}>
                   <ListItem disablePadding>
@@ -223,7 +237,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                       )}
                     </ListItemButton>
                   </ListItem>
-                  
+
                   {/* Submenu for candidats */}
                   {open && isCandidatsItem && item.hasSubmenu && (
                     <Collapse in={candidatsOpen} timeout="auto" unmountOnExit>

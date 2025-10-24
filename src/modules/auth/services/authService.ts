@@ -1,21 +1,22 @@
 // Service d'authentification avec mocks
 import { LoginRequest, AuthResponse } from './types';
 import { loginMock, logoutMock, refreshTokenMock, checkCNEPCStatusMock } from './auth.service';
+import axiosAuthentifcation from '../../../shared/environment/envauth';
+import axiosClient from '../../../shared/environment/envdev';
 
 export class AuthService {
-  async login(credentials: LoginRequest): Promise<AuthResponse> {
+  async login(credentials: LoginRequest): Promise<any> {
     try {
-      // Utilisation du mock pour le développement
-      return await loginMock(credentials);
+     // Utilisation du mock pour le développement
+      return await axiosAuthentifcation.post("/auth/login-direct", credentials);
     } catch (error: any) {
       throw new Error(`Erreur de connexion: ${error.message}`);
     }
   }
 
-  async logout(): Promise<void> {
+  async logoutBackEnd(): Promise<void> {
     try {
-      // Utilisation du mock pour le développement
-      await logoutMock();
+      await axiosClient.post("/auth/logout");
     } catch (error: any) {
       throw new Error(`Erreur de déconnexion: ${error.message}`);
     }

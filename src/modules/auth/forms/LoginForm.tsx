@@ -3,6 +3,7 @@ import { Button, TextField, Card, CardContent, Typography, Box, Alert, CircularP
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../../store';
 import { authService } from '../services/authService';
+import { tokenService } from '../services';
 import { User } from '../types';
 import { ROUTES } from '../../../shared/constants';
 
@@ -90,19 +91,22 @@ const LoginForm: React.FC = () => {
         email: formData.email,
         password: formData.password,
       });
-      
+      //console.log(authResponse.data)
       // Conversion du type pour correspondre au store
       const user: User = {
-        id: authResponse.user.id,
-        email: authResponse.user.email,
-        name: authResponse.user.name,
-        role: authResponse.user.role as 'admin' | 'instructor' | 'student',
-        createdAt: authResponse.user.createdAt,
+        id: authResponse.data.user.id,
+        email: authResponse.data.user.email,
+        name: authResponse.data.user.personne.nom_complet,
+        role: authResponse.data.user.role,
+        createdAt: authResponse.data.user.created_at,
       };
-      
-      login(user, authResponse.token);
+      // console.log(authResponse.data.user.personne.nom_complet)
+      // console.log(user)
+      login(user, authResponse.data.access_token);
       setMessage({ type: 'success', text: 'Connexion réussie !' });
-      
+      tokenService.setAuthData(authResponse.data.access_token,user);
+     //console.log(tokenService.getUser());
+
       // Redirection vers le dashboard après connexion réussie
       setTimeout(() => {
         navigate(ROUTES.DASHBOARD);
