@@ -12,6 +12,7 @@ import ValidationPage from './ValidationPage';
 import ElevesPage from './ElevesPage';
 import CNEPCPage from './CNEPCPage';
 import PageUpdateAutoecole from '../modules/cnepc/forms/updateinfoAutoEcole'
+import AutoEcolePage from './AutoEcolePage';
 
 // Import des pages Settings
 import SettingsPage from '../modules/settings/pages/SettingsPage';
@@ -55,6 +56,12 @@ const AppRoutes: React.FC = () => {
       path: ROUTES.CNEPC, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(CNEPCPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.AUTO_ECOLES, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(AutoEcolePage))
       ) 
     }),
     React.createElement(Route, { 

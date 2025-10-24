@@ -27,6 +27,7 @@ import {
   ExpandMore as ChevronDownIcon,
   Settings as SettingsIcon,
   Person as PersonIcon,
+  School as SchoolIcon,
 } from '@mui/icons-material';
 import { ROUTES } from '../constants';
 import tokenService from '../../modules/auth/services/tokenService';
@@ -50,6 +51,12 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       icon: HomeIcon,
       path: ROUTES.DASHBOARD,
       description: 'Vue d\'ensemble de l\'application'
+    },
+    {
+      title: 'Gestion des Auto-Écoles',
+      icon: SchoolIcon,
+      path: ROUTES.AUTO_ECOLES,
+      description: 'Gérer les auto-écoles et leurs candidats inscrits'
     },
     {
       title: 'Modifier Vos informations personnelles',

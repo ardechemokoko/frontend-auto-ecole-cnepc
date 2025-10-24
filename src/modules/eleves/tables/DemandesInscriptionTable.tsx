@@ -23,7 +23,7 @@ import {
 // Heroicons imports
 import { EyeIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { DemandeInscription, FiltresDemandes, StatistiquesDemandes } from '../types/inscription';
-import { getDemandesInscriptionMock, getStatistiquesDemandesMock } from '../services/inscriptionService';
+import { getDemandesInscription, getStatistiquesDemandes } from '../services/inscriptionService';
 
 interface DemandesInscriptionTableProps {
   onCandidatSelect?: (candidat: DemandeInscription) => void;
@@ -45,10 +45,19 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
   const chargerDemandes = async () => {
     try {
       setLoading(true);
-      const demandesData = await getDemandesInscriptionMock(filtres);
+      console.log('📋 Chargement des dossiers avec filtres:', filtres);
+      
+      const demandesData = await getDemandesInscription(filtres);
       setDemandes(demandesData);
-    } catch (error) {
-      console.error('Erreur lors du chargement des demandes:', error);
+      
+      console.log('✅ Dossiers chargés:', demandesData.length);
+    } catch (error: any) {
+      console.error('❌ Erreur lors du chargement des demandes:', error);
+      
+      // Afficher un message d'erreur à l'utilisateur si nécessaire
+      if (error.message?.includes('auto-école')) {
+        console.warn('⚠️ Aucune auto-école associée - vérifiez votre connexion');
+      }
     } finally {
       setLoading(false);
     }
@@ -56,10 +65,12 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
 
   const chargerStatistiques = async () => {
     try {
-      const stats = await getStatistiquesDemandesMock();
+      const stats = await getStatistiquesDemandes();
       setStatistiques(stats);
+      console.log('📊 Statistiques chargées:', stats);
     } catch (error) {
-      console.error('Erreur lors du chargement des statistiques:', error);
+      console.error('❌ Erreur lors du chargement des statistiques:', error);
+      // Les statistiques par défaut (vides) seront utilisées
     }
   };
 
@@ -76,7 +87,9 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
     switch (statut) {
       case 'en_attente': return 'warning';
       case 'en_cours': return 'info';
+      case 'valide':
       case 'validee': return 'success';
+      case 'rejete':
       case 'rejetee': return 'error';
       default: return 'default';
     }
@@ -86,8 +99,10 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
     switch (statut) {
       case 'en_attente': return 'En attente';
       case 'en_cours': return 'En cours';
-      case 'validee': return 'Validée';
-      case 'rejetee': return 'Rejetée';
+      case 'valide':
+      case 'validee': return 'Validé';
+      case 'rejete':
+      case 'rejetee': return 'Rejeté';
       default: return statut;
     }
   };
