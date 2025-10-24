@@ -6,6 +6,7 @@ export const ROUTES = {
   ELEVES: '/eleves',
   CNEPC: '/cnepc',
   UPDATE: '/updateinfo',
+  REF: '/referenciel',
 } as const;
 
 export const STATUS = {

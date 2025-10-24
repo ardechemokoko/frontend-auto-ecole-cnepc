@@ -18,6 +18,8 @@ import {
 } from '@mui/material';
 import {
   Home as HomeIcon,
+  Edit as EditIcon,
+  Refresh as Ref,
   People as UserGroupIcon,
   CheckCircle as CheckCircleIcon,
   Send as PaperAirplaneIcon,
@@ -51,10 +53,16 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       description: 'Vue d\'ensemble de l\'application'
     },
     {
-      title: 'Modifier Vos informations personnelles',
-      icon: HomeIcon,
+      title: 'Vos informations personnelles',
+      icon: EditIcon,
       path: ROUTES.UPDATE,
       description: 'modifier les informations de l\' auto-école'
+    },
+        {
+      title: 'Referenciel',
+      icon: Ref,
+      path: ROUTES.REF,
+      description: 'reference de l\' auto-école'
     },
     {
       title: 'Gestion des Candidats',

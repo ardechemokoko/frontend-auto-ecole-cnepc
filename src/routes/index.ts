@@ -12,6 +12,7 @@ import ValidationPage from './ValidationPage';
 import ElevesPage from './ElevesPage';
 import CNEPCPage from './CNEPCPage';
 import PageUpdateAutoecole from '../modules/cnepc/forms/updateinfoAutoEcole'
+import PageReferenciel from '../modules/cnepc/forms/referentiel';
 
 // Composant de protection des routes
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -29,12 +30,24 @@ const AppRoutes: React.FC = () => {
     // Route de connexion
     React.createElement(Route, { path: ROUTES.LOGIN, element: React.createElement(LoginPage) }),
 
-        React.createElement(Route, { path: ROUTES.UPDATE, element: React.createElement(PageUpdateAutoecole) }),
+     //   React.createElement(Route, { path: ROUTES.UPDATE, element: React.createElement(PageUpdateAutoecole) }),
     // Routes protégées avec layout
     React.createElement(Route, { 
       path: ROUTES.DASHBOARD, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(DashboardPage))
+      ) 
+    }),
+     React.createElement(Route, { 
+      path: ROUTES.UPDATE, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(PageUpdateAutoecole))
+      ) 
+    }),
+      React.createElement(Route, { 
+      path: ROUTES.REF, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(PageReferenciel))
       ) 
     }),
     React.createElement(Route, { 
