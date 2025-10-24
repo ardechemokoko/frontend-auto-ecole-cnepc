@@ -91,7 +91,33 @@ const LoginForm: React.FC = () => {
         email: formData.email,
         password: formData.password,
       });
-      //console.log(authResponse.data)
+      
+      // 🔍 DÉBOGAGE : Vérifier le token reçu du backend
+      console.log('🎫 RÉPONSE D\'AUTHENTIFICATION:', {
+        success: authResponse.data.success,
+        token_type: authResponse.data.token_type,
+        expires_in: authResponse.data.expires_in,
+        access_token_preview: authResponse.data.access_token?.substring(0, 50) + '...',
+        access_token_length: authResponse.data.access_token?.length,
+        access_token_parts: authResponse.data.access_token?.split('.').length,
+        user_id: authResponse.data.user?.id,
+        user_email: authResponse.data.user?.email,
+        user_role: authResponse.data.user?.role
+      });
+      
+      // Vérifier si le token est bien un JWT
+      const token = authResponse.data.access_token;
+      if (!token) {
+        throw new Error('❌ Aucun token reçu du backend !');
+      }
+      
+      if (token.split('.').length !== 3) {
+        console.error('❌ ATTENTION : Le token reçu n\'est PAS un JWT standard !');
+        console.error('Token reçu:', token.substring(0, 100));
+        console.error('Format attendu: header.payload.signature (3 parties)');
+        console.error('Format reçu:', token.split('.').length, 'parties');
+      }
+      
       // Conversion du type pour correspondre au store
       const user: User = {
         id: authResponse.data.user.id,
@@ -100,12 +126,12 @@ const LoginForm: React.FC = () => {
         role: authResponse.data.user.role,
         createdAt: authResponse.data.user.created_at,
       };
-      // console.log(authResponse.data.user.personne.nom_complet)
-      // console.log(user)
-      login(user, authResponse.data.access_token);
+      
+      login(user, token);
       setMessage({ type: 'success', text: 'Connexion réussie !' });
-      tokenService.setAuthData(authResponse.data.access_token,user);
-     //console.log(tokenService.getUser());
+      tokenService.setAuthData(token, user);
+      
+      console.log('✅ Token sauvegardé dans localStorage avec la clé "access_token"');
 
       // Redirection vers le dashboard après connexion réussie
       setTimeout(() => {

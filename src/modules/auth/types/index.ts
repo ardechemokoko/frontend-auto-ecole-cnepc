@@ -2,9 +2,20 @@
 export interface User {
   id: string;
   email: string;
-  name: string;
-  role: 'admin' | 'instructor' | 'student';
-  createdAt: Date;
+  name?: string;
+  role: 'admin' | 'instructor' | 'student' | 'candidat' | 'responsable_auto_ecole';
+  createdAt?: Date;
+  created_at?: string;
+  updated_at?: string;
+  personne?: {
+    id: string;
+    nom: string;
+    prenom: string;
+    nom_complet: string;
+    email: string;
+    contact: string;
+    adresse: string;
+  };
 }
 
 export interface LoginCredentials {
