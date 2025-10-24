@@ -3,6 +3,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ROUTES } from '../shared/constants';
 import { useAppStore } from '../store';
+import AppLayout from '../shared/components/AppLayout';
 
 // Import des composants de pages
 import LoginPage from '../modules/auth/forms/LoginForm';
@@ -26,22 +27,30 @@ const AppRoutes: React.FC = () => {
     }),
     // Route de connexion
     React.createElement(Route, { path: ROUTES.LOGIN, element: React.createElement(LoginPage) }),
-    // Routes protégées
+    // Routes protégées avec layout
     React.createElement(Route, { 
       path: ROUTES.DASHBOARD, 
-      element: React.createElement(ProtectedRoute, null, React.createElement(DashboardPage)) 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(DashboardPage))
+      ) 
     }),
     React.createElement(Route, { 
       path: ROUTES.VALIDATION, 
-      element: React.createElement(ProtectedRoute, null, React.createElement(ValidationPage)) 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(ValidationPage))
+      ) 
     }),
     React.createElement(Route, { 
       path: ROUTES.ELEVES + "/*", 
-      element: React.createElement(ProtectedRoute, null, React.createElement(ElevesPage)) 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(ElevesPage))
+      ) 
     }),
     React.createElement(Route, { 
       path: ROUTES.CNEPC, 
-      element: React.createElement(ProtectedRoute, null, React.createElement(CNEPCPage)) 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CNEPCPage))
+      ) 
     }),
     // Route 404
     React.createElement(Route, { 
