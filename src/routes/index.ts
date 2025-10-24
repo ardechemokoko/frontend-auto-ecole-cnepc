@@ -16,6 +16,7 @@ import PageUpdateAutoecole from '../modules/cnepc/forms/updateinfoAutoEcole'
 // Import des pages Settings
 import SettingsPage from '../modules/settings/pages/SettingsPage';
 import UserManagementPage from '../modules/settings/pages/UserManagementPage';
+import CircuitPage from '../modules/circuit/pages/CircuitPage';
 
 // Composant de protection des routes
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -74,6 +75,12 @@ const AppRoutes: React.FC = () => {
       path: ROUTES.USER_MANAGEMENT, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(UserManagementPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.WORKFLOW_CIRCUIT, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CircuitPage))
       ) 
     }),
     // Route 404

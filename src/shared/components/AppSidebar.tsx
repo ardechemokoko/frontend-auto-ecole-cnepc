@@ -43,6 +43,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
   const { user, logout } = useAppStore();
   const [candidatsOpen, setCandidatsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [workflowOpen, setWorkflowOpen] = useState(false);
 
   const menuItems = [
     {
@@ -105,6 +106,25 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
           title: 'Gestion d\'utilisateurs',
           description: 'Créer et gérer les opérateurs'
         }
+      ]
+    },
+    {
+      title: 'Workflow',
+      icon: UserGroupIcon,
+      path: ROUTES.WORKFLOW,
+      description: 'Gestion du workflow',
+      hasSubmenu: true,
+      submenu: [
+        {
+          path: ROUTES.WORKFLOW_CIRCUIT,
+          title: 'Circuits',
+          description: 'Créer et gérer les circuits de validation'
+        },
+        // {
+        //   path: ROUTES.WORKFLOW_CIRCUIT,
+        //   title: 'Statuts',
+        //   description: 'Créer et gérer les status'
+        // },
       ]
     },
   ];
@@ -199,6 +219,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
               const IconComponent = item.icon;
               const isCandidatsItem = item.title === 'Gestion des Candidats';
               const isSettingsItem = item.title === 'Paramètres';
+              const isWorkflowItem = item.title === 'Workflow';
               return (
                 <React.Fragment key={item.path}>
                   <ListItem disablePadding>
@@ -208,7 +229,10 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                           setCandidatsOpen(!candidatsOpen);
                         } else if (isSettingsItem && item.hasSubmenu) {
                           setSettingsOpen(!settingsOpen);
-                        } else {
+                        } else if (isWorkflowItem && item.hasSubmenu) {
+                          setWorkflowOpen(!workflowOpen);
+                        }
+                        else {
                           handleNavigation(item.path);
                         }
                       }}
@@ -245,10 +269,10 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                               color: 'white',
                             }}
                           />
-                          {(isCandidatsItem || isSettingsItem) && item.hasSubmenu && (
+                          {(isCandidatsItem || isSettingsItem || isWorkflowItem) && item.hasSubmenu && (
                             <ChevronDownIcon
                               sx={{
-                                transform: (isCandidatsItem ? candidatsOpen : settingsOpen) ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transform: (isCandidatsItem ? candidatsOpen : (isSettingsItem ? settingsOpen : workflowOpen)) ? 'rotate(180deg)' : 'rotate(0deg)',
                                 transition: 'transform 0.2s ease-in-out',
                               }}
                             />
@@ -300,6 +324,45 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                   {/* Submenu for settings */}
                   {open && isSettingsItem && item.hasSubmenu && (
                     <Collapse in={settingsOpen} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding>
+                        {item.submenu?.map((subItem) => {
+                          const subActive = isActive(subItem.path);
+                          return (
+                            <ListItem key={subItem.path} disablePadding>
+                              <ListItemButton
+                                onClick={() => handleNavigation(subItem.path)}
+                                sx={{
+                                  ml: 4,
+                                  mr: 1,
+                                  borderRadius: 2,
+                                  mb: 0.5,
+                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    color: 'white',
+                                  },
+                                  transition: 'all 0.2s ease-in-out',
+                                }}
+                              >
+                                <ListItemText
+                                  primary={subItem.title}
+                                  primaryTypographyProps={{
+                                    variant: 'body2',
+                                    fontSize: '0.875rem',
+                                  }}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          );
+                        })}
+                      </List>
+                    </Collapse>
+                  )}
+
+                  {/* Submenu for settings */}
+                  {open && isWorkflowItem && item.hasSubmenu && (
+                    <Collapse in={workflowOpen} timeout="auto" unmountOnExit>
                       <List component="div" disablePadding>
                         {item.submenu?.map((subItem) => {
                           const subActive = isActive(subItem.path);

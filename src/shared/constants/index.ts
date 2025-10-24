@@ -8,6 +8,8 @@ export const ROUTES = {
   UPDATE: '/updateinfo',
   SETTINGS: '/settings',
   USER_MANAGEMENT: '/settings/users',
+  WORKFLOW: '/workflow',
+  WORKFLOW_CIRCUIT: '/workflow/circuits',
 } as const;
 
 export const STATUS = {
