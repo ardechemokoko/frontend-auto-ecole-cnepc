@@ -1,238 +1,240 @@
-// Service de gestion des demandes d'inscription avec mocks
-import { DemandeInscription, NouvelleDemande, FiltresDemandes, StatistiquesDemandes } from '../types/inscription';
-import ValidationService from './validationService';
+// Service de gestion des demandes d'inscription - API réelle
+import { DemandeInscription, FiltresDemandes, StatistiquesDemandes } from '../types/inscription';
+import axiosClient from '../../../shared/environment/envdev';
 
-// Mock des demandes d'inscription
-const mockDemandes: DemandeInscription[] = [
-  {
-    id: '1',
-    numero: 'INS-2024-001',
+/**
+ * Mapper les données de l'API vers le format DemandeInscription
+ */
+function mapDossierToDemandeInscription(dossier: any): DemandeInscription {
+  return {
+    id: dossier.id,
+    numero: dossier.candidat?.numero_candidat || 'N/A',
     eleve: {
-      firstName: 'Marie',
-      lastName: 'Dupont',
-      email: 'marie.dupont@email.com',
-      phone: '0612345678',
-      address: '123 Rue de la Paix, 75001 Paris',
-      birthDate: '1990-05-15',
-      nationality: 'Gabonaise',
-      lieuNaissance: 'Libreville',
+      firstName: dossier.candidat?.personne?.prenom || '',
+      lastName: dossier.candidat?.personne?.nom || '',
+      email: dossier.candidat?.personne?.email || '',
+      phone: dossier.candidat?.personne?.contact || '',
+      address: dossier.candidat?.personne?.adresse || '',
+      birthDate: dossier.candidat?.date_naissance || '',
+      nationality: dossier.candidat?.nationalite || '',
+      lieuNaissance: dossier.candidat?.lieu_naissance || '',
       nationaliteEtrangere: ''
     },
     autoEcole: {
-      id: '2',
-      name: 'Auto-École du Centre',
-      email: 'autoecole.centre@email.com'
+      id: dossier.auto_ecole_id || '',
+      name: dossier.formation?.autoEcole?.nom_auto_ecole || 'Auto-École',
+      email: dossier.formation?.autoEcole?.email || ''
     },
-    dateDemande: '2024-01-15T09:30:00Z',
-    statut: 'en_attente',
-    documents: [
-      {
-        id: '1',
-        type: 'carte_identite',
-        nom: 'Carte d\'identité recto',
-        url: '/documents/carte-identite-1.pdf',
-        taille: '2.5 MB',
-        dateUpload: '2024-01-15T09:30:00Z',
-        statut: 'en_attente'
-      },
-      {
-        id: '2',
-        type: 'photo',
-        nom: 'Photo d\'identité',
-        url: '/documents/photo-1.jpg',
-        taille: '1.2 MB',
-        dateUpload: '2024-01-15T09:35:00Z',
-        statut: 'en_attente'
-      }
-    ],
-    commentaires: 'Demande d\'inscription pour permis B'
-  },
-  {
-    id: '2',
-    numero: 'INS-2024-002',
-    eleve: {
-      firstName: 'Jean',
-      lastName: 'Ngoma',
-      email: 'jean.ngoma@email.com',
-      phone: '0698765432',
-      address: '456 Avenue des Champs, 75008 Paris',
-      birthDate: '1988-12-03',
-      nationality: 'Étrangère',
-      lieuNaissance: 'Douala',
-      nationaliteEtrangere: 'Camerounaise'
-    },
-    autoEcole: {
-      id: '3',
-      name: 'Auto-École du Nord',
-      email: 'autoecole.nord@email.com'
-    },
-    dateDemande: '2024-01-16T14:20:00Z',
-    statut: 'en_cours',
-    documents: [
-      {
-        id: '3',
-        type: 'carte_identite',
-        nom: 'Carte d\'identité',
-        url: '/documents/carte-identite-2.pdf',
-        taille: '2.1 MB',
-        dateUpload: '2024-01-16T14:20:00Z',
-        statut: 'valide'
-      },
-      {
-        id: '4',
-        type: 'certificat_medical',
-        nom: 'Certificat médical',
-        url: '/documents/certificat-2.pdf',
-        taille: '1.8 MB',
-        dateUpload: '2024-01-16T14:25:00Z',
-        statut: 'valide'
-      }
-    ],
-    traiteePar: 'admin@dgtt.com',
-    dateTraitement: '2024-01-17T10:00:00Z'
+    dateDemande: dossier.date_creation || dossier.created_at,
+    statut: dossier.statut,
+    documents: (dossier.documents || []).map((doc: any) => ({
+      id: doc.id,
+      type: doc.type || 'autre',
+      nom: doc.nom || doc.nom_fichier || 'Document',
+      url: doc.chemin_fichier || '',
+      taille: doc.taille_fichier ? `${(doc.taille_fichier / 1024 / 1024).toFixed(1)} MB` : 'N/A',
+      dateUpload: doc.date_upload || doc.created_at,
+      statut: doc.statut || 'en_attente'
+    })),
+    commentaires: dossier.commentaires || '',
+    traiteePar: dossier.traite_par,
+    dateTraitement: dossier.date_modification
+  };
+}
+
+/**
+ * Récupérer tous les dossiers de l'auto-école connectée
+ * Endpoint: GET /api/auto-ecoles/mes-dossiers
+ */
+export async function getDemandesInscription(filtres?: FiltresDemandes): Promise<DemandeInscription[]> {
+  try {
+    console.log('📋 Récupération des dossiers de l\'auto-école...', filtres);
+    
+    // Construire les paramètres de requête
+    const params: any = {};
+    if (filtres?.statut) {
+      params.statut = filtres.statut;
+    }
+    
+    const response = await axiosClient.get('/auto-ecoles/mes-dossiers', { params });
+    
+    console.log('✅ Dossiers récupérés:', {
+      total: response.data.dossiers?.length || 0,
+      auto_ecole: response.data.auto_ecole?.nom_auto_ecole
+    });
+    
+    if (!response.data.success) {
+      throw new Error(response.data.message || 'Erreur lors de la récupération des dossiers');
+    }
+    
+    // Mapper les dossiers vers le format DemandeInscription
+    let demandes = (response.data.dossiers || []).map(mapDossierToDemandeInscription);
+    
+    // Filtrer côté client si nécessaire
+    if (filtres?.recherche) {
+      const recherche = filtres.recherche.toLowerCase();
+      demandes = demandes.filter((d: DemandeInscription) => 
+        d.eleve.firstName.toLowerCase().includes(recherche) ||
+        d.eleve.lastName.toLowerCase().includes(recherche) ||
+        d.eleve.email.toLowerCase().includes(recherche) ||
+        d.numero.toLowerCase().includes(recherche)
+      );
+    }
+    
+    return demandes;
+  } catch (error: any) {
+    console.error('❌ Erreur lors de la récupération des dossiers:', error);
+    
+    if (error.response) {
+      console.error('Statut:', error.response.status);
+      console.error('Message:', error.response.data?.message);
+    }
+    
+    throw new Error(error.response?.data?.message || error.message || 'Erreur lors de la récupération des dossiers');
   }
-];
+}
 
-// Mock de la récupération des demandes d'inscription
-export async function getDemandesInscriptionMock(filtres?: FiltresDemandes): Promise<DemandeInscription[]> {
-  return new Promise(async (resolve) => {
-    setTimeout(async () => {
-      // Récupérer les demandes validées pour les exclure
-      const demandesValidees = await ValidationService.getDemandesValidees();
-      
-      // Filtrer les demandes non validées
-      let demandes = mockDemandes.filter(d => !demandesValidees.includes(d.id));
-      
-      if (filtres) {
-        if (filtres.statut) {
-          demandes = demandes.filter(d => d.statut === filtres.statut);
-        }
-        if (filtres.autoEcole) {
-          demandes = demandes.filter(d => d.autoEcole.id === filtres.autoEcole);
-        }
-        if (filtres.recherche) {
-          const recherche = filtres.recherche.toLowerCase();
-          demandes = demandes.filter(d => 
-            d.eleve.firstName.toLowerCase().includes(recherche) ||
-            d.eleve.lastName.toLowerCase().includes(recherche) ||
-            d.eleve.email.toLowerCase().includes(recherche) ||
-            d.numero.toLowerCase().includes(recherche)
-          );
-        }
+// Alias pour compatibilité
+export const getDemandesInscriptionMock = getDemandesInscription;
+
+/**
+ * Récupérer un dossier spécifique par son ID
+ * Endpoint: GET /api/dossiers/{id}
+ */
+export async function getDemandeById(id: string): Promise<DemandeInscription> {
+  try {
+    console.log('🔍 Récupération du dossier:', id);
+    
+    const response = await axiosClient.get(`/dossiers/${id}`);
+    
+    if (!response.data.success) {
+      throw new Error(response.data.message || 'Dossier non trouvé');
+    }
+    
+    console.log('✅ Dossier récupéré:', response.data.data.id);
+    
+    return mapDossierToDemandeInscription(response.data.data);
+  } catch (error: any) {
+    console.error('❌ Erreur lors de la récupération du dossier:', error);
+    throw new Error(error.response?.data?.message || 'Dossier non trouvé');
+  }
+}
+
+// Alias pour compatibilité
+export const getDemandeByIdMock = getDemandeById;
+
+/**
+ * NOTE: La création de dossiers se fait maintenant via NouvelleDemandeForm.tsx
+ * qui utilise directement candidatService pour le flux complet
+ */
+
+/**
+ * Mettre à jour le statut d'un dossier
+ * Endpoint: PUT /api/dossiers/{id}
+ */
+export async function mettreAJourStatutDemande(
+  id: string, 
+  statut: string, 
+  commentaires?: string
+): Promise<DemandeInscription> {
+  try {
+    console.log('📝 Mise à jour du statut du dossier:', { id, statut });
+    
+    const response = await axiosClient.put(`/dossiers/${id}`, {
+      statut,
+      commentaires
+    });
+    
+    if (!response.data.success) {
+      throw new Error(response.data.message || 'Erreur lors de la mise à jour');
+    }
+    
+    console.log('✅ Statut mis à jour');
+    
+    return mapDossierToDemandeInscription(response.data.data);
+  } catch (error: any) {
+    console.error('❌ Erreur lors de la mise à jour:', error);
+    throw new Error(error.response?.data?.message || 'Erreur lors de la mise à jour du dossier');
+  }
+}
+
+// Alias pour compatibilité
+export const mettreAJourStatutDemandeMock = mettreAJourStatutDemande;
+
+/**
+ * Récupérer les statistiques des dossiers de l'auto-école
+ * Utilise les données de GET /api/auto-ecoles/mes-dossiers
+ */
+export async function getStatistiquesDemandes(): Promise<StatistiquesDemandes> {
+  try {
+    console.log('📊 Récupération des statistiques...');
+    
+    const response = await axiosClient.get('/auto-ecoles/mes-dossiers');
+    
+    if (!response.data.success) {
+      throw new Error(response.data.message || 'Erreur lors de la récupération des statistiques');
+    }
+    
+    const statistiques = response.data.statistiques || {
+      total: 0,
+      en_attente: 0,
+      en_cours: 0,
+      valide: 0,
+      rejete: 0
+    };
+    
+    const stats: StatistiquesDemandes = {
+      total: statistiques.total,
+      enAttente: statistiques.en_attente,
+      enCours: statistiques.en_cours,
+      validees: statistiques.valide,
+      rejetees: statistiques.rejete,
+      parAutoEcole: {
+        [response.data.auto_ecole?.nom_auto_ecole || 'Auto-École']: statistiques.total
       }
-      
-      resolve(demandes);
-    }, 600);
-  });
+    };
+    
+    console.log('✅ Statistiques récupérées:', stats);
+    
+    return stats;
+  } catch (error: any) {
+    console.error('❌ Erreur lors de la récupération des statistiques:', error);
+    
+    // Retourner des statistiques vides en cas d'erreur
+    return {
+      total: 0,
+      enAttente: 0,
+      enCours: 0,
+      validees: 0,
+      rejetees: 0,
+      parAutoEcole: {}
+    };
+  }
 }
 
-// Mock de la récupération d'une demande par ID
-export async function getDemandeByIdMock(id: string): Promise<DemandeInscription> {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const demande = mockDemandes.find(d => d.id === id);
-      if (demande) {
-        resolve(demande);
-      } else {
-        reject(new Error('Demande d\'inscription non trouvée'));
-      }
-    }, 300);
-  });
+// Alias pour compatibilité
+export const getStatistiquesDemandesMock = getStatistiquesDemandes;
+
+/**
+ * Supprimer un dossier
+ * Endpoint: DELETE /api/dossiers/{id}
+ */
+export async function supprimerDemande(id: string): Promise<void> {
+  try {
+    console.log('🗑️ Suppression du dossier:', id);
+    
+    const response = await axiosClient.delete(`/dossiers/${id}`);
+    
+    if (!response.data.success) {
+      throw new Error(response.data.message || 'Erreur lors de la suppression');
+    }
+    
+    console.log('✅ Dossier supprimé');
+  } catch (error: any) {
+    console.error('❌ Erreur lors de la suppression:', error);
+    throw new Error(error.response?.data?.message || 'Erreur lors de la suppression du dossier');
+  }
 }
 
-// Mock de la création d'une nouvelle demande
-export async function creerDemandeInscriptionMock(nouvelleDemande: NouvelleDemande): Promise<DemandeInscription> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const nouvelleDemandeInscription: DemandeInscription = {
-        id: (mockDemandes.length + 1).toString(),
-        numero: `INS-2024-${String(mockDemandes.length + 1).padStart(3, '0')}`,
-        eleve: nouvelleDemande.eleve,
-        autoEcole: {
-          id: '2', // Mock auto-école connectée
-          name: 'Auto-École du Centre',
-          email: 'autoecole.centre@email.com'
-        },
-        dateDemande: new Date().toISOString(),
-        statut: 'en_attente',
-        documents: nouvelleDemande.documents.map((file, index) => ({
-          id: (index + 1).toString(),
-          type: 'carte_identite' as any, // Mock type
-          nom: file.name,
-          url: `/documents/${file.name}`,
-          taille: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
-          dateUpload: new Date().toISOString(),
-          statut: 'en_attente' as any
-        })),
-        commentaires: nouvelleDemande.commentaires
-      };
-      
-      mockDemandes.push(nouvelleDemandeInscription);
-      resolve(nouvelleDemandeInscription);
-    }, 800);
-  });
-}
-
-// Mock de la mise à jour du statut d'une demande
-export async function mettreAJourStatutDemandeMock(id: string, statut: string, commentaires?: string): Promise<DemandeInscription> {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const demande = mockDemandes.find(d => d.id === id);
-      if (demande) {
-        demande.statut = statut as any;
-        demande.commentaires = commentaires;
-        demande.traiteePar = 'admin@dgtt.com';
-        demande.dateTraitement = new Date().toISOString();
-        resolve(demande);
-      } else {
-        reject(new Error('Demande d\'inscription non trouvée'));
-      }
-    }, 500);
-  });
-}
-
-// Mock de la récupération des statistiques
-export async function getStatistiquesDemandesMock(): Promise<StatistiquesDemandes> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const stats: StatistiquesDemandes = {
-        total: mockDemandes.length,
-        enAttente: mockDemandes.filter(d => d.statut === 'en_attente').length,
-        enCours: mockDemandes.filter(d => d.statut === 'en_cours').length,
-        validees: mockDemandes.filter(d => d.statut === 'validee').length,
-        rejetees: mockDemandes.filter(d => d.statut === 'rejetee').length,
-        parAutoEcole: mockDemandes.reduce((acc, d) => {
-          acc[d.autoEcole.name] = (acc[d.autoEcole.name] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>)
-      };
-      resolve(stats);
-    }, 400);
-  });
-}
-
-// Mock de la suppression d'une demande
-export async function supprimerDemandeMock(id: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const index = mockDemandes.findIndex(d => d.id === id);
-      if (index !== -1) {
-        mockDemandes.splice(index, 1);
-        resolve();
-      } else {
-        reject(new Error('Demande d\'inscription non trouvée'));
-      }
-    }, 400);
-  });
-}
-
-// Version API future (préparée mais commentée)
-// export async function getDemandesInscription(filtres?: FiltresDemandes): Promise<DemandeInscription[]> {
-//   const { data } = await apiClient.get('/demandes-inscription', { params: filtres });
-//   return data;
-// }
-
-// export async function creerDemandeInscription(nouvelleDemande: NouvelleDemande): Promise<DemandeInscription> {
-//   const { data } = await apiClient.post('/demandes-inscription', nouvelleDemande);
-//   return data;
-// }
+// Alias pour compatibilité
+export const supprimerDemandeMock = supprimerDemande;
