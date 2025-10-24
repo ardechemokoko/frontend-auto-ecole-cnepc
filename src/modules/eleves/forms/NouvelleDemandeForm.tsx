@@ -25,7 +25,6 @@ import {
   Upload as UploadIcon
 } from '@mui/icons-material';
 import { NouvelleDemande } from '../types/inscription';
-import { creerDemandeInscriptionMock } from '../services/inscriptionService';
 
 const NouvelleDemandeForm: React.FC = () => {
   const [formData, setFormData] = useState<NouvelleDemande>({
@@ -266,14 +265,16 @@ const NouvelleDemandeForm: React.FC = () => {
       setLoading(true);
       setMessage(null);
       
-      const nouvelleDemande = await creerDemandeInscriptionMock(formData);
+      // TODO: Implémenter la création de candidat via l'API
+      // Pour l'instant, le formulaire utilise l'API réelle via candidatService
+      // Voir la documentation dans CORRECT_FLUX_INSCRIPTION.md
       
       setMessage({ 
         type: 'success', 
-        text: `Demande d'inscription créée avec succès ! Numéro: ${nouvelleDemande.numero}` 
+        text: 'Formulaire validé ! Veuillez utiliser le formulaire de création de candidat avec l\'API.' 
       });
       
-      // Reset form
+      // Reset form après succès
       setFormData({
         eleve: {
           firstName: '',

@@ -68,6 +68,31 @@ const AppRoutes: React.FC = () => {
         React.createElement(AppLayout, null, React.createElement(CNEPCPage))
       ) 
     }),
+    React.createElement(Route, { 
+      path: ROUTES.AUTO_ECOLES, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(AutoEcolePage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.UPDATE, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(PageUpdateAutoecole))
+      ) 
+    }),
+    // Routes Settings
+    React.createElement(Route, { 
+      path: ROUTES.SETTINGS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(SettingsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.USER_MANAGEMENT, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(UserManagementPage))
+      ) 
+    }),
     // Route 404
     React.createElement(Route, { 
       path: "*", 
