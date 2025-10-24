@@ -21,12 +21,12 @@ import {
   People as UserGroupIcon,
   CheckCircle as CheckCircleIcon,
   Send as PaperAirplaneIcon,
-  Business as BuildingOffice2Icon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
-  Notifications as BellIcon,
   Logout as ArrowRightOnRectangleIcon,
   ExpandMore as ChevronDownIcon,
+  Settings as SettingsIcon,
+  Person as PersonIcon,
 } from '@mui/icons-material';
 import { ROUTES } from '../constants';
 import tokenService from '../../modules/auth/services/tokenService';
@@ -42,6 +42,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
   const location = useLocation();
   const { user, logout } = useAppStore();
   const [candidatsOpen, setCandidatsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const menuItems = [
     {
@@ -52,7 +53,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
     },
     {
       title: 'Modifier Vos informations personnelles',
-      icon: HomeIcon,
+      icon: PersonIcon,
       path: ROUTES.UPDATE,
       description: 'modifier les informations de l\' auto-école'
     },
@@ -92,10 +93,28 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       path: ROUTES.CNEPC,
       description: 'Transmettre les dossiers validés au CNEPC'
     },
+    {
+      title: 'Paramètres',
+      icon: SettingsIcon,
+      path: ROUTES.SETTINGS,
+      description: 'Configuration et gestion du système',
+      hasSubmenu: true,
+      submenu: [
+        {
+          path: ROUTES.USER_MANAGEMENT,
+          title: 'Gestion d\'utilisateurs',
+          description: 'Créer et gérer les opérateurs'
+        }
+      ]
+    },
   ];
 
   const handleNavigation = (path: string) => {
     navigate(path);
+    // Ne pas fermer la sidebar sur desktop
+    if (isMobile) {
+      // Sur mobile, on peut laisser la sidebar se fermer
+    }
   };
 
   const handleLogout = () => {
@@ -176,11 +195,10 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
         {/* Navigation */}
         <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
           <List sx={{ px: 1, py: 2 }}>
-            {menuItems.map((item, index) => {
+            {menuItems.map((item) => {
               const IconComponent = item.icon;
-              const active = isActive(item.path);
               const isCandidatsItem = item.title === 'Gestion des Candidats';
-
+              const isSettingsItem = item.title === 'Paramètres';
               return (
                 <React.Fragment key={item.path}>
                   <ListItem disablePadding>
@@ -188,6 +206,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                       onClick={() => {
                         if (isCandidatsItem && item.hasSubmenu) {
                           setCandidatsOpen(!candidatsOpen);
+                        } else if (isSettingsItem && item.hasSubmenu) {
+                          setSettingsOpen(!settingsOpen);
                         } else {
                           handleNavigation(item.path);
                         }
@@ -196,11 +216,11 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                         mx: 1,
                         borderRadius: 2,
                         mb: 0.5,
-                        backgroundColor: active ? 'rgba(255, 255, 255, 0.3)' : 'transparent',
-                        borderLeft: active ? '4px solid white' : 'none',
+                        backgroundColor: isActive(item.path) ? 'rgba(255, 255, 255, 0.3)' : 'transparent',
+                        borderLeft: isActive(item.path) ? '4px solid white' : 'none',
                         color: 'white',
                         '&:hover': {
-                          backgroundColor: active ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.2)',
+                          backgroundColor: isActive(item.path) ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.2)',
                         },
                         transition: 'all 0.2s ease-in-out',
                       }}
@@ -221,14 +241,14 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                             primary={item.title}
                             primaryTypographyProps={{
                               variant: 'body2',
-                              fontWeight: active ? 'medium' : 'normal',
+                              fontWeight: isActive(item.path) ? 'medium' : 'normal',
                               color: 'white',
                             }}
                           />
-                          {isCandidatsItem && item.hasSubmenu && (
+                          {(isCandidatsItem || isSettingsItem) && item.hasSubmenu && (
                             <ChevronDownIcon
                               sx={{
-                                transform: candidatsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transform: (isCandidatsItem ? candidatsOpen : settingsOpen) ? 'rotate(180deg)' : 'rotate(0deg)',
                                 transition: 'transform 0.2s ease-in-out',
                               }}
                             />
@@ -241,6 +261,45 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                   {/* Submenu for candidats */}
                   {open && isCandidatsItem && item.hasSubmenu && (
                     <Collapse in={candidatsOpen} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding>
+                        {item.submenu?.map((subItem) => {
+                          const subActive = isActive(subItem.path);
+                          return (
+                            <ListItem key={subItem.path} disablePadding>
+                              <ListItemButton
+                                onClick={() => handleNavigation(subItem.path)}
+                                sx={{
+                                  ml: 4,
+                                  mr: 1,
+                                  borderRadius: 2,
+                                  mb: 0.5,
+                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    color: 'white',
+                                  },
+                                  transition: 'all 0.2s ease-in-out',
+                                }}
+                              >
+                                <ListItemText
+                                  primary={subItem.title}
+                                  primaryTypographyProps={{
+                                    variant: 'body2',
+                                    fontSize: '0.875rem',
+                                  }}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          );
+                        })}
+                      </List>
+                    </Collapse>
+                  )}
+
+                  {/* Submenu for settings */}
+                  {open && isSettingsItem && item.hasSubmenu && (
+                    <Collapse in={settingsOpen} timeout="auto" unmountOnExit>
                       <List component="div" disablePadding>
                         {item.submenu?.map((subItem) => {
                           const subActive = isActive(subItem.path);
@@ -350,7 +409,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                   primary="Déconnexion"
                   secondary="Se déconnecter"
                   primaryTypographyProps={{ variant: 'body2', fontWeight: 'bold', color: 'white' }}
-                  secondaryTypographyProps={{ variant: 'caption', color: 'white', opacity: 0.8 }}
+                  secondaryTypographyProps={{ variant: 'caption', color: 'rgba(255, 255, 255, 0.8)' }}
                 />
               )}
             </ListItemButton>
@@ -398,7 +457,6 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', py: 1 }}>
             {menuItems.map((item) => {
               const IconComponent = item.icon;
-              const active = isActive(item.path);
               return (
                 <IconButton
                   key={item.path}
