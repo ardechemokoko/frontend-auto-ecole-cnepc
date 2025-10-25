@@ -8,6 +8,7 @@ export const ROUTES = {
   AUTO_ECOLES: '/auto-ecoles',
   UPDATE: '/updateinfo',
   REF: '/referenciel',
+  CPW: '/change-password',
 } as const;
 
 export const STATUS = {

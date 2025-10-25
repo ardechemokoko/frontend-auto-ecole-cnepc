@@ -34,13 +34,32 @@ export class ReferentielService {
       throw new Error(`Erreur de savegarde: ${error.message}`);
     }
   }
-    async deleteReferentiels(referentiel: Referentiel): Promise<void> {
+  async deleteReferentiels(referentiel: Referentiel): Promise<void> {
     try {
-      return await axiosClient.delete("referentiels/"+referentiel.id, );
+      return await axiosClient.delete("referentiels/" + referentiel.id,);
     } catch (error: any) {
       throw new Error(`Erreur de savegarde: ${error.message}`);
     }
   }
+  async updateReferentiels(referentiel: Referentiel): Promise<Referentiel> {
+    try {
+      return await axiosClient.put("referentiels/"+referentiel.id, {
+        "libelle": referentiel.libelle,
+        "description": referentiel.description,
+        "statut": true
+      });
+    } catch (error: any) {
+      throw new Error(`Erreur de savegarde: ${error.message}`);
+    }
+  }
+  //   async deleteReferentiels(referentiel: Referentiel): Promise<void> {
+  //   try {
+  //     return await axiosClient.delete("referentiels/"+referentiel.id, );
+  //   } catch (error: any) {
+  //     throw new Error(`Erreur de savegarde: ${error.message}`);
+  //   }
+  // }
+
 }
 
 

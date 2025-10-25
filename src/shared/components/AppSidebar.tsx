@@ -30,6 +30,7 @@ import {
   Settings as SettingsIcon,
   Person as PersonIcon,
   School as SchoolIcon,
+  Password,
 } from '@mui/icons-material';
 import { ROUTES } from '../constants';
 import tokenService from '../../modules/auth/services/tokenService';
@@ -60,11 +61,17 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       path: ROUTES.UPDATE,
       description: 'modifier les informations de l\' auto-école'
     },
-        {
+    {
       title: 'Referenciel',
       icon: Ref,
       path: ROUTES.REF,
       description: 'reference de l\' auto-école'
+    },
+    {
+      title: 'Change mot de passe',
+      icon: Password,
+      path: ROUTES.CPW,
+      description: 'changement de mot de passe'
     },
     {
       title: 'Gestion des Candidats',

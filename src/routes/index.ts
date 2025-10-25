@@ -13,6 +13,9 @@ import ElevesPage from './ElevesPage';
 import CNEPCPage from './CNEPCPage';
 import PageUpdateAutoecole from '../modules/cnepc/forms/updateinfoAutoEcole'
 import PageReferenciel from '../modules/cnepc/forms/referentiel';
+import AutoEcolePage from './AutoEcolePage';
+import { SettingsPage, UserManagementPage } from '../modules/settings';
+import PageChangePassWord from '../modules/cnepc/forms/changePassword';
 
 // Composant de protection des routes
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -80,19 +83,26 @@ const AppRoutes: React.FC = () => {
         React.createElement(AppLayout, null, React.createElement(PageUpdateAutoecole))
       ) 
     }),
+        // Routes changement de mot de passe
+    React.createElement(Route, { 
+      path: ROUTES.CPW, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(PageChangePassWord))
+      ) 
+    }),
     // Routes Settings
-    React.createElement(Route, { 
-      path: ROUTES.SETTINGS, 
-      element: React.createElement(ProtectedRoute, null, 
-        React.createElement(AppLayout, null, React.createElement(SettingsPage))
-      ) 
-    }),
-    React.createElement(Route, { 
-      path: ROUTES.USER_MANAGEMENT, 
-      element: React.createElement(ProtectedRoute, null, 
-        React.createElement(AppLayout, null, React.createElement(UserManagementPage))
-      ) 
-    }),
+    // React.createElement(Route, { 
+    //   path: ROUTES.SETTINGS, 
+    //   element: React.createElement(ProtectedRoute, null, 
+    //     React.createElement(AppLayout, null, React.createElement(SettingsPage))
+    //   ) 
+    // }),
+    // React.createElement(Route, { 
+    //   path: ROUTES.USER_MANAGEMENT, 
+    //   element: React.createElement(ProtectedRoute, null, 
+    //     React.createElement(AppLayout, null, React.createElement(UserManagementPage))
+    //   ) 
+    // }),
     // Route 404
     React.createElement(Route, { 
       path: "*", 

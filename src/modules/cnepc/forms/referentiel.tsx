@@ -55,9 +55,10 @@ import {
 const PageReferenciel: React.FC = () => {
   const [referentiels, setReferentiels] = useState<Referentiel[]>([]);
   const [statut, setStatut] = useState<boolean>(true);
-   const [update, setUpdate] = useState<boolean>(true);
+  const [update, setUpdate] = useState<boolean>(true);
   const [errors, setErrors] = useState<Partial<ReferentielFormulaire>>({});
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [updatData, setUpdateFormData] = useState<Referentiel>({ id: 0, code: '', libelle: '', statut: true, type_ref: '', description: '' });
 
   const [formData, setFormData] = useState<ReferentielFormulaire>({ code: '', libelle: '', statut: true, type_ref: '', description: '' });
   useEffect(() => {
@@ -92,36 +93,56 @@ const PageReferenciel: React.FC = () => {
   function onViewreferentiel(referentiel: Referentiel): void {
     setFormData({ code: referentiel.code, libelle: referentiel.libelle, statut: true, type_ref: referentiel.type_ref, description: referentiel.description })
     showFormulaire();
-
+    setUpdateFormData(referentiel)
     setUpdate(true)
   }
 
   function showFormulaire(): void {
     setStatut((prev) => !prev);
-  
+
   }
 
   const creationDeRef = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
-      const res = await referentielService.saveReferentiels({
+      // const res = await referentielService.saveReferentiels({
+      //   libelle: formData.libelle,
+      //   code: formData.code,
+      //   type_ref: formData.type_ref,
+      //   description: formData.description,
+      //   statut: true,
+      // })
+      // if (res) {
+      //   // showFormulaire()
+      //   getReferentiel();
+      //   setFormData({ code: '', libelle: '', statut: true, type_ref: '', description: '' })
+      //   setMessage({ type: 'success', text: 'Sauvegarde réussie !' });
+
+      //   setTimeout(() => {
+      //     showFormulaire()
+      //   }, 100);
+      // }
+      console.log(formData)
+      const resUpdate = await referentielService.updateReferentiels({
+        code: updatData.code,
+        id: updatData.id,
         libelle: formData.libelle,
-        code: formData.code,
-        type_ref: formData.type_ref,
-        description: formData.description,
-        statut: true,
+        statut: updatData.statut,
+        type_ref: updatData.type_ref,
+        description: formData.description
+
       })
-      if (res) {
+      console.log(resUpdate)
+       if (resUpdate) {
         // showFormulaire()
         getReferentiel();
-        setFormData({ code: '', libelle: '', statut: true, type_ref: '', description: '' })
-        setMessage({ type: 'success', text: 'Sauvegarde réussie !' });
+        setUpdateFormData({id:0, code: '', libelle: '', statut: true, type_ref: '', description: '' })
+        setMessage({ type: 'success', text: 'Modification réussie !' });
 
         setTimeout(() => {
           showFormulaire()
         }, 100);
       }
-
     } catch (e) {
       console.log(e)
     }
@@ -332,7 +353,7 @@ const PageReferenciel: React.FC = () => {
                   py: { xs: 1.5, sm: 2 }
                 }}
               >
-            {  update ? "Modifier Referentiel":"Creation de Referentiel"}
+                {update ? "Modifier Referentiel" : "Creation de Referentiel"}
               </Button>
             </Box>
           </form>

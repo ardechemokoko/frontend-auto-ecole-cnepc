@@ -29,11 +29,11 @@ const LoginForm: React.FC = () => {
   // Afficher le loader pendant la vérification de l'authentification
   if (isLoading && !isAuthenticated) {
     return (
-      <Box 
-        sx={{ 
-          minHeight: '100vh', 
-          display: 'flex', 
-          alignItems: 'center', 
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: '#f5f5f5'
         }}
@@ -50,19 +50,19 @@ const LoginForm: React.FC = () => {
 
   const validateForm = (): boolean => {
     const newErrors: Partial<LoginFormData> = {};
-    
+
     if (!formData.email) {
       newErrors.email = 'L\'email est requis';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email invalide';
     }
-    
+
     if (!formData.password) {
       newErrors.password = 'Le mot de passe est requis';
     } else if (formData.password.length < 6) {
       newErrors.password = 'Le mot de passe doit contenir au moins 6 caractères';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -77,7 +77,7 @@ const LoginForm: React.FC = () => {
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -85,39 +85,17 @@ const LoginForm: React.FC = () => {
     try {
       setLoading(true);
       setMessage(null);
-      
+
       // Utilisation du service mocké
       const authResponse = await authService.login({
         email: formData.email,
         password: formData.password,
       });
-      
-      // 🔍 DÉBOGAGE : Vérifier le token reçu du backend
-      console.log('🎫 RÉPONSE D\'AUTHENTIFICATION:', {
-        success: authResponse.data.success,
-        token_type: authResponse.data.token_type,
-        expires_in: authResponse.data.expires_in,
-        access_token_preview: authResponse.data.access_token?.substring(0, 50) + '...',
-        access_token_length: authResponse.data.access_token?.length,
-        access_token_parts: authResponse.data.access_token?.split('.').length,
-        user_id: authResponse.data.user?.id,
-        user_email: authResponse.data.user?.email,
-        user_role: authResponse.data.user?.role
-      });
-      
+
+      console.log(authResponse);
+
       // Vérifier si le token est bien un JWT
       const token = authResponse.data.access_token;
-      if (!token) {
-        throw new Error('❌ Aucun token reçu du backend !');
-      }
-      
-      if (token.split('.').length !== 3) {
-        console.error('❌ ATTENTION : Le token reçu n\'est PAS un JWT standard !');
-        console.error('Token reçu:', token.substring(0, 100));
-        console.error('Format attendu: header.payload.signature (3 parties)');
-        console.error('Format reçu:', token.split('.').length, 'parties');
-      }
-      
       // Conversion du type pour correspondre au store
       const user: User = {
         id: authResponse.data.user.id,
@@ -126,11 +104,11 @@ const LoginForm: React.FC = () => {
         role: authResponse.data.user.role,
         createdAt: authResponse.data.user.created_at,
       };
-      
+
       login(user, token);
       setMessage({ type: 'success', text: 'Connexion réussie !' });
       tokenService.setAuthData(token, user);
-      
+
       console.log('✅ Token sauvegardé dans localStorage avec la clé "access_token"');
 
       // Redirection vers le dashboard après connexion réussie
@@ -145,17 +123,17 @@ const LoginForm: React.FC = () => {
   };
 
   return (
-    <Box 
-      sx={{ 
-        minHeight: '100vh', 
+    <Box
+      sx={{
+        minHeight: '100vh',
         display: 'flex',
         flexDirection: { xs: 'column', lg: 'row' },
         backgroundColor: '#f5f5f5'
       }}
     >
       {/* Section gauche - Présentation */}
-      <Box 
-        sx={{ 
+      <Box
+        sx={{
           flex: { xs: 'none', lg: 1 },
           height: { xs: '40vh', lg: 'auto' },
           display: 'flex',
@@ -168,60 +146,60 @@ const LoginForm: React.FC = () => {
           position: 'relative'
         }}
       >
-        <Box sx={{ 
-          textAlign: 'center', 
+        <Box sx={{
+          textAlign: 'center',
           maxWidth: { xs: '100%', sm: 500 },
           px: { xs: 2, sm: 0 }
         }}>
           {/* Images officielles */}
-          <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
+          <Box sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
             gap: { xs: 2, sm: 3, md: 4 },
             mb: { xs: 2, sm: 3 },
             flexWrap: 'wrap'
           }}>
-            <Box sx={{ 
+            <Box sx={{
               width: { xs: 60, sm: 80, md: 100 },
               height: { xs: 60, sm: 80, md: 100 },
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <img 
-                src="/src/assets/img/blason.png" 
-                alt="Blason du Gabon" 
-                style={{ 
-                  width: '100%', 
-                  height: '100%', 
-                  objectFit: 'contain' 
+              <img
+                src="/src/assets/img/blason.png"
+                alt="Blason du Gabon"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain'
                 }}
               />
             </Box>
-            <Box sx={{ 
+            <Box sx={{
               width: { xs: 60, sm: 80, md: 100 },
               height: { xs: 60, sm: 80, md: 100 },
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <img 
-                src="/src/assets/img/mtt.png" 
-                alt="Ministère des Transports" 
-                style={{ 
-                  width: '100%', 
-                  height: '100%', 
-                  objectFit: 'contain' 
+              <img
+                src="/src/assets/img/mtt.png"
+                alt="Ministère des Transports"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain'
                 }}
               />
             </Box>
           </Box>
-          
-          <Typography 
-            variant="h2" 
-            component="h1" 
-            sx={{ 
+
+          <Typography
+            variant="h2"
+            component="h1"
+            sx={{
               mb: { xs: 2, sm: 3 },
               fontWeight: 'bold',
               fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem', lg: '3rem' }
@@ -230,10 +208,10 @@ const LoginForm: React.FC = () => {
           >
             Portail Auto-École
           </Typography>
-          
-          <Typography 
-            variant="h5" 
-            sx={{ 
+
+          <Typography
+            variant="h5"
+            sx={{
               mb: { xs: 3, sm: 4 },
               fontWeight: 400,
               lineHeight: 1.6,
@@ -244,11 +222,11 @@ const LoginForm: React.FC = () => {
           >
             Logiciel officiel du Ministère des Transports, de la Marine Marchande et de la Logistique
           </Typography>
-          
+
           {/* Version mobile du texte */}
-          <Typography 
-            variant="body1" 
-            sx={{ 
+          <Typography
+            variant="body1"
+            sx={{
               mb: { xs: 3, sm: 4 },
               fontWeight: 400,
               lineHeight: 1.4,
@@ -259,11 +237,11 @@ const LoginForm: React.FC = () => {
           >
             Logiciel officiel du Ministère des Transports
           </Typography>
-          
+
           <Box sx={{ mt: { xs: 3, sm: 6 } }}>
-            <Typography 
-              variant="h6" 
-              sx={{ 
+            <Typography
+              variant="h6"
+              sx={{
                 fontWeight: 600,
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: { xs: '0.9rem', sm: '1.1rem' }
@@ -271,9 +249,9 @@ const LoginForm: React.FC = () => {
             >
               Développé par
             </Typography>
-            <Typography 
-              variant="h4" 
-              sx={{ 
+            <Typography
+              variant="h4"
+              sx={{
                 fontWeight: 'bold',
                 color: 'white',
                 mt: 1,
@@ -283,16 +261,16 @@ const LoginForm: React.FC = () => {
               Rengus Digital
             </Typography>
           </Box>
-          
+
         </Box>
       </Box>
 
       {/* Section droite - Formulaire de connexion */}
-      <Box 
-        sx={{ 
+      <Box
+        sx={{
           flex: { xs: 1, lg: 1 },
-          display: 'flex', 
-          alignItems: 'center', 
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'center',
           p: { xs: 2, sm: 3, md: 4 },
           minHeight: { xs: '60vh', lg: 'auto' },
@@ -316,9 +294,9 @@ const LoginForm: React.FC = () => {
           }
         }}
       >
-        <Card sx={{ 
-          width: '100%', 
-          maxWidth: { xs: '100%', sm: 400 }, 
+        <Card sx={{
+          width: '100%',
+          maxWidth: { xs: '100%', sm: 400 },
           boxShadow: { xs: 1, sm: 3 },
           mx: { xs: 1, sm: 0 },
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -326,11 +304,11 @@ const LoginForm: React.FC = () => {
           zIndex: 1
         }}>
           <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
-            <Typography 
-              variant="h4" 
-              component="h1" 
-              sx={{ 
-                textAlign: 'center', 
+            <Typography
+              variant="h4"
+              component="h1"
+              sx={{
+                textAlign: 'center',
                 mb: 2,
                 fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }
               }}
@@ -338,11 +316,11 @@ const LoginForm: React.FC = () => {
             >
               Connexion
             </Typography>
-            <Typography 
-              variant="body2" 
-              sx={{ 
-                textAlign: 'center', 
-                mb: 3, 
+            <Typography
+              variant="body2"
+              sx={{
+                textAlign: 'center',
+                mb: 3,
                 color: 'text.secondary',
                 fontSize: { xs: '0.9rem', sm: '1rem' }
               }}
@@ -350,17 +328,17 @@ const LoginForm: React.FC = () => {
             >
               Accédez à votre espace de gestion
             </Typography>
-            
+
             {message && (
-              <Alert 
-                severity={message.type} 
+              <Alert
+                severity={message.type}
                 sx={{ mb: 2 }}
                 onClose={() => setMessage(null)}
               >
                 {message.text}
               </Alert>
             )}
-            
+
             <form onSubmit={onSubmit}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1.5, sm: 2 } }}>
                 <TextField
@@ -373,7 +351,7 @@ const LoginForm: React.FC = () => {
                   helperText={errors.email}
                   size={window.innerWidth < 600 ? 'small' : 'medium'}
                 />
-                
+
                 <TextField
                   label="Mot de passe"
                   type="password"
@@ -384,7 +362,7 @@ const LoginForm: React.FC = () => {
                   helperText={errors.password}
                   size={window.innerWidth < 600 ? 'small' : 'medium'}
                 />
-                
+
                 <Button
                   type="submit"
                   variant="contained"
@@ -405,15 +383,15 @@ const LoginForm: React.FC = () => {
             </form>
           </CardContent>
         </Card>
-        
+
         {/* Lignes colorées décoratives en bas de la section droite */}
-        <Box sx={{ 
-          position: 'absolute', 
-          bottom: 0, 
-          left: 0, 
-          right: 0, 
-          display: 'flex', 
-          height: 8 
+        <Box sx={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          height: 8
         }}>
           <Box sx={{ flex: 1, backgroundColor: '#2E8B57', height: '100%' }} />
           <Box sx={{ flex: 1, backgroundColor: '#FFD700', height: '100%' }} />

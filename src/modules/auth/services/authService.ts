@@ -3,30 +3,32 @@ import { LoginRequest } from './types';
 
 import axiosAuthentifcation from '../../../shared/environment/envauth';
 import axiosClient from '../../../shared/environment/envdev';
+import { Person } from '../../cnepc/forms/updateinfoAutoEcole';
+import { ChangePasswordForm } from '../../eleves/types/changepassword';
 
 export class AuthService {
   async login(credentials: LoginRequest): Promise<any> {
     try {
       console.log('🔐 Tentative de connexion:', { email: credentials.email });
-      
+
       // Utilisation de l'API d'authentification
       const response = await axiosAuthentifcation.post("/auth/login-direct", credentials);
-      
+
       // Logs détaillés de l'utilisateur authentifié
       console.log('✅ Connexion réussie !');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('👤 INFORMATIONS UTILISATEUR AUTHENTIFIÉ');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      
+
       if (response.data && response.data.user) {
         const user = response.data.user;
-        
+
         console.log('📋 Identité:');
         console.log('  • ID Utilisateur:', user.id);
         console.log('  • Email:', user.email);
         console.log('  • Rôle:', user.role);
         console.log('  • Date de création:', user.created_at);
-        
+
         if (user.personne) {
           console.log('\n👨‍💼 Informations Personnelles:');
           console.log('  • ID Personne:', user.personne.id);
@@ -37,16 +39,16 @@ export class AuthService {
           console.log('  • Contact:', user.personne.contact);
           console.log('  • Adresse:', user.personne.adresse || 'Non renseignée');
         }
-        
+
         console.log('\n🔑 Token:');
         console.log('  • Type:', response.data.token_type || 'Bearer');
         console.log('  • Access Token:', response.data.access_token ? `${response.data.access_token.substring(0, 30)}...` : 'N/A');
         console.log('  • Refresh Token:', response.data.refresh_token ? 'Présent' : 'Absent');
         console.log('  • Expire dans:', response.data.expires_in ? `${response.data.expires_in}s` : 'N/A');
-        
+
         // Log spécifique selon le rôle
         console.log('\n🎭 RÔLE DÉTECTÉ:', user.role.toUpperCase());
-        
+
         switch (user.role) {
           case 'responsable_auto_ecole':
             console.log('  ➜ Type: Responsable d\'Auto-École');
@@ -65,26 +67,26 @@ export class AuthService {
             console.log('  ➜ Type: Rôle non reconnu');
             console.warn('  ⚠️ Attention: Rôle inattendu détecté');
         }
-        
+
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       } else {
         console.warn('⚠️ Réponse d\'authentification incomplète');
         console.log('Réponse reçue:', response.data);
       }
-      
+
       return response;
     } catch (error: any) {
       console.error('❌ ERREUR DE CONNEXION');
       console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.error('Message:', error.message);
-      
+
       if (error.response) {
         console.error('Statut HTTP:', error.response.status);
         console.error('Données:', error.response.data);
       }
-      
+
       console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      
+
       throw new Error(`Erreur de connexion: ${error.message}`);
     }
   }
@@ -118,6 +120,23 @@ export class AuthService {
     } catch (error: any) {
       console.error('❌ Erreur vérification CNEPC:', error.message);
       throw new Error(`Erreur de vérification CNEPC: ${error.message}`);
+    }
+  }
+
+  async updateProfile(update: Person): Promise<any> {
+    try {
+      const response = await axiosClient.put("/auth/update-profile", update);
+      return response.data;
+    } catch (e) {
+
+    }
+  }
+  async changePassword(changePassword:ChangePasswordForm):Promise<any>{
+     try {
+      const response = await axiosClient.post("/auth/change-password", changePassword);
+      return response.data;
+    } catch (e) {
+
     }
   }
 }
