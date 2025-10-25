@@ -14,11 +14,18 @@ import {
   Paper,
   Alert,
   CircularProgress,
+  DialogContentText,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import { Statut } from '../types/statut'
 import { statutService } from '../services/statut.service'
-import StatutTable from '../components/StatutTable' // à créer (similaire à CircuitTable)
+import StatutTable from '../components/StatutTable';
+
+interface ResponseData {
+  data: Statut[],
+  links: any,
+  meta: any
+}
 
 const StatutPage: React.FC = () => {
   const [openDialog, setOpenDialog] = useState(false)
@@ -32,13 +39,16 @@ const StatutPage: React.FC = () => {
   const [statuts, setStatuts] = useState<Statut[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [openConfirm, setOpenConfirm] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  // === Récupération de la liste ===
+  // === Charger la liste ===
   const fetchStatuts = async () => {
+    setError(null)
     try {
       setLoading(true)
-      const data = await statutService.getAll()
-      setStatuts(data)
+      const response: any = await statutService.getAll()
+      setStatuts(response?.data)
     } catch (err: any) {
       setError(err.message ?? 'Erreur lors du chargement des statuts')
     } finally {
@@ -99,14 +109,25 @@ const StatutPage: React.FC = () => {
   }
 
   // === Suppression ===
-  const handleDelete = async (id: string) => {
-    if (!confirm('Supprimer ce statut ?')) return
+  const handleDelete = (id: string) => {
+    setSelectedId(id)
+    setOpenConfirm(true)
+  }
+
+  const confirmDelete = async () => {
     try {
-      await statutService.remove(id)
-      setStatuts((prev) => prev.filter((s) => s.id !== id))
+      await statutService.remove(selectedId as string)
+      setStatuts((prev) => prev.filter((s) => s.id !== selectedId))
     } catch (err: any) {
-      alert(err.message)
+      setError(err.message ?? 'Erreur lors de la suppression du statut')
+    } finally {
+      setOpenConfirm(false)
+      setSelectedId(null)
     }
+  }
+
+  const handleCloseConfirm = () => {
+    setOpenConfirm(false)
   }
 
   return (
@@ -118,7 +139,7 @@ const StatutPage: React.FC = () => {
             Gestion des statuts
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Créer et gérer les statuts de workflow
+            Créer et gérer les statuts du workflow
           </Typography>
         </Box>
         <Button
@@ -131,34 +152,31 @@ const StatutPage: React.FC = () => {
         </Button>
       </Box>
 
+      {/* CONTENU PRINCIPAL */}
       <Paper>
-        {loading ? (
+        {loading && (
           <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
             <CircularProgress />
-          </Box>) : null
-        }
-        
-        {/* LISTE */}
+          </Box>
+        )}
+
         {error && (
           <Box sx={{ p: 2 }}>
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
             </Alert>
           </Box>
-          
         )}
-        
-        {!loading ? (
+
+        {!loading && (
           <StatutTable
             data={statuts}
             onEdit={handleOpenDialog}
             onDelete={handleDelete}
+            refreshTrigger={statuts.length}
           />
-        ): null }
-        
+        )}
       </Paper>
-
-      
 
       {/* DIALOG FORM */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
@@ -184,7 +202,12 @@ const StatutPage: React.FC = () => {
               fullWidth
               label="Libellé"
               value={formData.libelle ?? ''}
-              onChange={(e) => setFormData({ ...formData, libelle: e.target.value })}
+              onChange={(e) => {
+                let value = e.target.value
+                // Première lettre en majuscule
+                value = value.charAt(0).toUpperCase() + value.slice(1)
+                setFormData({ ...formData, libelle: value })
+              }}
               margin="normal"
             />
 
@@ -219,6 +242,29 @@ const StatutPage: React.FC = () => {
           <Button onClick={handleCloseDialog}>Annuler</Button>
           <Button onClick={handleSubmit} variant="contained">
             {editingStatut ? 'Modifier' : 'Créer'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* DIALOG CONFIRMATION SUPPRESSION */}
+      <Dialog
+        open={openConfirm}
+        onClose={handleCloseConfirm}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">{"Suppression du statut ?"}</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            Êtes-vous sûr de vouloir supprimer ce statut ? Cette action est irréversible.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseConfirm} color="primary">
+            Annuler
+          </Button>
+          <Button onClick={confirmDelete} color="error" autoFocus>
+            Supprimer
           </Button>
         </DialogActions>
       </Dialog>

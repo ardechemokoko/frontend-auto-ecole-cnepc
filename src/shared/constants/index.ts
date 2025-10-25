@@ -10,6 +10,7 @@ export const ROUTES = {
   USER_MANAGEMENT: '/settings/users',
   WORKFLOW: '/workflow',
   WORKFLOW_CIRCUIT: '/workflow/circuits',
+  WORKFLOW_CIRCUIT_DETAIL: '/workflow/circuits/detail/:id',
   WORKFLOW_STATUT: '/workflow/statuts',
 } as const;
 

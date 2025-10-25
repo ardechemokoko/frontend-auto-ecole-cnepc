@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { EyeIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { Circuit } from '../types/circuit';
+import { useNavigate } from 'react-router-dom'
 
 interface CircuitTableProps {
   onCircuitSelect?: (circuit: Circuit) => void;
@@ -23,7 +24,6 @@ interface CircuitTableProps {
 }
 
 const CircuitTable: React.FC<CircuitTableProps> = ({
-  onCircuitSelect,
   onEdit,
   onDelete,
   refreshTrigger,
@@ -33,10 +33,18 @@ const CircuitTable: React.FC<CircuitTableProps> = ({
     // si besoin, déclenche un refresh à chaque fois que refreshTrigger change
   }, [refreshTrigger]);
 
-  const showDetails = (circuit: Circuit) => {
-    console.log('Détails du circuit :', circuit);
-    onCircuitSelect?.(circuit);
-  };
+  const navigate = useNavigate()
+
+
+  // const showDetails = (circuit: Circuit) => {
+  //   console.log('Détails du circuit :', circuit);
+  //   onCircuitSelect?.(circuit);
+
+  //   // navigate(`/circuits/${circuit.id}`)}
+
+  //   console.log(10);
+    
+  // };
 
   return (
     <TableContainer component={Paper}>
@@ -86,7 +94,7 @@ const CircuitTable: React.FC<CircuitTableProps> = ({
                 <TableCell align="center">
                   <IconButton
                     size="small"
-                    onClick={() => showDetails(circuit)}
+                    onClick={() => navigate(`/workflow/circuits/detail/${circuit.id}`)}
                     color="primary"
                   >
                     <EyeIcon className="w-4 h-4" />

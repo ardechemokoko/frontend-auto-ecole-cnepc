@@ -6,11 +6,11 @@ import { Statut } from '../types'
 export class StatutService {
   constructor(
     private axios = axiosAuthentifcation,
-    private url = '/statuts' // base URL (ex: /api/statuts)
+    private url = '/workflow/statuts' // base URL (ex: /api/statuts)
   ) {}
 
   // GET /statuts?...
-  async getAll(params?: Record<string, any>): Promise<Statut[]> {
+  async getAll(params?: Record<string, any>): Promise<any> {
     try {
       const res = await this.axios.get<Statut[]>(this.url, { params })
       return res.data

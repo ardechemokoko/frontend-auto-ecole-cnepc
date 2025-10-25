@@ -18,6 +18,7 @@ import SettingsPage from '../modules/settings/pages/SettingsPage';
 import UserManagementPage from '../modules/settings/pages/UserManagementPage';
 import CircuitPage from '../modules/circuit/pages/CircuitPage';
 import StatutPage from '../modules/statut/pages/StatutPage';
+import CircuitDetailPage from '../modules/circuit/pages/CircuitDetailPage';
 
 // Composant de protection des routes
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -82,6 +83,12 @@ const AppRoutes: React.FC = () => {
       path: ROUTES.WORKFLOW_CIRCUIT, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(CircuitPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.WORKFLOW_CIRCUIT_DETAIL, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CircuitDetailPage))
       ) 
     }),
     React.createElement(Route, { 

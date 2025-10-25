@@ -39,28 +39,8 @@ const StatutTable: React.FC<StatutTableProps> = ({
   // const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // getAll();
+    
   }, [refreshTrigger]);
-
-  // const getAll = async () => {
-  //   setLoading(true);
-  //   statutService
-  //     .getAll()
-  //     .then((data) => {
-  //       setStatuts(data);
-  //     })
-  //     .catch((error) => {
-  //       console.error('Erreur lors du chargement des statuts:', error);
-  //     })
-  //     .finally(() => {
-  //       setLoading(false);
-  //     });
-  // };
-
-  const showDetails = (statut: Statut) => {
-    console.log('Détails du statut :', statut);
-    onStatutSelect?.(statut);
-  };
 
   return (
     <TableContainer component={Paper}>
@@ -99,13 +79,6 @@ const StatutTable: React.FC<StatutTableProps> = ({
                   <Checkbox checked={!!statut.annulable} disabled />
                 </TableCell>
                 <TableCell align="center">
-                  <IconButton
-                    size="small"
-                    onClick={() => showDetails(statut)}
-                    color="primary"
-                  >
-                    <EyeIcon className="w-4 h-4" />
-                  </IconButton>
                   <IconButton
                     size="small"
                     color="secondary"
