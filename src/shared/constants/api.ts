@@ -31,5 +31,13 @@ export const API_ENDPOINTS = {
     STATUS: '/cnepc/status',
     HISTORY: '/cnepc/history',
   },
+  // Gestion des utilisateurs (Admin)
+  USERS: {
+    LIST: '/admin/operators',
+    CREATE: '/admin/operators',
+    UPDATE: (id: string) => `/admin/operators/${id}`,
+    DELETE: (id: string) => `/admin/operators/${id}`,
+    TOGGLE_STATUS: (id: string) => `/admin/operators/${id}/toggle-status`,
+  },
   HEALTH: '/health',
 } as const;
