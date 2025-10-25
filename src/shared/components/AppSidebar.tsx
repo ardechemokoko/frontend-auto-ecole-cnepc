@@ -32,6 +32,7 @@ import {
 import { ROUTES } from '../constants';
 import tokenService from '../../modules/auth/services/tokenService';
 import { authService } from '../../modules/auth/services/authService';
+import { canAccessMenu } from '../utils/permissions';
 
 interface AppSidebarProps {
   open: boolean;
@@ -45,30 +46,35 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
   const [candidatsOpen, setCandidatsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const menuItems = [
+  // Définition de tous les menus possibles avec leurs clés
+  const allMenuItems = [
     {
       title: 'Tableau de bord',
       icon: HomeIcon,
       path: ROUTES.DASHBOARD,
-      description: 'Vue d\'ensemble de l\'application'
+      description: 'Vue d\'ensemble de l\'application',
+      key: 'dashboard'
     },
     {
       title: 'Gestion des Auto-Écoles',
       icon: SchoolIcon,
       path: ROUTES.AUTO_ECOLES,
-      description: 'Gérer les auto-écoles et leurs candidats inscrits'
+      description: 'Gérer les auto-écoles et leurs candidats inscrits',
+      key: 'auto_ecoles'
     },
     {
       title: 'Modifier Vos informations personnelles',
       icon: PersonIcon,
       path: ROUTES.UPDATE,
-      description: 'modifier les informations de l\' auto-école'
+      description: 'modifier les informations de l\' auto-école',
+      key: 'update'
     },
     {
       title: 'Gestion des Candidats',
       icon: UserGroupIcon,
       path: ROUTES.ELEVES,
       description: 'Inscrire et gérer les dossiers des candidats',
+      key: 'candidates',
       hasSubmenu: true,
       submenu: [
         {
@@ -92,19 +98,22 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       title: 'Validation des Dossiers',
       icon: CheckCircleIcon,
       path: ROUTES.VALIDATION,
-      description: 'Valider les dossiers complets des élèves'
+      description: 'Valider les dossiers complets des élèves',
+      key: 'validation'
     },
     {
       title: 'Envoi CNEPC',
       icon: PaperAirplaneIcon,
       path: ROUTES.CNEPC,
-      description: 'Transmettre les dossiers validés au CNEPC'
+      description: 'Transmettre les dossiers validés au CNEPC',
+      key: 'cnepc'
     },
     {
       title: 'Paramètres',
       icon: SettingsIcon,
       path: ROUTES.SETTINGS,
       description: 'Configuration et gestion du système',
+      key: 'settings',
       hasSubmenu: true,
       submenu: [
         {
@@ -115,6 +124,24 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       ]
     },
   ];
+
+  // Filtrer les menus selon les permissions de l'utilisateur
+  console.log('🎭 AppSidebar: Filtrage des menus pour l\'utilisateur', {
+    userRole: user?.role,
+    userName: user?.name || user?.email,
+    totalMenus: allMenuItems.length
+  });
+  
+  const menuItems = allMenuItems.filter(item => {
+    const hasAccess = canAccessMenu(user, item.key);
+    console.log('🎭 AppSidebar: Menu', item.title, '->', hasAccess ? 'AUTORISÉ' : 'REFUSÉ');
+    return hasAccess;
+  });
+  
+  console.log('🎭 AppSidebar: Menus finaux autorisés', {
+    count: menuItems.length,
+    menus: menuItems.map(item => item.title)
+  });
 
   const handleNavigation = (path: string) => {
     navigate(path);
