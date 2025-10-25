@@ -62,14 +62,6 @@ const StatutTable: React.FC<StatutTableProps> = ({
     onStatutSelect?.(statut);
   };
 
-  // if (loading) {
-  //   return (
-  //     <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-  //       <CircularProgress />
-  //     </Box>
-  //   );
-  // }
-
   return (
     <TableContainer component={Paper}>
       <Table>
