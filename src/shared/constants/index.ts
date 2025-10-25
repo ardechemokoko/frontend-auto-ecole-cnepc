@@ -7,8 +7,7 @@ export const ROUTES = {
   CNEPC: '/cnepc',
   AUTO_ECOLES: '/auto-ecoles',
   UPDATE: '/updateinfo',
-  SETTINGS: '/settings',
-  USER_MANAGEMENT: '/settings/users',
+  REF: '/referenciel',
 } as const;
 
 export const STATUS = {
