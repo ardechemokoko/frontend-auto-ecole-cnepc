@@ -25,6 +25,13 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  Drawer,
+  Divider,
+  Card,
+  CardContent,
+  Grid,
+  List,
+  ListItem,
 } from '@mui/material';
 import {
   Search,
@@ -37,6 +44,12 @@ import {
   Person,
   Phone,
   LocationOn,
+  Close,
+  Email,
+  CalendarToday,
+  Badge,
+  MenuBook,
+  FolderOpen,
 } from '@mui/icons-material';
 import { AutoEcole, AutoEcoleListResponse, autoEcoleService } from '../services';
 import { AutoEcoleForm } from '../forms';
@@ -63,6 +76,12 @@ const AutoEcoleTable: React.FC<AutoEcoleTableProps> = ({
   const [selectedAutoEcole, setSelectedAutoEcole] = useState<AutoEcole | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [autoEcoleToDelete, setAutoEcoleToDelete] = useState<AutoEcole | null>(null);
+  
+  // États pour le drawer de détails
+  const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
+  const [autoEcoleDetails, setAutoEcoleDetails] = useState<AutoEcole | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
   
   // Menu contextuel
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -132,12 +151,46 @@ const AutoEcoleTable: React.FC<AutoEcoleTableProps> = ({
     handleMenuClose();
   };
 
+  // Charger les détails d'une auto-école
+  const loadAutoEcoleDetails = async (id: string) => {
+    setLoadingDetails(true);
+    setDetailsError(null);
+    
+    try {
+      console.log('📋 Chargement des détails de l\'auto-école:', id);
+      const details = await autoEcoleService.getAutoEcoleById(id);
+      console.log('✅ Détails chargés:', details);
+      setAutoEcoleDetails(details);
+      setDetailsDrawerOpen(true);
+    } catch (err: any) {
+      console.error('❌ Erreur lors du chargement des détails:', err);
+      setDetailsError(err.response?.data?.message || 'Erreur lors du chargement des détails');
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
   const handleView = () => {
-    const autoEcole = autoEcoles.find(ae => ae.id === selectedRowId);
-    if (autoEcole && onAutoEcoleSelect) {
-      onAutoEcoleSelect(autoEcole);
+    console.log('🔍 handleView appelé, selectedRowId:', selectedRowId);
+    if (selectedRowId) {
+      console.log('📋 Chargement des détails pour l\'auto-école:', selectedRowId);
+      loadAutoEcoleDetails(selectedRowId);
+      
+      // Si un callback est fourni, l'appeler aussi
+      const autoEcole = autoEcoles.find(ae => ae.id === selectedRowId);
+      if (autoEcole && onAutoEcoleSelect) {
+        onAutoEcoleSelect(autoEcole);
+      }
+    } else {
+      console.error('❌ Aucun ID sélectionné !');
     }
     handleMenuClose();
+  };
+
+  const handleCloseDetailsDrawer = () => {
+    setDetailsDrawerOpen(false);
+    setAutoEcoleDetails(null);
+    setDetailsError(null);
   };
 
   const handleDelete = () => {
@@ -155,7 +208,7 @@ const AutoEcoleTable: React.FC<AutoEcoleTableProps> = ({
     setSelectedAutoEcole(undefined);
   };
 
-  const handleFormSuccess = (autoEcole: AutoEcole) => {
+  const handleFormSuccess = (_autoEcole: AutoEcole) => {
     loadAutoEcoles();
     handleFormClose();
   };
@@ -387,6 +440,398 @@ const AutoEcoleTable: React.FC<AutoEcoleTableProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Drawer des détails de l'auto-école */}
+      <Drawer
+        anchor="right"
+        open={detailsDrawerOpen}
+        onClose={handleCloseDetailsDrawer}
+        PaperProps={{
+          sx: { width: { xs: '100%', sm: 500, md: 600 } }
+        }}
+      >
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          {/* En-tête du drawer */}
+          <Box
+            sx={{
+              p: 3,
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <School sx={{ fontSize: 40 }} />
+              <Box>
+                <Typography variant="h5" fontWeight="bold">
+                  {autoEcoleDetails?.nom_auto_ecole || 'Détails Auto-École'}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  Informations complètes
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={handleCloseDetailsDrawer} sx={{ color: 'white' }}>
+              <Close />
+            </IconButton>
+          </Box>
+
+          {/* Contenu du drawer */}
+          <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
+            {loadingDetails ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                <CircularProgress />
+              </Box>
+            ) : detailsError ? (
+              <Alert severity="error">{detailsError}</Alert>
+            ) : autoEcoleDetails ? (
+              <>
+                {/* Statut */}
+                <Card sx={{ mb: 3 }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="h6" fontWeight="bold">
+                        Statut
+                      </Typography>
+                      <Chip
+                        label={autoEcoleDetails.statut_libelle}
+                        color={autoEcoleDetails.statut ? 'success' : 'error'}
+                        size="medium"
+                      />
+                    </Box>
+                  </CardContent>
+                </Card>
+
+                {/* Informations générales */}
+                <Card sx={{ mb: 3 }}>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <School color="primary" />
+                      Informations Générales
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    
+                    <List disablePadding>
+                      <ListItem sx={{ px: 0, py: 1 }}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={4}>
+                            <Typography variant="body2" color="text.secondary" fontWeight="medium">
+                              Nom
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={8}>
+                            <Typography variant="body2" fontWeight="bold">
+                              {autoEcoleDetails.nom_auto_ecole}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </ListItem>
+                      
+                      <ListItem sx={{ px: 0, py: 1 }}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={4}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Email fontSize="small" color="action" />
+                              <Typography variant="body2" color="text.secondary" fontWeight="medium">
+                                Email
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={8}>
+                            <Typography variant="body2">{autoEcoleDetails.email}</Typography>
+                          </Grid>
+                        </Grid>
+                      </ListItem>
+                      
+                      <ListItem sx={{ px: 0, py: 1 }}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={4}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Phone fontSize="small" color="action" />
+                              <Typography variant="body2" color="text.secondary" fontWeight="medium">
+                                Contact
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={8}>
+                            <Typography variant="body2">{autoEcoleDetails.contact}</Typography>
+                          </Grid>
+                        </Grid>
+                      </ListItem>
+                      
+                      <ListItem sx={{ px: 0, py: 1 }}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={4}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <LocationOn fontSize="small" color="action" />
+                              <Typography variant="body2" color="text.secondary" fontWeight="medium">
+                                Adresse
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={8}>
+                            <Typography variant="body2">{autoEcoleDetails.adresse}</Typography>
+                          </Grid>
+                        </Grid>
+                      </ListItem>
+
+                      <ListItem sx={{ px: 0, py: 1 }}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={4}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <CalendarToday fontSize="small" color="action" />
+                              <Typography variant="body2" color="text.secondary" fontWeight="medium">
+                                Créé le
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={8}>
+                            <Typography variant="body2">
+                              {formatDate(autoEcoleDetails.created_at)}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </ListItem>
+                    </List>
+                  </CardContent>
+                </Card>
+
+                {/* Informations du responsable */}
+                <Card sx={{ mb: 3 }}>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Person color="primary" />
+                      Responsable
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    
+                    <List disablePadding>
+                      <ListItem sx={{ px: 0, py: 1 }}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={4}>
+                            <Typography variant="body2" color="text.secondary" fontWeight="medium">
+                              Nom complet
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={8}>
+                            <Typography variant="body2" fontWeight="bold">
+                              {autoEcoleDetails.responsable.prenom} {autoEcoleDetails.responsable.nom}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </ListItem>
+                      
+                      <ListItem sx={{ px: 0, py: 1 }}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={4}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Email fontSize="small" color="action" />
+                              <Typography variant="body2" color="text.secondary" fontWeight="medium">
+                                Email
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={8}>
+                            <Typography variant="body2">{autoEcoleDetails.responsable.email}</Typography>
+                          </Grid>
+                        </Grid>
+                      </ListItem>
+                      
+                      <ListItem sx={{ px: 0, py: 1 }}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={4}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Phone fontSize="small" color="action" />
+                              <Typography variant="body2" color="text.secondary" fontWeight="medium">
+                                Contact
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={8}>
+                            <Typography variant="body2">{autoEcoleDetails.responsable.contact}</Typography>
+                          </Grid>
+                        </Grid>
+                      </ListItem>
+                      
+                      <ListItem sx={{ px: 0, py: 1 }}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={4}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <LocationOn fontSize="small" color="action" />
+                              <Typography variant="body2" color="text.secondary" fontWeight="medium">
+                                Adresse
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={8}>
+                            <Typography variant="body2">{autoEcoleDetails.responsable.adresse}</Typography>
+                          </Grid>
+                        </Grid>
+                      </ListItem>
+
+                      <ListItem sx={{ px: 0, py: 1 }}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={4}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Badge fontSize="small" color="action" />
+                              <Typography variant="body2" color="text.secondary" fontWeight="medium">
+                                ID
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={8}>
+                            <Typography variant="caption" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                              {autoEcoleDetails.responsable.id}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </ListItem>
+                    </List>
+                  </CardContent>
+                </Card>
+
+                {/* Statistiques */}
+                {autoEcoleDetails.formations || autoEcoleDetails.dossiers ? (
+                  <Card sx={{ mb: 3 }}>
+                    <CardContent>
+                      <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        📊 Statistiques
+                      </Typography>
+                      <Divider sx={{ mb: 2 }} />
+                      
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <Card variant="outlined">
+                            <CardContent sx={{ textAlign: 'center' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1 }}>
+                                <MenuBook color="primary" />
+                                <Typography variant="h4" color="primary" fontWeight="bold">
+                                  {autoEcoleDetails.formations?.length || 0}
+                                </Typography>
+                              </Box>
+                              <Typography variant="body2" color="text.secondary">
+                                Formations
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                        
+                        <Grid item xs={6}>
+                          <Card variant="outlined">
+                            <CardContent sx={{ textAlign: 'center' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1 }}>
+                                <FolderOpen color="secondary" />
+                                <Typography variant="h4" color="secondary" fontWeight="bold">
+                                  {autoEcoleDetails.dossiers?.length || 0}
+                                </Typography>
+                              </Box>
+                              <Typography variant="body2" color="text.secondary">
+                                Dossiers
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                ) : null}
+
+                {/* Identifiants techniques */}
+                <Card sx={{ mb: 3, bgcolor: 'grey.50' }}>
+                  <CardContent>
+                    <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ mb: 1, display: 'block' }}>
+                      INFORMATIONS TECHNIQUES
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    
+                    <List disablePadding>
+                      <ListItem sx={{ px: 0, py: 0.5 }}>
+                        <Grid container spacing={1}>
+                          <Grid item xs={5}>
+                            <Typography variant="caption" color="text.secondary">
+                              ID Auto-École
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={7}>
+                            <Typography variant="caption" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                              {autoEcoleDetails.id}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </ListItem>
+                      
+                      <ListItem sx={{ px: 0, py: 0.5 }}>
+                        <Grid container spacing={1}>
+                          <Grid item xs={5}>
+                            <Typography variant="caption" color="text.secondary">
+                              ID Responsable
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={7}>
+                            <Typography variant="caption" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                              {autoEcoleDetails.responsable_id}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </ListItem>
+                      
+                      <ListItem sx={{ px: 0, py: 0.5 }}>
+                        <Grid container spacing={1}>
+                          <Grid item xs={5}>
+                            <Typography variant="caption" color="text.secondary">
+                              Dernière MAJ
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={7}>
+                            <Typography variant="caption">
+                              {formatDate(autoEcoleDetails.updated_at)}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </ListItem>
+                    </List>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Alert severity="info">Aucune information disponible</Alert>
+            )}
+          </Box>
+
+          {/* Actions du drawer */}
+          {autoEcoleDetails && (
+            <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    startIcon={<Edit />}
+                    onClick={() => {
+                      setSelectedAutoEcole(autoEcoleDetails);
+                      setFormOpen(true);
+                      handleCloseDetailsDrawer();
+                    }}
+                  >
+                    Modifier
+                  </Button>
+                </Grid>
+                <Grid item xs={6}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    onClick={handleCloseDetailsDrawer}
+                  >
+                    Fermer
+                  </Button>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+        </Box>
+      </Drawer>
     </Box>
   );
 };

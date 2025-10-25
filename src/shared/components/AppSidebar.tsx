@@ -29,7 +29,6 @@ import {
   ExpandMore as ChevronDownIcon,
   Settings as SettingsIcon,
   Person as PersonIcon,
-  School as SchoolIcon,
 } from '@mui/icons-material';
 import { ROUTES } from '../constants';
 import tokenService from '../../modules/auth/services/tokenService';
@@ -47,6 +46,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
   const { user, logout } = useAppStore();
   const [candidatsOpen, setCandidatsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [cnepcOpen, setCnepcOpen] = useState(false);
 
   // Définition de tous les menus possibles avec leurs clés
   const allMenuItems = [
@@ -56,13 +56,6 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       path: ROUTES.DASHBOARD,
       description: 'Vue d\'ensemble de l\'application',
       key: 'dashboard'
-    },
-    {
-      title: 'Gestion des Auto-Écoles',
-      icon: SchoolIcon,
-      path: ROUTES.AUTO_ECOLES,
-      description: 'Gérer les auto-écoles et leurs candidats inscrits',
-      key: 'auto_ecoles'
     },
     {
       title: 'Modifier Vos informations personnelles',
@@ -110,11 +103,23 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       key: 'validation'
     },
     {
-      title: 'Envoi CNEPC',
+      title: 'CNEPC',
       icon: PaperAirplaneIcon,
       path: ROUTES.CNEPC,
-      description: 'Transmettre les dossiers validés au CNEPC',
-      key: 'cnepc'
+      description: 'Gestion CNEPC et Auto-Écoles',
+      hasSubmenu: true,
+      submenu: [
+        {
+          path: ROUTES.AUTO_ECOLES,
+          title: 'Gestion des Auto-Écoles',
+          description: 'Gérer les auto-écoles et leurs candidats inscrits'
+        },
+        {
+          path: ROUTES.CNEPC,
+          title: 'Management',
+          description: 'Transmettre les dossiers validés au CNEPC'
+        }
+      ]
     },
     {
       title: 'Paramètres',
@@ -241,6 +246,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
               const IconComponent = item.icon;
               const isCandidatsItem = item.title === 'Gestion des Candidats';
               const isSettingsItem = item.title === 'Paramètres';
+              const isCnepcItem = item.title === 'CNEPC';
               return (
                 <React.Fragment key={item.path}>
                   <ListItem disablePadding>
@@ -250,6 +256,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                           setCandidatsOpen(!candidatsOpen);
                         } else if (isSettingsItem && item.hasSubmenu) {
                           setSettingsOpen(!settingsOpen);
+                        } else if (isCnepcItem && item.hasSubmenu) {
+                          setCnepcOpen(!cnepcOpen);
                         } else {
                           handleNavigation(item.path);
                         }
@@ -287,10 +295,10 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                               color: 'white',
                             }}
                           />
-                          {(isCandidatsItem || isSettingsItem) && item.hasSubmenu && (
+                          {(isCandidatsItem || isSettingsItem || isCnepcItem) && item.hasSubmenu && (
                             <ChevronDownIcon
                               sx={{
-                                transform: (isCandidatsItem ? candidatsOpen : settingsOpen) ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transform: (isCandidatsItem ? candidatsOpen : (isSettingsItem ? settingsOpen : cnepcOpen)) ? 'rotate(180deg)' : 'rotate(0deg)',
                                 transition: 'transform 0.2s ease-in-out',
                               }}
                             />
@@ -342,6 +350,45 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                   {/* Submenu for settings */}
                   {open && isSettingsItem && item.hasSubmenu && (
                     <Collapse in={settingsOpen} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding>
+                        {item.submenu?.map((subItem) => {
+                          const subActive = isActive(subItem.path);
+                          return (
+                            <ListItem key={subItem.path} disablePadding>
+                              <ListItemButton
+                                onClick={() => handleNavigation(subItem.path)}
+                                sx={{
+                                  ml: 4,
+                                  mr: 1,
+                                  borderRadius: 2,
+                                  mb: 0.5,
+                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    color: 'white',
+                                  },
+                                  transition: 'all 0.2s ease-in-out',
+                                }}
+                              >
+                                <ListItemText
+                                  primary={subItem.title}
+                                  primaryTypographyProps={{
+                                    variant: 'body2',
+                                    fontSize: '0.875rem',
+                                  }}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          );
+                        })}
+                      </List>
+                    </Collapse>
+                  )}
+
+                  {/* Submenu for CNEPC */}
+                  {open && isCnepcItem && item.hasSubmenu && (
+                    <Collapse in={cnepcOpen} timeout="auto" unmountOnExit>
                       <List component="div" disablePadding>
                         {item.submenu?.map((subItem) => {
                           const subActive = isActive(subItem.path);

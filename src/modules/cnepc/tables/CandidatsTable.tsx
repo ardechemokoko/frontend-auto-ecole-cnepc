@@ -9,7 +9,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TablePagination,
   IconButton,
   Chip,
   Button,
@@ -27,13 +26,15 @@ import {
   ListItemIcon,
   ListItemText,
   Avatar,
-  Tooltip,
+  Card,
+  CardContent,
+  List,
+  ListItem,
 } from '@mui/material';
 import {
   Search,
   Add,
   MoreVert,
-  Edit,
   Delete,
   Visibility,
   Person,
@@ -43,7 +44,7 @@ import {
   School,
   Assignment,
 } from '@mui/icons-material';
-import { Dossier, MesDossiersResponse, autoEcoleService } from '../services';
+import { Dossier, MesDossiersResponse, AutoEcole, autoEcoleService } from '../services';
 import { CandidatForm, DossierForm } from '../forms';
 
 interface CandidatsTableProps {
@@ -58,15 +59,20 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
   const [dossiers, setDossiers] = useState<Dossier[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [statistiques, setStatistiques] = useState({
-    total: 0,
-    en_attente: 0,
-    en_cours: 0,
-    valide: 0,
-    rejete: 0,
-  });
   const [searchTerm, setSearchTerm] = useState('');
   const [statutFilter, setStatutFilter] = useState<string>('');
+  
+  // États pour les détails de l'auto-école
+  const [autoEcoleDetails, setAutoEcoleDetails] = useState<AutoEcole | null>(null);
+  
+  // États pour les statistiques
+  const [statistiques, setStatistiques] = useState<{
+    total: number;
+    en_attente: number;
+    en_cours: number;
+    valide: number;
+    rejete: number;
+  } | null>(null);
   
   // États pour les modales
   const [candidatFormOpen, setCandidatFormOpen] = useState(false);
@@ -84,16 +90,69 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
   const loadDossiers = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      const response: MesDossiersResponse = await autoEcoleService.getMesDossiers({
-        statut: statutFilter as any,
-      });
-      
-      setDossiers(response.dossiers);
-      setStatistiques(response.statistiques);
+      console.log('╔══════════════════════════════════════════════════════════════╗');
+      console.log('║  [CANDIDATS TABLE] Chargement des dossiers                  ║');
+      console.log('╚══════════════════════════════════════════════════════════════╝');
+      console.log('🏫 Auto-École ID fourni:', autoEcoleId || 'Aucun (mode "mes dossiers")');
+      console.log('═══════════════════════════════════════════════════════════════');
+
+      // Si un autoEcoleId est fourni, utiliser l'endpoint /dossiers
+      // Sinon, utiliser l'endpoint /auto-ecoles/mes-dossiers (pour le responsable connecté)
+      if (autoEcoleId) {
+        console.log('📍 Mode: Dossiers d\'une auto-école spécifique (ID fourni)');
+        
+        const response = await autoEcoleService.getDossiersByAutoEcoleId(autoEcoleId, {
+          statut: statutFilter as any,
+        });
+
+        console.log('📋 Réponse complète:', response);
+        console.log('📊 Nombre de dossiers:', response.dossiers?.length || 0);
+        console.log('═══════════════════════════════════════════════════════════════');
+
+        setDossiers(response.dossiers || []);
+        
+        // Si on a un autoEcoleId, charger les détails de l'auto-école séparément
+        if (autoEcoleId && !autoEcoleDetails) {
+          try {
+            const autoEcoleData = await autoEcoleService.getAutoEcoleById(autoEcoleId);
+            setAutoEcoleDetails(autoEcoleData);
+          } catch (err) {
+            console.error('❌ Erreur lors du chargement des détails de l\'auto-école:', err);
+          }
+        }
+        
+        // Pas de statistiques avec /dossiers, on les calcule localement
+        const dossiers = response.dossiers || [];
+        const stats = {
+          total: dossiers.length,
+          en_attente: dossiers.filter(d => d.statut === 'en_attente').length,
+          en_cours: dossiers.filter(d => d.statut === 'en_cours').length,
+          valide: dossiers.filter(d => d.statut === 'valide').length,
+          rejete: dossiers.filter(d => d.statut === 'rejete').length,
+        };
+        setStatistiques(stats);
+      } else {
+        console.log('📍 Mode: Mes dossiers (responsable connecté)');
+        
+        const response: MesDossiersResponse = await autoEcoleService.getMesDossiers({
+          statut: statutFilter as any,
+        });
+
+        console.log('📋 Réponse complète:', response);
+        console.log('📊 Auto-école:', response.auto_ecole?.nom_auto_ecole);
+        console.log('📊 Nombre de dossiers:', response.dossiers?.length || 0);
+        console.log('📊 Statistiques:', response.statistiques);
+        console.log('═══════════════════════════════════════════════════════════════');
+
+        // Utiliser directement les données de la réponse
+        setDossiers(response.dossiers || []);
+        setAutoEcoleDetails(response.auto_ecole || null);
+        setStatistiques(response.statistiques || null);
+      }
     } catch (err: any) {
-      console.error('Erreur lors du chargement des dossiers:', err);
+      console.error('❌ Erreur lors du chargement des dossiers:', err);
       setError(err.response?.data?.message || 'Erreur lors du chargement des candidats');
     } finally {
       setLoading(false);
@@ -103,7 +162,7 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
   // Effet pour charger les données
   useEffect(() => {
     loadDossiers();
-  }, [statutFilter, refreshTrigger]);
+  }, [autoEcoleId, statutFilter, refreshTrigger]);
 
   // Filtrer les dossiers par terme de recherche
   const filteredDossiers = dossiers.filter(dossier => {
@@ -243,66 +302,168 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
 
   return (
     <Box>
-      {/* En-tête avec statistiques */}
+      {/* Section des détails de l'auto-école */}
+      {autoEcoleDetails && (
+        <Box sx={{ mb: 4 }}>
+            <Card elevation={3}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3 }}>
+                  <Avatar
+                    sx={{
+                      width: 80,
+                      height: 80,
+                      bgcolor: 'primary.main',
+                      color: 'white',
+                    }}
+                  >
+                    <School sx={{ fontSize: 48 }} />
+                  </Avatar>
+                  
+                  <Box sx={{ flex: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
+                      <Box>
+                        <Typography variant="h4" fontWeight="bold" gutterBottom color="text.primary">
+                          {autoEcoleDetails.nom_auto_ecole}
+                        </Typography>
+                        <Chip
+                          label={autoEcoleDetails.statut_libelle}
+                          color={autoEcoleDetails.statut ? 'success' : 'error'}
+                          size="small"
+                          sx={{ mb: 2 }}
+                        />
+                      </Box>
+                    </Box>
+                    
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} md={6}>
+                        <Card variant="outlined">
+                          <CardContent>
+                            <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                              Contact
+                            </Typography>
+                            <List dense disablePadding>
+                              <ListItem disablePadding sx={{ py: 0.5 }}>
+                                <Email fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                                <Typography variant="body2">{autoEcoleDetails.email}</Typography>
+                              </ListItem>
+                              <ListItem disablePadding sx={{ py: 0.5 }}>
+                                <Phone fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                                <Typography variant="body2">{autoEcoleDetails.contact}</Typography>
+                              </ListItem>
+                              <ListItem disablePadding sx={{ py: 0.5 }}>
+                                <LocationOn fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                                <Typography variant="body2">{autoEcoleDetails.adresse}</Typography>
+                              </ListItem>
+                            </List>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      
+                      <Grid item xs={12} md={6}>
+                        <Card variant="outlined">
+                          <CardContent>
+                            <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                              Responsable
+                            </Typography>
+                            <List dense disablePadding>
+                              <ListItem disablePadding sx={{ py: 0.5 }}>
+                                <Person fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                                <Typography variant="body2" fontWeight="bold">
+                                  {autoEcoleDetails.responsable.prenom} {autoEcoleDetails.responsable.nom}
+                                </Typography>
+                              </ListItem>
+                              <ListItem disablePadding sx={{ py: 0.5 }}>
+                                <Email fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                                <Typography variant="body2">{autoEcoleDetails.responsable.email}</Typography>
+                              </ListItem>
+                              <ListItem disablePadding sx={{ py: 0.5 }}>
+                                <Phone fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                                <Typography variant="body2">{autoEcoleDetails.responsable.contact}</Typography>
+                              </ListItem>
+                            </List>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+        </Box>
+      )}
+      
+      {/* En-tête */}
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" component="h1" sx={{ mb: 2 }}>
-          Candidats Inscrits
+          {autoEcoleDetails ? `Candidats de ${autoEcoleDetails.nom_auto_ecole}` : 'Candidats Inscrits'}
         </Typography>
-        
-        {/* Statistiques */}
+      </Box>
+
+      {/* Statistiques */}
+      {statistiques && (
         <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={2}>
-            <Paper sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="h6" color="primary">
-                {statistiques.total}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Total
-              </Typography>
-            </Paper>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="overline" color="text.secondary">
+                  Total
+                </Typography>
+                <Typography variant="h4" fontWeight="bold" color="primary.main">
+                  {statistiques.total}
+                </Typography>
+              </CardContent>
+            </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={2}>
-            <Paper sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="h6" color="warning.main">
-                {statistiques.en_attente}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                En attente
-              </Typography>
-            </Paper>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="overline" color="text.secondary">
+                  En attente
+                </Typography>
+                <Typography variant="h4" fontWeight="bold" color="warning.main">
+                  {statistiques.en_attente}
+                </Typography>
+              </CardContent>
+            </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={2}>
-            <Paper sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="h6" color="info.main">
-                {statistiques.en_cours}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                En cours
-              </Typography>
-            </Paper>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="overline" color="text.secondary">
+                  En cours
+                </Typography>
+                <Typography variant="h4" fontWeight="bold" color="info.main">
+                  {statistiques.en_cours}
+                </Typography>
+              </CardContent>
+            </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={2}>
-            <Paper sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="h6" color="success.main">
-                {statistiques.valide}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Validés
-              </Typography>
-            </Paper>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="overline" color="text.secondary">
+                  Validés
+                </Typography>
+                <Typography variant="h4" fontWeight="bold" color="success.main">
+                  {statistiques.valide}
+                </Typography>
+              </CardContent>
+            </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={2}>
-            <Paper sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="h6" color="error.main">
-                {statistiques.rejete}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Rejetés
-              </Typography>
-            </Paper>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="overline" color="text.secondary">
+                  Rejetés
+                </Typography>
+                <Typography variant="h4" fontWeight="bold" color="error.main">
+                  {statistiques.rejete}
+                </Typography>
+              </CardContent>
+            </Card>
           </Grid>
         </Grid>
-      </Box>
+      )}
 
       {/* Barres de recherche et filtres */}
       <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -406,10 +567,22 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
                         <School color="action" />
                         <Box>
                           <Typography variant="body2" fontWeight="medium">
-                            {dossier.formation.nom}
+                            {dossier.formation.nom || (() => {
+                              // Récupérer le libellé du type de permis de manière sûre
+                              if (dossier.formation.type_permis) {
+                                const typePermis = dossier.formation.type_permis;
+                                if ('libelle' in typePermis) {
+                                  return `Formation ${typePermis.libelle}`;
+                                } else if ('nom' in typePermis) {
+                                  return `Formation ${typePermis.nom}`;
+                                }
+                              }
+                              return 'Formation N/A';
+                            })()}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {dossier.formation.prix}€ - {dossier.formation.duree_jours} jours
+                            {dossier.formation.montant_formate || `${dossier.formation.montant} FCFA`}
+                            {dossier.formation.duree_jours && ` - ${dossier.formation.duree_jours} jours`}
                           </Typography>
                         </Box>
                       </Box>
