@@ -14,6 +14,7 @@ import {
   Paper,
   Alert,
   CircularProgress,
+  DialogContentText,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import { Circuit } from '../types/circuit'
@@ -27,14 +28,17 @@ const CircuitPage: React.FC = () => {
     nom: '',
     description: '',
     actif: true,
-    entite_type: '',
+    nom_entite: '',
   })
   const [circuits, setCircuits] = useState<Circuit[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [open, setOpen] = React.useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // === Charger la liste ===
   const fetchCircuits = async () => {
+    setError(null);
     try {
       setLoading(true)
       const data = await circuitService.getAll()
@@ -58,7 +62,7 @@ const CircuitPage: React.FC = () => {
         nom: circuit.nom,
         description: circuit.description,
         actif: circuit.actif,
-        entite_type: circuit.entite_type,
+        nom_entite: circuit.nom_entite,
       })
     } else {
       setEditingCircuit(null)
@@ -66,7 +70,7 @@ const CircuitPage: React.FC = () => {
         nom: '',
         description: '',
         actif: true,
-        entite_type: '',
+        nom_entite: '',
       })
     }
     setOpenDialog(true)
@@ -79,7 +83,7 @@ const CircuitPage: React.FC = () => {
       nom: '',
       description: '',
       actif: true,
-      entite_type: '',
+      nom_entite: '',
     })
   }
 
@@ -100,13 +104,24 @@ const CircuitPage: React.FC = () => {
 
   // === Suppression ===
   const handleDelete = async (id: string) => {
-    if (!confirm('Supprimer ce circuit ?')) return
+    setSelectedId(id);
+    setOpen(true);
+  }
+
+  const confirmDelete = async () => {
     try {
-      await circuitService.remove(id)
-      setCircuits((prev) => prev.filter((c) => c.id !== id))
+      await circuitService.remove(selectedId as string)
+      setCircuits((prev) => prev.filter((c) => c.id !== selectedId))
     } catch (err: any) {
-      alert(err.message)
+      setError(err.message ?? 'Erreur lors de la sauvegarde du circuit')
+    } finally {
+      setOpen(false);
+      setSelectedId(null);
     }
+  }
+
+  function handleClose(): void {
+    setOpen(false);
   }
 
   return (
@@ -169,18 +184,23 @@ const CircuitPage: React.FC = () => {
               fullWidth
               label="Nom"
               value={formData.nom ?? ''}
-              onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
+              onChange={(e) => {
+                let value = e.target.value
+                // Met la première lettre en majuscule, le reste reste tel quel
+                value = value.charAt(0).toUpperCase() + value.slice(1)
+                setFormData({ ...formData, nom: value })
+              }}
               margin="normal"
             />
             <TextField
               fullWidth
               label="Entité concernée"
-              value={formData.entite_type ?? ''}
+              value={formData.nom_entite ?? ''}
               onChange={(e) => {
                 let value = e.target.value.toUpperCase()
                 value = value.replace(/\s+/g, '')
                 value = value.replace(/[^A-Z0-9_-]/g, '')
-                setFormData({ ...formData, entite_type: value })
+                setFormData({ ...formData, nom_entite: value })
               }}
               margin="normal"
             />
@@ -217,7 +237,30 @@ const CircuitPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">
+          {"Suppression de l'élément?"}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            Etes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClose} color="primary">Annuler</Button>
+          <Button autoFocus color="primary" onClick={confirmDelete}>
+            Confirmer
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
+    
   )
 }
 

@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const axiosAuthentifcation = axios.create({
-  baseURL: "https://9c8r7bbvybn.preview.infomaniak.website/api",
+  baseURL: "https://api.artech-agency.site/api",
   headers: {
     "Content-Type": "application/json"
   },

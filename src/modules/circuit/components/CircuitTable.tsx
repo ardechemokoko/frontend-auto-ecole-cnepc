@@ -70,7 +70,7 @@ const CircuitTable: React.FC<CircuitTableProps> = ({
                 </TableCell>
 
                 <TableCell>
-                  <Typography variant="body2">{circuit.entite_type}</Typography>
+                  <Typography variant="body2">{circuit.nom_entite}</Typography>
                 </TableCell>
 
                 <TableCell>

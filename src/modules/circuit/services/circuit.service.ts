@@ -6,7 +6,7 @@ export class CircuitService {
 
     constructor(
     private axios = axiosAuthentifcation, // ton instance axios avec interceptors
-        private url = '/circuits'         // base URL de la ressource
+        private url = '/workflow/circuits'       // base URL de la ressource
     ) {}
   
     async getAll(params?: Record<string, any>): Promise<Circuit[]> {
