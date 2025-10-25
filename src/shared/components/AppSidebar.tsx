@@ -120,11 +120,11 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
           title: 'Circuits',
           description: 'Créer et gérer les circuits de validation'
         },
-        // {
-        //   path: ROUTES.WORKFLOW_CIRCUIT,
-        //   title: 'Statuts',
-        //   description: 'Créer et gérer les status'
-        // },
+        {
+          path: ROUTES.WORKFLOW_STATUT,
+          title: 'Statuts',
+          description: 'Créer et gérer les status'
+        },
       ]
     },
   ];
