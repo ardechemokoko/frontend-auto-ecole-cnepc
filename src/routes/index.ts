@@ -14,7 +14,7 @@ import CNEPCPage from './CNEPCPage';
 import PageUpdateAutoecole from '../modules/cnepc/forms/updateinfoAutoEcole'
 import PageReferenciel from '../modules/cnepc/forms/referentiel';
 import AutoEcolePage from './AutoEcolePage';
-import { SettingsPage, UserManagementPage } from '../modules/settings';
+// import { SettingsPage, UserManagementPage } from '../modules/settings';
 import CircuitPage from '../modules/circuit/pages/CircuitPage';
 import CircuitDetailPage from '../modules/circuit/pages/CircuitDetailPage';
 import StatutPage from '../modules/statut/pages/StatutPage';
@@ -86,18 +86,18 @@ const AppRoutes: React.FC = () => {
       ) 
     }),
     // Routes Settings
-    React.createElement(Route, { 
-      path: ROUTES.SETTINGS, 
-      element: React.createElement(ProtectedRoute, null, 
-        React.createElement(AppLayout, null, React.createElement(SettingsPage))
-      ) 
-    }),
-    React.createElement(Route, { 
-      path: ROUTES.USER_MANAGEMENT, 
-      element: React.createElement(ProtectedRoute, null, 
-        React.createElement(AppLayout, null, React.createElement(UserManagementPage))
-      ) 
-    }),
+    // React.createElement(Route, { 
+    //   path: ROUTES.SETTINGS, 
+    //   element: React.createElement(ProtectedRoute, null, 
+    //     React.createElement(AppLayout, null, React.createElement(SettingsPage))
+    //   ) 
+    // }),
+    // React.createElement(Route, { 
+    //   path: ROUTES.USER_MANAGEMENT, 
+    //   element: React.createElement(ProtectedRoute, null, 
+    //     React.createElement(AppLayout, null, React.createElement(UserManagementPage))
+    //   ) 
+    // }),
     React.createElement(Route, { 
       path: ROUTES.WORKFLOW_CIRCUIT, 
       element: React.createElement(ProtectedRoute, null, 
