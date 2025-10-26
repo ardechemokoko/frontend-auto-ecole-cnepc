@@ -98,13 +98,6 @@ const AppRoutes: React.FC = () => {
         React.createElement(AppLayout, null, React.createElement(UserManagementPage))
       ) 
     }),
-    // Route détails candidat
-    React.createElement(Route, { 
-      path: "/candidat/:dossierId", 
-      element: React.createElement(ProtectedRoute, null, 
-        React.createElement(AppLayout, null, React.createElement(CandidateDetailsPage))
-      ) 
-    }),
     // Route 404
     React.createElement(Route, { 
       path: "*", 

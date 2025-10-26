@@ -136,6 +136,25 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
         }
       ]
     },
+    {
+      title: 'Workflow',
+      icon: UserGroupIcon,
+      path: ROUTES.WORKFLOW,
+      description: 'Gestion du workflow',
+      hasSubmenu: true,
+      submenu: [
+        {
+          path: ROUTES.WORKFLOW_CIRCUIT,
+          title: 'Circuits',
+          description: 'Créer et gérer les circuits de validation'
+        },
+        {
+          path: ROUTES.WORKFLOW_STATUT,
+          title: 'Statuts',
+          description: 'Créer et gérer les status'
+        },
+      ]
+    },
   ];
 
   // Filtrer les menus selon les permissions de l'utilisateur
