@@ -266,6 +266,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
               const isCandidatsItem = item.title === 'Gestion des Candidats';
               const isSettingsItem = item.title === 'Paramètres';
               const isCnepcItem = item.title === 'CNEPC';
+              const isWorkflowItem = item.title === 'Workflow';
               return (
                 <React.Fragment key={item.path}>
                   <ListItem disablePadding>
