@@ -93,6 +93,24 @@ const AppRoutes: React.FC = () => {
         React.createElement(AppLayout, null, React.createElement(UserManagementPage))
       ) 
     }),
+    React.createElement(Route, { 
+      path: ROUTES.WORKFLOW_CIRCUIT, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CircuitPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.WORKFLOW_CIRCUIT_DETAIL, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CircuitDetailPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.WORKFLOW_STATUT, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(StatutPage))
+      ) 
+    }),
     // Route 404
     React.createElement(Route, { 
       path: "*", 
