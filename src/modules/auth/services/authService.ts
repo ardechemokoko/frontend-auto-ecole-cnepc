@@ -5,6 +5,8 @@ import axiosAuthentifcation from '../../../shared/environment/envauth';
 import axiosClient from '../../../shared/environment/envdev';
 import { Person } from '../../cnepc/forms/updateinfoAutoEcole';
 import { ChangePasswordForm } from '../../eleves/types/changepassword';
+import { FormDataEmail } from '../forms/LoginForm';
+import { ResetPasswordFormData } from '../forms/resetpassword';
 
 export class AuthService {
   async login(credentials: LoginRequest): Promise<any> {
@@ -131,12 +133,34 @@ export class AuthService {
 
     }
   }
-  async changePassword(changePassword:ChangePasswordForm):Promise<any>{
-     try {
+  async changePassword(changePassword: ChangePasswordForm): Promise<any> {
+    try {
       const response = await axiosClient.post("/auth/change-password", changePassword);
       return response.data;
     } catch (e) {
 
+    }
+  }
+
+  async forgotPassword(email: FormDataEmail): Promise<any> {
+    try {
+     // console.log("email envoyé " + email.email)
+      const response = await axiosClient.post("/auth/forgot-password",email);
+      console.log(response)
+      return response.data;
+    } catch (e) {
+     console.log(e)
+    }
+  }
+
+   async resetPassword(resetpassword: ResetPasswordFormData): Promise<any> {
+    try {
+     // console.log("email envoyé " + email.email)
+      const response = await axiosClient.post("/auth/reset-password",resetpassword);
+      console.log(response)
+      return response.data;
+    } catch (e) {
+     console.log(e)
     }
   }
 }

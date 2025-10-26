@@ -14,7 +14,11 @@ import {
   IconButton,
   Avatar,
   Tooltip,
-  Button
+  Button,
+  Modal,
+  Stack,
+  Fade,
+  CircularProgress
 } from '@mui/material';
 import {
   School as SchoolIcon,
@@ -24,7 +28,8 @@ import {
   Edit as EditIcon,
   Schedule as ScheduleIcon,
   Add as AddIcon,
-  Delete
+  Delete,
+  Edit
 } from '@mui/icons-material';
 import { Referentiel, ReferentielFormulaire } from '../../../shared/model/referentiel';
 import { referentielService } from '../../auth/services/referentiel.services';
@@ -34,20 +39,9 @@ import {
   Card,
   CardContent,
   TextField,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Alert,
-
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-
-  Divider
 } from '@mui/material';
+import DeleteConfirmModal from '../../auth/delete/deletemodal';
 
 
 
@@ -56,9 +50,19 @@ const PageReferenciel: React.FC = () => {
   const [referentiels, setReferentiels] = useState<Referentiel[]>([]);
   const [statut, setStatut] = useState<boolean>(true);
   const [update, setUpdate] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+
   const [errors, setErrors] = useState<Partial<ReferentielFormulaire>>({});
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [updatData, setUpdateFormData] = useState<Referentiel>({ id: 0, code: '', libelle: '', statut: true, type_ref: '', description: '' });
+  // const [updatData, setUpdateFormData] = useState<Referentiel>({ id: 0, code: '', libelle: '', statut: true, type_ref: '', description: '' });
+
+  // const [open, setOpen] = useState(false);
+
+  // const handleDelete = () => {
+  //   console.log("✅ Élément supprimé !");
+  //   setOpen(false);
+  // };
+
 
   const [formData, setFormData] = useState<ReferentielFormulaire>({ code: '', libelle: '', statut: true, type_ref: '', description: '' });
   useEffect(() => {
@@ -72,8 +76,10 @@ const PageReferenciel: React.FC = () => {
       // On vérifie que res contient bien un tableau
       if (Array.isArray(res)) {
         setReferentiels(res);
+        setIsLoading(false);
       } else if (Array.isArray(res)) {
         setReferentiels(res);
+        setIsLoading(false);
       } else {
         console.warn("Format de données inattendu :", res);
         setReferentiels([]);
@@ -90,12 +96,12 @@ const PageReferenciel: React.FC = () => {
       setReferentiels([]); // on vide la liste en cas d’erreur
     }
   };
-  function onViewreferentiel(referentiel: Referentiel): void {
-    setFormData({ code: referentiel.code, libelle: referentiel.libelle, statut: true, type_ref: referentiel.type_ref, description: referentiel.description })
-    showFormulaire();
-    setUpdateFormData(referentiel)
-    setUpdate(true)
-  }
+  // function onViewreferentiel(referentiel: Referentiel): void {
+  //   setFormData({ code: referentiel.code, libelle: referentiel.libelle, statut: true, type_ref: referentiel.type_ref, description: referentiel.description })
+  //   showFormulaire();
+  //   setUpdateFormData(referentiel)
+  //   setUpdate((prev) => !prev)
+  // }
 
   function showFormulaire(): void {
     setStatut((prev) => !prev);
@@ -105,44 +111,27 @@ const PageReferenciel: React.FC = () => {
   const creationDeRef = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
-      // const res = await referentielService.saveReferentiels({
-      //   libelle: formData.libelle,
-      //   code: formData.code,
-      //   type_ref: formData.type_ref,
-      //   description: formData.description,
-      //   statut: true,
-      // })
-      // if (res) {
-      //   // showFormulaire()
-      //   getReferentiel();
-      //   setFormData({ code: '', libelle: '', statut: true, type_ref: '', description: '' })
-      //   setMessage({ type: 'success', text: 'Sauvegarde réussie !' });
-
-      //   setTimeout(() => {
-      //     showFormulaire()
-      //   }, 100);
-      // }
-      console.log(formData)
-      const resUpdate = await referentielService.updateReferentiels({
-        code: updatData.code,
-        id: updatData.id,
+      setIsLoading(true)
+      setUpdate((prev) => !prev)
+      const res = await referentielService.saveReferentiels({
         libelle: formData.libelle,
-        statut: updatData.statut,
-        type_ref: updatData.type_ref,
-        description: formData.description
-
+        code: formData.code,
+        type_ref: formData.type_ref,
+        description: formData.description,
+        statut: true,
       })
-      console.log(resUpdate)
-       if (resUpdate) {
+      if (res) {
         // showFormulaire()
         getReferentiel();
-        setUpdateFormData({id:0, code: '', libelle: '', statut: true, type_ref: '', description: '' })
-        setMessage({ type: 'success', text: 'Modification réussie !' });
+        setFormData({ code: '', libelle: '', statut: true, type_ref: '', description: '' })
+        setMessage({ type: 'success', text: 'Sauvegarde réussie !' });
 
         setTimeout(() => {
           showFormulaire()
-        }, 100);
+        }, 1000);
       }
+      console.log(formData)
+
     } catch (e) {
       console.log(e)
     }
@@ -156,6 +145,7 @@ const PageReferenciel: React.FC = () => {
     }
   };
 
+
   function ondeleteferentiel(referentiel: Referentiel): void {
     try {
       referentielService.deleteReferentiels(referentiel);
@@ -165,10 +155,35 @@ const PageReferenciel: React.FC = () => {
     }
   }
 
+  if (isLoading) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#f5f5f5'
+        }}
+      >
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={60} sx={{ color: '#50C786', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary">
+            chargement des données...
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
+
   return (
     <><Box>
       <Button
-        onClick={showFormulaire}
+        onClick={() => {
+          setUpdate((prev) => !prev)
+
+        }}
+
       >
         <AddIcon></AddIcon>
       </Button>
@@ -183,7 +198,20 @@ const PageReferenciel: React.FC = () => {
           {message.text}
         </Alert>
       )}
-      {statut ? <TableContainer component={Paper}>
+      {update ? <TableContainer component={Paper}>
+        <Typography
+          variant="h4"
+          component="h1"
+          sx={{
+            textAlign: 'center',
+            mb: 2,
+            fontSize: { xs: '0.5rem', sm: '1rem', md: '1.5rem' }
+          }}
+          className="font-display"
+        >
+          Referentiels
+
+        </Typography>
         <Table>
           <TableHead>
             <TableRow>
@@ -255,18 +283,14 @@ const PageReferenciel: React.FC = () => {
                           color="primary"
                         >
                           <Delete fontSize="small" />
+
+
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Gérer le referentiel">
-                        <IconButton
-                          size="small"
-                          onClick={() => onViewreferentiel(referentiel)}
-                          color="secondary"
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+
                     </Box>
+
+
                   </TableCell>
                 </TableRow>
               ))
@@ -283,54 +307,68 @@ const PageReferenciel: React.FC = () => {
             )}
           </TableBody>
         </Table>
-      </TableContainer> : <Card>
-        <CardContent>
-          {message && (
-            <Alert
-              severity={message.type}
-              sx={{ mb: 2 }}
-              onClose={() => setMessage(null)}
-            >
-              {message.text}
-            </Alert>
-          )}
-          <form onSubmit={creationDeRef}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1.5, sm: 2 } }}>
-              <TextField
-                label="Libelle"
-                type="text"
-                onChange={handleInputChange('libelle')}
-                fullWidth
-                value={formData.libelle}
-                size={window.innerWidth < 600 ? 'small' : 'medium'}
+      </TableContainer> :
+        <Card>
+          <Typography
+            variant="h4"
+            component="h1"
+            sx={{
+              textAlign: 'center',
+              mb: 2,
+              fontSize: { xs: '0.5rem', sm: '1rem', md: '1.5rem' }
+            }}
+            className="font-display"
+          >
+            Ajouter Un Referentiel
 
-              />
+          </Typography>
+          <CardContent>
+            {message && (
+              <Alert
+                severity={message.type}
+                sx={{ mb: 2 }}
+                onClose={() => setMessage(null)}
+              >
+                {message.text}
+              </Alert>
+            )}
+            <form onSubmit={creationDeRef}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1.5, sm: 2 } }}>
+                <TextField
+                  label="Libelle"
+                  type="text"
+                  onChange={handleInputChange('libelle')}
+                  fullWidth
+                  value={formData.libelle}
+                  size={window.innerWidth < 600 ? 'small' : 'medium'}
 
-              <TextField
-                label="Code de reference"
-                type="text"
-                onChange={handleInputChange('code')}
-                fullWidth
-                value={formData.code}
-                size={window.innerWidth < 600 ? 'small' : 'medium'}
-              />
-              <TextField
-                label="Type de Referentiel"
-                type="text"
-                fullWidth
-                value={formData.type_ref}
-                onChange={handleInputChange('type_ref')}
-                size={window.innerWidth < 600 ? 'small' : 'medium'}
-              />
-              <TextField
-                label="Description"
-                type="text"
-                fullWidth
-                onChange={handleInputChange('description')}
-                value={formData.description}
-                size={window.innerWidth < 600 ? 'small' : 'medium'}
-              />
-              {/* <TextField
+                />
+
+                <TextField
+                  label="Code de reference"
+                  type="text"
+                  onChange={handleInputChange('code')}
+                  fullWidth
+                  value={formData.code}
+                  size={window.innerWidth < 600 ? 'small' : 'medium'}
+                />
+                <TextField
+                  label="Type de Referentiel"
+                  type="text"
+                  fullWidth
+                  value={formData.type_ref}
+                  onChange={handleInputChange('type_ref')}
+                  size={window.innerWidth < 600 ? 'small' : 'medium'}
+                />
+                <TextField
+                  label="Description"
+                  type="text"
+                  fullWidth
+                  onChange={handleInputChange('description')}
+                  value={formData.description}
+                  size={window.innerWidth < 600 ? 'small' : 'medium'}
+                />
+                {/* <TextField
                 label="Statut"
                 type="radio"
                 onChange={handleInputChange('statut')}
@@ -339,29 +377,26 @@ const PageReferenciel: React.FC = () => {
                 size={window.innerWidth < 600 ? 'small' : 'medium'}
               /> */}
 
-              <Button
-                type="submit"
-                variant="contained"
-                fullWidth
-                size={window.innerWidth < 600 ? 'medium' : 'large'}
+                <Button
+                  type="submit"
+                  variant="contained"
+                  fullWidth
+                  size={window.innerWidth < 600 ? 'medium' : 'large'}
 
-                sx={{
-                  mt: { xs: 1.5, sm: 2 },
-                  backgroundColor: '#50C786',
-                  '&:hover': { backgroundColor: '#40B676' },
-                  fontSize: { xs: '0.9rem', sm: '1rem' },
-                  py: { xs: 1.5, sm: 2 }
-                }}
-              >
-                {update ? "Modifier Referentiel" : "Creation de Referentiel"}
-              </Button>
-            </Box>
-          </form>
-        </CardContent>
-      </Card>} </>);
+                  sx={{
+                    mt: { xs: 1.5, sm: 2 },
+                    backgroundColor: '#50C786',
+                    '&:hover': { backgroundColor: '#40B676' },
+                    fontSize: { xs: '0.9rem', sm: '1rem' },
+                    py: { xs: 1.5, sm: 2 }
+                  }}
+                >
+                  Creation de Referentiel
+                </Button>
+              </Box>
+            </form>
+          </CardContent>
+        </Card>} </>);
 }
 export default PageReferenciel;
 
-function setErrors(arg0: (prev: any) => any) {
-  throw new Error('Function not implemented.');
-}

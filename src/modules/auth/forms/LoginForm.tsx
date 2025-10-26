@@ -1,23 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { Button, TextField, Card, CardContent, Typography, Box, Alert, CircularProgress } from '@mui/material';
+import { Button, TextField, Card, CardContent, Typography, Box, Alert, CircularProgress, Link, tabClasses } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../../store';
 import { authService } from '../services/authService';
 import { tokenService } from '../services';
 import { User } from '../types';
 import { ROUTES } from '../../../shared/constants';
+import ForgotPasswordLink from './forgotpasswordtext';
 
 interface LoginFormData {
   email: string;
   password: string;
 }
+export interface FormDataEmail {
+  email: string;
+}
+
+interface FormErrorsEmail {
+  email?: string;
+}
 
 const LoginForm: React.FC = () => {
   const { login, setLoading, isLoading, isAuthenticated } = useAppStore();
+  const [isLoadingSendEmail, setIsLoadingSendEmail] = useState<boolean>(false);
+  const [isLoadingSendEmailError, setIsLoadingSendEmailError] = useState<boolean>(false);
   const navigate = useNavigate();
   const [formData, setFormData] = useState<LoginFormData>({ email: '', password: '' });
   const [errors, setErrors] = useState<Partial<LoginFormData>>({});
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [forgotPassword, setForgotPassword] = useState<boolean>(false);
+  const [email, setMail] = useState<string>('');
+  const [emailerrors, setMailerrors] = useState<String>('');
+  const [emailData, setEmailFormData] = useState<FormDataEmail>({
+    email: "",
+  });
+
 
   // Redirection automatique si déjà connecté
   useEffect(() => {
@@ -48,6 +65,58 @@ const LoginForm: React.FC = () => {
     );
   }
 
+  // Afficher l'envoi des email
+  if (isLoadingSendEmail) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#f5f5f5'
+        }}
+      >
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={60} sx={{ color: '#50C786', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary">
+            Envoi de Mail En cours...
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
+
+  //   if (isLoadingSendEmailError) {
+  //   return (
+  //     <Box
+  //       sx={{
+  //         minHeight: '100vh',
+  //         display: 'flex',
+  //         alignItems: 'center',
+  //         justifyContent: 'center',
+  //         backgroundColor: '#f5f5f5'
+  //       }}
+  //     >
+  //       <Box sx={{ textAlign: 'center' }}>
+  //         <CircularProgress size={60} sx={{ color: '#50C786', mb: 2 }} />
+  //         <Typography variant="h6" color="text.secondary">
+  //           Envoi de Mail En cours...
+  //         </Typography>
+  //       </Box>
+  //     </Box>
+  //   );
+  // }
+  const validateEmail = (): boolean => {
+    const newErrors: Partial<String> = {};
+    if (!emailData.email) {
+      setMailerrors('L\'email est requis')
+    } else if (!/\S+@\S+\.\S+/.test(emailData.email)) {
+      setMailerrors('Email invalide')
+    }
+    return Object.keys(newErrors).length === 0;
+  }
+
   const validateForm = (): boolean => {
     const newErrors: Partial<LoginFormData> = {};
 
@@ -75,6 +144,50 @@ const LoginForm: React.FC = () => {
     }
   };
 
+  const handleEmailChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value.trim();
+
+    setEmailFormData({
+      email: value
+    });
+    if (!emailData.email) {
+      setMailerrors('L\'email est requis')
+    } else if (!/\S+@\S+\.\S+/.test(emailData.email)) {
+      setMailerrors('Email invalide')
+    } else {
+      setMailerrors('')
+    }
+    if (emailData.email = "") {
+      setMailerrors('')
+    }
+  };
+
+  const onSubmitForgotPassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!validateEmail()) {
+      return;
+    }
+    try {
+      if (emailData.email != "") {
+        setIsLoadingSendEmail(true);
+      }
+      //
+      const rest = await authService.forgotPassword(emailData);
+      if (rest) {
+        setMessage({ type: 'success', text: 'Veuillez consulter votre email' });
+
+      }
+      // console.log(rest)
+    } catch (e) {
+      setIsLoadingSendEmail(false);
+      console.log(e)
+    }
+    setTimeout(() => {
+      navigate(ROUTES.RPW);
+    }, 1000);
+    // console.log(emailData.email)
+  }
+
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -83,7 +196,10 @@ const LoginForm: React.FC = () => {
     }
 
     try {
-      setLoading(true);
+      if (formData.email != "" && formData.password != "") {
+        setLoading(true);
+      }
+
       setMessage(null);
 
       // Utilisation du service mocké
@@ -92,7 +208,7 @@ const LoginForm: React.FC = () => {
         password: formData.password,
       });
 
-      console.log(authResponse);
+      //console.log(authResponse);
 
       // Vérifier si le token est bien un JWT
       const token = authResponse.data.access_token;
@@ -103,6 +219,8 @@ const LoginForm: React.FC = () => {
         name: authResponse.data.user.personne.nom_complet,
         role: authResponse.data.user.role,
         createdAt: authResponse.data.user.created_at,
+        personne: authResponse.data.user.personne
+
       };
 
       login(user, token);
@@ -238,7 +356,7 @@ const LoginForm: React.FC = () => {
             Logiciel officiel du Ministère des Transports
           </Typography>
 
-          <Box sx={{ mt: { xs: 3, sm: 6 } }}>
+          {/* <Box sx={{ mt: { xs: 3, sm: 6 } }}>
             <Typography
               variant="h6"
               sx={{
@@ -260,7 +378,7 @@ const LoginForm: React.FC = () => {
             >
               Rengus Digital
             </Typography>
-          </Box>
+          </Box> */}
 
         </Box>
       </Box>
@@ -314,20 +432,10 @@ const LoginForm: React.FC = () => {
               }}
               className="font-display"
             >
-              Connexion
+              {forgotPassword ? "Mot de passe oublié" : "Connexion"}
+
             </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                textAlign: 'center',
-                mb: 3,
-                color: 'text.secondary',
-                fontSize: { xs: '0.9rem', sm: '1rem' }
-              }}
-              className="font-primary"
-            >
-              Accédez à votre espace de gestion
-            </Typography>
+
 
             {message && (
               <Alert
@@ -338,8 +446,56 @@ const LoginForm: React.FC = () => {
                 {message.text}
               </Alert>
             )}
+            {forgotPassword ? <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1.5, sm: 2 } }}>
+              <form onSubmit={onSubmitForgotPassword}>
+                <TextField
+                  label="Email"
+                  type="email"
 
-            <form onSubmit={onSubmit}>
+                  fullWidth
+                  value={emailData.email}
+                  onChange={handleEmailChange}
+                  error={!!emailerrors}
+                  helperText={emailerrors}
+                  size={window.innerWidth < 600 ? 'small' : 'medium'}
+                />
+
+                <Button
+                  type="submit"
+                  variant="contained"
+                  fullWidth
+                  size={window.innerWidth < 600 ? 'medium' : 'large'}
+                  disabled={isLoading}
+                  sx={{
+                    mt: { xs: 1.5, sm: 2 },
+                    backgroundColor: '#50C786',
+                    '&:hover': { backgroundColor: '#40B676' },
+                    fontSize: { xs: '0.9rem', sm: '1rem' },
+                    py: { xs: 1.5, sm: 2 }
+                  }}
+                >
+                  Envoi Email
+                </Button>
+              </form>
+
+              <Box textAlign="right" mt={1}>
+                <Link
+                  component="button"
+                  variant="body2"
+                  onClick={() => {
+                    setForgotPassword((prev) => !prev)
+                  }}
+                  underline="hover"
+                  sx={{
+                    fontSize: "0.85rem",
+                    color: "text.secondary",
+                    "&:hover": { color: "primary.main" },
+                  }}
+                >
+                  connexion
+                </Link>
+              </Box>
+            </Box> : <form onSubmit={onSubmit}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1.5, sm: 2 } }}>
                 <TextField
                   label="Email"
@@ -379,8 +535,26 @@ const LoginForm: React.FC = () => {
                 >
                   {isLoading ? 'Connexion...' : 'Se connecter'}
                 </Button>
+                {/* <Box textAlign="right" mt={1}>
+                  <Link
+                    component="button"
+                    variant="body2"
+                    onClick={() => {
+                      setForgotPassword((prev) => !prev)
+                    }}
+                    underline="hover"
+                    sx={{
+                      fontSize: "0.85rem",
+                      color: "text.secondary",
+                      "&:hover": { color: "primary.main" },
+                    }}
+                  >
+                    Mot de passe oublié
+                  </Link>
+                </Box> */}
               </Box>
-            </form>
+            </form>}
+
           </CardContent>
         </Card>
 

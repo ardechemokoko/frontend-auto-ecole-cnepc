@@ -9,6 +9,7 @@ export const ROUTES = {
   UPDATE: '/updateinfo',
   REF: '/referenciel',
   CPW: '/change-password',
+  RPW: '/reset-password',
 } as const;
 
 export const STATUS = {

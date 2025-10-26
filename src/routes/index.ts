@@ -16,6 +16,7 @@ import PageReferenciel from '../modules/cnepc/forms/referentiel';
 import AutoEcolePage from './AutoEcolePage';
 import { SettingsPage, UserManagementPage } from '../modules/settings';
 import PageChangePassWord from '../modules/cnepc/forms/changePassword';
+import ResetPasswordForm from '../modules/auth/forms/resetpassword';
 
 // Composant de protection des routes
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -32,6 +33,9 @@ const AppRoutes: React.FC = () => {
     }),
     // Route de connexion
     React.createElement(Route, { path: ROUTES.LOGIN, element: React.createElement(LoginPage) }),
+
+       // reset password 
+    React.createElement(Route, { path: ROUTES.RPW, element: React.createElement(ResetPasswordForm) }),
 
      //   React.createElement(Route, { path: ROUTES.UPDATE, element: React.createElement(PageUpdateAutoecole) }),
     // Routes protégées avec layout
