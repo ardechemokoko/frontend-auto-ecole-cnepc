@@ -454,7 +454,7 @@ export class AutoEcoleService {
    */
   async getDossierById(id: string): Promise<Dossier> {
     try {
-      const response = await axiosClient.get(`/api/dossiers/${id}`);
+      const response = await axiosClient.get(`/dossiers/${id}`);
       return response.data.data;
     } catch (error) {
       console.error('Erreur lors de la récupération du dossier:', error);
@@ -467,7 +467,7 @@ export class AutoEcoleService {
    */
   async updateDossier(id: string, data: Partial<DossierFormData>): Promise<{ success: boolean; message: string; data: Dossier }> {
     try {
-      const response = await axiosClient.put(`/api/dossiers/${id}`, data);
+      const response = await axiosClient.put(`/dossiers/${id}`, data);
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la mise à jour du dossier:', error);
@@ -524,7 +524,7 @@ export class AutoEcoleService {
    */
   async checkAutoEcoleResponsable(): Promise<boolean> {
     try {
-      const response = await axiosClient.get('/api/auto-ecoles/mes-dossiers');
+      const response = await axiosClient.get('/auto-ecoles/mes-dossiers');
       return response.data.success;
     } catch (error) {
       console.error('Erreur lors de la vérification du responsable:', error);
@@ -543,7 +543,7 @@ export class AutoEcoleService {
     dossiers_rejetes: number;
   }> {
     try {
-      const response = await axiosClient.get(`/api/auto-ecoles/${autoEcoleId}/statistiques`);
+      const response = await axiosClient.get(`/auto-ecoles/${autoEcoleId}/statistiques`);
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la récupération des statistiques:', error);
