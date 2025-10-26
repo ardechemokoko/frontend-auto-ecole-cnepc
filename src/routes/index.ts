@@ -11,8 +11,13 @@ import DashboardPage from './DashboardPage';
 import ValidationPage from './ValidationPage';
 import ElevesPage from './ElevesPage';
 import CNEPCPage from './CNEPCPage';
+
 import PageUpdateAutoecole from '../modules/cnepc/forms/updateinfoAutoEcole'
 import PageReferenciel from '../modules/cnepc/forms/referentiel';
+import { CandidateDetailsPage } from '../modules/cnepc/pages';
+import SettingsPage from '../modules/settings/pages/SettingsPage';
+import UserManagementPage from '../modules/settings/pages/UserManagementPage';
+import AutoEcolePage from './AutoEcolePage';
 
 // Composant de protection des routes
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -91,6 +96,13 @@ const AppRoutes: React.FC = () => {
       path: ROUTES.USER_MANAGEMENT, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(UserManagementPage))
+      ) 
+    }),
+    // Route détails candidat
+    React.createElement(Route, { 
+      path: "/candidat/:dossierId", 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CandidateDetailsPage))
       ) 
     }),
     // Route 404
