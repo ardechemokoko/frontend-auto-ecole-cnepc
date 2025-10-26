@@ -13,6 +13,11 @@ import ElevesPage from './ElevesPage';
 import CNEPCPage from './CNEPCPage';
 import PageUpdateAutoecole from '../modules/cnepc/forms/updateinfoAutoEcole'
 import PageReferenciel from '../modules/cnepc/forms/referentiel';
+import AutoEcolePage from './AutoEcolePage';
+import { SettingsPage, UserManagementPage } from '../modules/settings';
+import CircuitPage from '../modules/circuit/pages/CircuitPage';
+import CircuitDetailPage from '../modules/circuit/pages/CircuitDetailPage';
+import StatutPage from '../modules/statut/pages/StatutPage';
 
 // Composant de protection des routes
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
