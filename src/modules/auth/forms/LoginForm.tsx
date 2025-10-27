@@ -3,6 +3,7 @@ import { Button, TextField, Card, CardContent, Typography, Box, Alert, CircularP
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../../store';
 import { authService } from '../services/authService';
+import { tokenService } from '../services';
 import { User } from '../types';
 import { ROUTES } from '../../../shared/constants';
 
@@ -91,18 +92,47 @@ const LoginForm: React.FC = () => {
         password: formData.password,
       });
       
+      // 🔍 DÉBOGAGE : Vérifier le token reçu du backend
+      console.log('🎫 RÉPONSE D\'AUTHENTIFICATION:', {
+        success: authResponse.data.success,
+        token_type: authResponse.data.token_type,
+        expires_in: authResponse.data.expires_in,
+        access_token_preview: authResponse.data.access_token?.substring(0, 50) + '...',
+        access_token_length: authResponse.data.access_token?.length,
+        access_token_parts: authResponse.data.access_token?.split('.').length,
+        user_id: authResponse.data.user?.id,
+        user_email: authResponse.data.user?.email,
+        user_role: authResponse.data.user?.role
+      });
+      
+      // Vérifier si le token est bien un JWT
+      const token = authResponse.data.access_token;
+      if (!token) {
+        throw new Error('❌ Aucun token reçu du backend !');
+      }
+      
+      if (token.split('.').length !== 3) {
+        console.error('❌ ATTENTION : Le token reçu n\'est PAS un JWT standard !');
+        console.error('Token reçu:', token.substring(0, 100));
+        console.error('Format attendu: header.payload.signature (3 parties)');
+        console.error('Format reçu:', token.split('.').length, 'parties');
+      }
+      
       // Conversion du type pour correspondre au store
       const user: User = {
-        id: authResponse.user.id,
-        email: authResponse.user.email,
-        name: authResponse.user.name,
-        role: authResponse.user.role as 'admin' | 'instructor' | 'student',
-        createdAt: authResponse.user.createdAt,
+        id: authResponse.data.user.id,
+        email: authResponse.data.user.email,
+        name: authResponse.data.user.personne.nom_complet,
+        role: authResponse.data.user.role,
+        createdAt: authResponse.data.user.created_at,
       };
       
-      login(user, authResponse.token);
+      login(user, token);
       setMessage({ type: 'success', text: 'Connexion réussie !' });
+      tokenService.setAuthData(token, user);
       
+      console.log('✅ Token sauvegardé dans localStorage avec la clé "access_token"');
+
       // Redirection vers le dashboard après connexion réussie
       setTimeout(() => {
         navigate(ROUTES.DASHBOARD);

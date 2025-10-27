@@ -5,6 +5,11 @@ export const ROUTES = {
   VALIDATION: '/validation',
   ELEVES: '/eleves',
   CNEPC: '/cnepc',
+  AUTO_ECOLES: '/auto-ecoles',
+  SETTINGS: '/settings',
+  USER_MANAGEMENT: '/user-management',
+  UPDATE: '/updateinfo',
+  REF: '/referenciel',
 } as const;
 
 export const STATUS = {

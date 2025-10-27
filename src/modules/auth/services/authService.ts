@@ -1,21 +1,158 @@
-// Service d'authentification avec mocks
-import { LoginRequest, AuthResponse } from './types';
-import { loginMock, logoutMock, refreshTokenMock, checkCNEPCStatusMock } from './auth.service';
+// Service d'authentification
+import { LoginRequest } from './types';
+
+import axiosAuthentifcation from '../../../shared/environment/envauth';
+import axiosClient from '../../../shared/environment/envdev';
 
 export class AuthService {
-  async login(credentials: LoginRequest): Promise<AuthResponse> {
+  async login(credentials: LoginRequest): Promise<any> {
     try {
-      // Utilisation du mock pour le développement
-      return await loginMock(credentials);
+      console.log('🔐 Tentative de connexion:', { email: credentials.email });
+      
+      // Utilisation de l'API d'authentification
+      const response = await axiosAuthentifcation.post("/auth/login-direct", credentials);
+      
+      // Logs détaillés de l'utilisateur authentifié
+      console.log('✅ Connexion réussie !');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('👤 INFORMATIONS UTILISATEUR AUTHENTIFIÉ');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      if (response.data && response.data.user) {
+        const user = response.data.user;
+        
+        console.log('📋 Identité:');
+        console.log('  • ID Utilisateur:', user.id);
+        console.log('  • Email:', user.email);
+        console.log('  • Rôle:', user.role);
+        console.log('  • Date de création:', user.created_at);
+        
+        if (user.personne) {
+          console.log('\n👨‍💼 Informations Personnelles:');
+          console.log('  • ID Personne:', user.personne.id);
+          console.log('  • Nom:', user.personne.nom);
+          console.log('  • Prénom:', user.personne.prenom);
+          console.log('  • Nom complet:', user.personne.nom_complet);
+          console.log('  • Email:', user.personne.email);
+          console.log('  • Contact:', user.personne.contact);
+          console.log('  • Adresse:', user.personne.adresse || 'Non renseignée');
+        }
+        
+        console.log('\n🔑 Token:');
+        console.log('  • Type:', response.data.token_type || 'Bearer');
+        console.log('  • Access Token:', response.data.access_token ? `${response.data.access_token.substring(0, 30)}...` : 'N/A');
+        console.log('  • Refresh Token:', response.data.refresh_token ? 'Présent' : 'Absent');
+        console.log('  • Expire dans:', response.data.expires_in ? `${response.data.expires_in}s` : 'N/A');
+        
+        // Log spécifique selon le rôle
+        console.log('\n🎭 RÔLE DÉTECTÉ:', user.role.toUpperCase());
+        
+        switch (user.role) {
+          case 'responsable_auto_ecole':
+            console.log('  ➜ Type: Responsable d\'Auto-École');
+            console.log('  ➜ Permissions: Gestion des candidats, dossiers, formations');
+            console.log('  ➜ Action suivante: Récupération de l\'auto-école...');
+            break;
+          case 'candidat':
+            console.log('  ➜ Type: Candidat');
+            console.log('  ➜ Permissions: Consultation de ses dossiers');
+            break;
+          case 'admin':
+            console.log('  ➜ Type: Administrateur');
+            console.log('  ➜ Permissions: Accès complet au système');
+            break;
+          default:
+            console.log('  ➜ Type: Rôle non reconnu');
+            console.warn('  ⚠️ Attention: Rôle inattendu détecté');
+        }
+        
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      } else {
+        console.warn('⚠️ Réponse d\'authentification incomplète');
+        console.log('Réponse reçue:', response.data);
+      }
+      
+      return response;
     } catch (error: any) {
+      console.error('❌ ERREUR DE CONNEXION');
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('Message:', error.message);
+      
+      if (error.response) {
+        console.error('Statut HTTP:', error.response.status);
+        console.error('Données:', error.response.data);
+      }
+      
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
       throw new Error(`Erreur de connexion: ${error.message}`);
     }
   }
 
-  async logout(): Promise<void> {
+  async register(data: {
+    email: string;
+    password: string;
+    password_confirmation: string;
+    nom: string;
+    prenom: string;
+    contact: string;
+    adresse?: string;
+    role: string;
+  }): Promise<any> {
     try {
-      // Utilisation du mock pour le développement
-      await logoutMock();
+      console.log('📝 Tentative d\'enregistrement:', { 
+        email: data.email, 
+        nom: data.nom, 
+        prenom: data.prenom, 
+        role: data.role 
+      });
+      
+      const response = await axiosAuthentifcation.post("/auth/register", data);
+      
+      console.log('✅ Enregistrement réussi !');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('👤 NOUVEL UTILISATEUR CRÉÉ');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      if (response.data && response.data.user) {
+        const user = response.data.user;
+        
+        console.log('📋 Identité:');
+        console.log('  • ID Utilisateur:', user.id);
+        console.log('  • Email:', user.email);
+        console.log('  • Rôle:', user.role);
+        
+        if (user.personne) {
+          console.log('\n👨‍💼 Informations Personnelles:');
+          console.log('  • ID Personne:', user.personne.id);
+          console.log('  • Nom:', user.personne.nom);
+          console.log('  • Prénom:', user.personne.prenom);
+          console.log('  • Contact:', user.personne.contact);
+        }
+        
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ ERREUR D\'ENREGISTREMENT');
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('Message:', error.message);
+      
+      if (error.response) {
+        console.error('Statut HTTP:', error.response.status);
+        console.error('Données:', error.response.data);
+      }
+      
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      throw error;
+    }
+  }
+
+  async logoutBackEnd(): Promise<void> {
+    try {
+      await axiosClient.post("/auth/logout");
     } catch (error: any) {
       throw new Error(`Erreur de déconnexion: ${error.message}`);
     }
@@ -23,18 +160,24 @@ export class AuthService {
 
   async refreshToken(): Promise<{ token: string; refreshToken: string }> {
     try {
-      // Utilisation du mock pour le développement
-      return await refreshTokenMock();
+      console.log('🔄 Rafraîchissement du token...');
+      const response = await axiosAuthentifcation.post("/auth/refresh");
+      console.log('✅ Token rafraîchi avec succès');
+      return response.data;
     } catch (error: any) {
+      console.error('❌ Erreur de rafraîchissement du token:', error.message);
       throw new Error(`Erreur de rafraîchissement: ${error.message}`);
     }
   }
 
   async checkCNEPCStatus(): Promise<{ isOnline: boolean; lastCheck: string }> {
     try {
-      // Utilisation du mock pour le développement
-      return await checkCNEPCStatusMock();
+      console.log('🔍 Vérification du statut CNEPC...');
+      const response = await axiosClient.get("/cnepc/status");
+      console.log('✅ Statut CNEPC:', response.data);
+      return response.data;
     } catch (error: any) {
+      console.error('❌ Erreur vérification CNEPC:', error.message);
       throw new Error(`Erreur de vérification CNEPC: ${error.message}`);
     }
   }
