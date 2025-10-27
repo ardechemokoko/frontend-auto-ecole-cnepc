@@ -130,7 +130,7 @@ export class AuthService {
       const response = await axiosClient.put("/auth/update-profile", update);
       return response.data;
     } catch (e) {
-
+      console.log(e)
     }
   }
   async changePassword(changePassword: ChangePasswordForm): Promise<any> {
@@ -144,23 +144,23 @@ export class AuthService {
 
   async forgotPassword(email: FormDataEmail): Promise<any> {
     try {
-     // console.log("email envoyé " + email.email)
-      const response = await axiosClient.post("/auth/forgot-password",email);
+      // console.log("email envoyé " + email.email)
+      const response = await axiosClient.post("/auth/forgot-password", email);
       console.log(response)
       return response.data;
     } catch (e) {
-     console.log(e)
+      console.log(e)
     }
   }
 
-   async resetPassword(resetpassword: ResetPasswordFormData): Promise<any> {
+  async resetPassword(resetpassword: ResetPasswordFormData): Promise<any> {
     try {
-     // console.log("email envoyé " + email.email)
-      const response = await axiosClient.post("/auth/reset-password",resetpassword);
+      // console.log("email envoyé " + email.email)
+      const response = await axiosClient.post("/auth/reset-password", resetpassword);
       console.log(response)
       return response.data;
     } catch (e) {
-     console.log(e)
+      console.log(e)
     }
   }
 }

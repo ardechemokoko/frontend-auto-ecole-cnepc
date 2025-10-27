@@ -51,6 +51,7 @@ const PageUpdateAutoecole: React.FC = () => {
       }
  
     } catch (e) {
+      console.log(e)
       setIsLoadingSendEmail(false);
     }
 
