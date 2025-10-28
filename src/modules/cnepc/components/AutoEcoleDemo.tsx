@@ -146,7 +146,7 @@ const AutoEcoleDemo: React.FC = () => {
             startIcon={<People />}
             onClick={() => handleFormOpen('candidat')}
           >
-            Nouveau Candidat
+            Nouveau Candidatss
           </Button>
           <Button
             variant="outlined"

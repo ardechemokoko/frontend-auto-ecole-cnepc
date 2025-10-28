@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Paper,
@@ -44,7 +45,7 @@ import {
   School,
   Assignment,
 } from '@mui/icons-material';
-import { Dossier, MesDossiersResponse, AutoEcole, autoEcoleService } from '../services';
+import { Dossier, MesDossiersResponse, AutoEcole, Formation, autoEcoleService } from '../services';
 import { CandidatForm, DossierForm } from '../forms';
 
 interface CandidatsTableProps {
@@ -56,6 +57,7 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
   autoEcoleId,
   refreshTrigger,
 }) => {
+  const navigate = useNavigate();
   const [dossiers, setDossiers] = useState<Dossier[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +66,9 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
   
   // États pour les détails de l'auto-école
   const [autoEcoleDetails, setAutoEcoleDetails] = useState<AutoEcole | null>(null);
+  
+  // Cache pour les détails de formation
+  const [formationsCache, setFormationsCache] = useState<Map<string, Formation>>(new Map());
   
   // États pour les statistiques
   const [statistiques, setStatistiques] = useState<{
@@ -85,6 +90,39 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
   // Menu contextuel
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+
+  // Fonction pour enrichir les données de formation
+  const enrichFormationData = async (dossiers: Dossier[]) => {
+    const formationsToFetch = new Set<string>();
+    
+    // Identifier les formations qui ont besoin d'être enrichies
+    dossiers.forEach(dossier => {
+      if (!formationsCache.has(dossier.formation.id)) {
+        formationsToFetch.add(dossier.formation.id);
+      }
+    });
+    
+    // Récupérer les détails des formations manquantes
+    if (formationsToFetch.size > 0) {
+      try {
+        console.log('🔄 Enrichissement des données de formation pour:', Array.from(formationsToFetch));
+        
+        // Récupérer toutes les formations de l'auto-école
+        const formations = await autoEcoleService.getFormationsByAutoEcole(autoEcoleId || autoEcoleDetails?.id || '');
+        
+        // Mettre à jour le cache
+        const newCache = new Map(formationsCache);
+        formations.forEach(formation => {
+          newCache.set(formation.id, formation);
+        });
+        setFormationsCache(newCache);
+        
+        console.log('✅ Cache de formations mis à jour:', newCache.size, 'formations');
+      } catch (error) {
+        console.error('❌ Erreur lors de l\'enrichissement des formations:', error);
+      }
+    }
+  };
 
   // Charger les dossiers (candidats inscrits)
   const loadDossiers = async () => {
@@ -123,6 +161,9 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
           }
         }
         
+        // Enrichir les données de formation
+        await enrichFormationData(response.dossiers || []);
+        
         // Pas de statistiques avec /dossiers, on les calcule localement
         const dossiers = response.dossiers || [];
         const stats = {
@@ -150,6 +191,9 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
         setDossiers(response.dossiers || []);
         setAutoEcoleDetails(response.auto_ecole || null);
         setStatistiques(response.statistiques || null);
+        
+        // Enrichir les données de formation
+        await enrichFormationData(response.dossiers || []);
       }
     } catch (err: any) {
       console.error('❌ Erreur lors du chargement des dossiers:', err);
@@ -201,8 +245,10 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
   const handleView = () => {
     const dossier = dossiers.find(d => d.id === selectedRowId);
     if (dossier) {
-      // Logique pour voir les détails du dossier
-      console.log('Voir dossier:', dossier);
+      // Navigation vers la page de détails du candidat avec les données du dossier
+      navigate(`/candidat/${dossier.id}`, { 
+        state: { dossier } 
+      });
     }
     handleMenuClose();
   };
@@ -547,7 +593,20 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
                           {dossier.candidat.personne.prenom[0]}{dossier.candidat.personne.nom[0]}
                         </Avatar>
                         <Box>
-                          <Typography variant="subtitle2" fontWeight="medium">
+                          <Typography 
+                            variant="subtitle2" 
+                            fontWeight="medium"
+                            sx={{ 
+                              cursor: 'pointer',
+                              '&:hover': { 
+                                color: 'primary.main',
+                                textDecoration: 'underline'
+                              }
+                            }}
+                            onClick={() => navigate(`/candidat/${dossier.id}`, { 
+                              state: { dossier } 
+                            })}
+                          >
                             {dossier.candidat.personne.prenom} {dossier.candidat.personne.nom}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
@@ -567,17 +626,53 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
                         <School color="action" />
                         <Box>
                           <Typography variant="body2" fontWeight="medium">
-                            {dossier.formation.nom || (() => {
-                              // Récupérer le libellé du type de permis de manière sûre
-                              if (dossier.formation.type_permis) {
-                                const typePermis = dossier.formation.type_permis;
-                                if ('libelle' in typePermis) {
+                            {(() => {
+                              // Utiliser les données enrichies du cache si disponibles
+                              const enrichedFormation = formationsCache.get(dossier.formation.id) || dossier.formation;
+                              const formation = enrichedFormation;
+                              
+                              // 1. Nom direct de la formation
+                              if (formation.nom && formation.nom.trim()) {
+                                return formation.nom;
+                              }
+                              
+                              // 2. Description de la formation
+                              if (formation.description && formation.description.trim()) {
+                                return formation.description;
+                              }
+                              
+                              // 3. Type de permis avec libellé
+                              if (formation.type_permis) {
+                                const typePermis = formation.type_permis as any;
+                                // Vérifier si c'est un Referentiel (a libelle)
+                                if (typePermis.libelle && typePermis.libelle.trim()) {
                                   return `Formation ${typePermis.libelle}`;
-                                } else if ('nom' in typePermis) {
+                                }
+                                // Vérifier si c'est un TypePermis (a nom)
+                                if (typePermis.nom && typePermis.nom.trim()) {
                                   return `Formation ${typePermis.nom}`;
                                 }
                               }
-                              return 'Formation N/A';
+                              
+                              // 4. TypePermis alternatif
+                              if (formation.typePermis) {
+                                const typePermis = formation.typePermis as any;
+                                // Vérifier si c'est un Referentiel (a libelle)
+                                if (typePermis.libelle && typePermis.libelle.trim()) {
+                                  return `Formation ${typePermis.libelle}`;
+                                }
+                                // Vérifier si c'est un TypePermis (a nom)
+                                if (typePermis.nom && typePermis.nom.trim()) {
+                                  return `Formation ${typePermis.nom}`;
+                                }
+                              }
+                              
+                              // 5. Fallback avec montant et durée
+                              const montant = formation.montant_formate || (formation.montant ? `${formation.montant} FCFA` : '');
+                              const duree = formation.duree_jours ? `${formation.duree_jours} jours` : '';
+                              const details = [montant, duree].filter(Boolean).join(' - ');
+                              
+                              return details ? `Formation (${details})` : 'Formation';
                             })()}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
