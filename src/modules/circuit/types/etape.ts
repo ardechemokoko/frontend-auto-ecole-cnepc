@@ -11,10 +11,12 @@ export interface Etape {
   created_at?: string
   updated_at?: string
   circuit_id: string
-  statut_id: string
+  statut_id?: string
+  roles?: string[]
 
   // Relations
   circuit?: Circuit
   statut?: Statut
-  exigences?: PieceJustificative[]
+  pieces?: PieceJustificative[],
+  statut_libelle?: string
 }

@@ -1,21 +1,21 @@
-import axiosAuthentifcation from '../../../shared/environment/envauth'
+import axiosClient from '../../../shared/environment/envdev';
 import { Etape } from '../types/etape'
 
 export class EtapeService {
   private url = '/workflow/etapes'
 
   async getByCircuitId(circuitId: string): Promise<Etape[]> {
-    const res = await axiosAuthentifcation.get(`${this.url}?circuit_id=${circuitId}`)
+    const res = await axiosClient.get(`${this.url}?circuit_id=${circuitId}`)
     return res.data
   }
 
   async create(payload: Partial<Etape>): Promise<Etape> {
-    const res = await axiosAuthentifcation.post(this.url, payload)
+    const res = await axiosClient.post(this.url, payload)
     return res.data
   }
 
   async remove(id: string): Promise<void> {
-    await axiosAuthentifcation.delete(`${this.url}/${id}`)
+    await axiosClient.delete(`${this.url}/${id}`)
   }
 }
 
