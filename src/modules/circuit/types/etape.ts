@@ -17,5 +17,6 @@ export interface Etape {
   // Relations
   circuit?: Circuit
   statut?: Statut
-  pieces?: PieceJustificative[]
+  pieces?: PieceJustificative[],
+  statut_libelle?: string
 }

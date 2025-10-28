@@ -5,4 +5,5 @@ export interface PieceJustificative {
   nombre_min?: number
   origine?: string
   type_document?: string
+  libelle: string
 }

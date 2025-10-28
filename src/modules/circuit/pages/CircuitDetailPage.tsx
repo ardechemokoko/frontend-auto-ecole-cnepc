@@ -39,6 +39,7 @@ import { roleService } from '../services/role.service'
 import { TypeDocument } from '../types'
 import { Transition } from '../types/transition'
 import { transitionService } from '../services/transition.service'
+import WorkflowDiagramme from '../components/WorkflowDiagramme'
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -299,6 +300,7 @@ const CircuitDetailPage: React.FC = () => {
         <Tabs value={value} onChange={handleChange} aria-label="basic tabs example">
           <Tab label="Etapes du circuit" {...a11yProps(0)} />
           <Tab label="Transitions du circuit" {...a11yProps(1)} />
+          <Tab label="Diagramme" {...a11yProps(2)} />
         </Tabs>
       </Box>
 
@@ -341,9 +343,9 @@ const CircuitDetailPage: React.FC = () => {
                     <Typography variant="body2">
                       {etape.auto_advance ? '⏩ Passage automatique' : '🕹️ Manuel'}
                     </Typography>
-                    {etape.statut && (
+                    {etape.statut_libelle && (
                       <Typography variant="body2" color="primary">
-                        Statut associé : {etape.statut.libelle} ({etape.statut.code})
+                        Statut associé : {etape.statut_libelle}
                       </Typography>
                     )}
 
@@ -355,7 +357,7 @@ const CircuitDetailPage: React.FC = () => {
                           {etape.pieces.map((ex, idx) => (
                             <li key={idx}>
                               {ex.piece_code} — {ex.origine || 'Inconnue'} —{' '}
-                              {ex.obligatoire ? 'Obligatoire' : 'Optionnelle'}
+                              {ex.obligatoire ? 'Obligatoire' : 'Optionnelle'} -
                             </li>
                           ))}
                         </ul>
@@ -431,10 +433,16 @@ const CircuitDetailPage: React.FC = () => {
         </Paper>
       </CustomTabPanel>
 
-      {/* === SECTION ÉTAPES === */}
-      
+      <CustomTabPanel value={value} index={2}>
+        {/* === DIAGRAMME DU WORKFLOW === */}
+        <Paper sx={{ p: 3, mt: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Diagramme du workflow
+          </Typography>
+          <WorkflowDiagramme etapes={etapes} transitions={transitions} />
+        </Paper>
+      </CustomTabPanel>
 
-      {/* === SECTION TRANSITIONS === */}
       
 
       {/* === DIALOG AJOUT ÉTAPE === */}
@@ -580,6 +588,7 @@ const CircuitDetailPage: React.FC = () => {
                         onChange={(e) => {
                           const newEx = [...(formEtape.pieces ?? [])]
                           newEx[index].type_document = e.target.value // code du document
+                          newEx[index].libelle = typeDocuments.find(td => td.id === e.target.value)?.libelle || ''  
                           setFormEtape({ ...formEtape, pieces: newEx })
                         }}
                       >
