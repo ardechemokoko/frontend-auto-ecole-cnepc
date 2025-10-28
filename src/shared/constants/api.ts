@@ -1,6 +1,6 @@
 // Configuration API
 export const API_CONFIG = {
-  BASE_URL: (import.meta as any).env?.VITE_API_URL || 'https://9c8r7bbvybn.preview.infomaniak.website/api',
+  BASE_URL: (import.meta as any).env?.VITE_API_URL || 'https://api.artech-agency.site/api',
   TIMEOUT: 10000, // 10 secondes
   RETRY_ATTEMPTS: 3,
 };
@@ -30,6 +30,14 @@ export const API_ENDPOINTS = {
     SEND: '/cnepc/send-batch',
     STATUS: '/cnepc/status',
     HISTORY: '/cnepc/history',
+  },
+  // Gestion des utilisateurs (Admin)
+  USERS: {
+    LIST: '/admin/operators',
+    CREATE: '/admin/operators',
+    UPDATE: (id: string) => `/admin/operators/${id}`,
+    DELETE: (id: string) => `/admin/operators/${id}`,
+    TOGGLE_STATUS: (id: string) => `/admin/operators/${id}/toggle-status`,
   },
   HEALTH: '/health',
 } as const;

@@ -1,30 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Paper,
   Typography,
   Tabs,
   Tab,
-  Grid,
-  Card,
-  CardContent,
-  CardActions,
   Button,
-  Chip,
-  Avatar,
-  Alert,
-  CircularProgress,
 } from '@mui/material';
 import {
   School,
-  People,
-  Assignment,
-  TrendingUp,
   Add,
   Visibility,
 } from '@mui/icons-material';
-import { AutoEcoleTable, CandidatsTable } from '../tables';
-import { AutoEcole, autoEcoleService } from '../services';
+import { AutoEcoleTable } from '../tables';
+import { AutoEcole } from '../services';
+import { AutoEcoleSettings } from '../components';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -51,42 +41,14 @@ function TabPanel(props: TabPanelProps) {
 const AutoEcoleManagement: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [selectedAutoEcole, setSelectedAutoEcole] = useState<AutoEcole | null>(null);
-  const [autoEcoleStats, setAutoEcoleStats] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Charger les statistiques de l'auto-école
-  const loadAutoEcoleStats = async () => {
-    if (!selectedAutoEcole) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const stats = await autoEcoleService.getAutoEcoleStats(selectedAutoEcole.id);
-      setAutoEcoleStats(stats);
-    } catch (err: any) {
-      console.error('Erreur lors du chargement des statistiques:', err);
-      setError(err.response?.data?.message || 'Erreur lors du chargement des statistiques');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Effet pour charger les statistiques quand une auto-école est sélectionnée
-  useEffect(() => {
-    if (selectedAutoEcole) {
-      loadAutoEcoleStats();
-    }
-  }, [selectedAutoEcole]);
-
   // Gestion du changement d'onglet
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
-  // Gestion de la sélection d'une auto-école
+  // Gestion de la sélection d'une auto-écolFe
   const handleAutoEcoleSelect = (autoEcole: AutoEcole) => {
     setSelectedAutoEcole(autoEcole);
     setTabValue(1); // Passer à l'onglet des candidats
@@ -95,9 +57,6 @@ const AutoEcoleManagement: React.FC = () => {
   // Rafraîchir les données
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
-    if (selectedAutoEcole) {
-      loadAutoEcoleStats();
-    }
   };
 
   return (
@@ -112,107 +71,13 @@ const AutoEcoleManagement: React.FC = () => {
         </Typography>
       </Box>
 
-      {/* Statistiques globales */}
-      {selectedAutoEcole && autoEcoleStats && (
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h5" gutterBottom>
-            Statistiques - {selectedAutoEcole.nom_auto_ecole}
-          </Typography>
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Avatar sx={{ bgcolor: 'primary.main' }}>
-                      <People />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="h4" color="primary">
-                        {autoEcoleStats.total_candidats}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Candidats total
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Avatar sx={{ bgcolor: 'warning.main' }}>
-                      <Assignment />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="h4" color="warning.main">
-                        {autoEcoleStats.dossiers_en_attente}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        En attente
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Avatar sx={{ bgcolor: 'info.main' }}>
-                      <TrendingUp />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="h4" color="info.main">
-                        {autoEcoleStats.dossiers_en_cours}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        En cours
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Avatar sx={{ bgcolor: 'success.main' }}>
-                      <School />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="h4" color="success.main">
-                        {autoEcoleStats.dossiers_valides}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Validés
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        </Box>
-      )}
-
-      {/* Message d'erreur */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
       {/* Onglets */}
       <Paper sx={{ width: '100%' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="auto-ecole tabs">
             <Tab label="Liste des Auto-Écoles" />
             <Tab 
-              label="Candidats Inscrits" 
+              label="Paramètres" 
               disabled={!selectedAutoEcole}
             />
           </Tabs>
@@ -226,11 +91,11 @@ const AutoEcoleManagement: React.FC = () => {
           />
         </TabPanel>
 
-        {/* Onglet 2: Candidats inscrits */}
+        {/* Onglet 2: Paramètres et gestion */}
         <TabPanel value={tabValue} index={1}>
           {selectedAutoEcole ? (
-            <CandidatsTable
-              autoEcoleId={selectedAutoEcole.id}
+            <AutoEcoleSettings
+              autoEcole={selectedAutoEcole}
               refreshTrigger={refreshTrigger}
             />
           ) : (
@@ -240,7 +105,7 @@ const AutoEcoleManagement: React.FC = () => {
                 Sélectionnez une auto-école
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Choisissez une auto-école dans la liste pour voir ses candidats inscrits
+                Choisissez une auto-école dans la liste pour gérer ses paramètres, candidats et formations
               </Typography>
             </Box>
           )}
@@ -255,7 +120,7 @@ const AutoEcoleManagement: React.FC = () => {
             startIcon={<Visibility />}
             onClick={() => setTabValue(1)}
           >
-            Voir les candidats
+            Gérer l'auto-école
           </Button>
           <Button
             variant="contained"

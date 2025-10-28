@@ -6,6 +6,8 @@ export const ROUTES = {
   ELEVES: '/eleves',
   CNEPC: '/cnepc',
   AUTO_ECOLES: '/auto-ecoles',
+  SETTINGS: '/settings',
+  USER_MANAGEMENT: '/user-management',
   UPDATE: '/updateinfo',
   REF: '/referenciel',
   CPW: '/change-password',

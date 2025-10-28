@@ -93,6 +93,67 @@ export class AuthService {
     }
   }
 
+  async register(data: {
+    email: string;
+    password: string;
+    password_confirmation: string;
+    nom: string;
+    prenom: string;
+    contact: string;
+    adresse?: string;
+    role: string;
+  }): Promise<any> {
+    try {
+      console.log('📝 Tentative d\'enregistrement:', { 
+        email: data.email, 
+        nom: data.nom, 
+        prenom: data.prenom, 
+        role: data.role 
+      });
+      
+      const response = await axiosAuthentifcation.post("/auth/register", data);
+      
+      console.log('✅ Enregistrement réussi !');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('👤 NOUVEL UTILISATEUR CRÉÉ');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      if (response.data && response.data.user) {
+        const user = response.data.user;
+        
+        console.log('📋 Identité:');
+        console.log('  • ID Utilisateur:', user.id);
+        console.log('  • Email:', user.email);
+        console.log('  • Rôle:', user.role);
+        
+        if (user.personne) {
+          console.log('\n👨‍💼 Informations Personnelles:');
+          console.log('  • ID Personne:', user.personne.id);
+          console.log('  • Nom:', user.personne.nom);
+          console.log('  • Prénom:', user.personne.prenom);
+          console.log('  • Contact:', user.personne.contact);
+        }
+        
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ ERREUR D\'ENREGISTREMENT');
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('Message:', error.message);
+      
+      if (error.response) {
+        console.error('Statut HTTP:', error.response.status);
+        console.error('Données:', error.response.data);
+      }
+      
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      throw error;
+    }
+  }
+
   async logoutBackEnd(): Promise<void> {
     try {
       await axiosClient.post("/auth/logout");

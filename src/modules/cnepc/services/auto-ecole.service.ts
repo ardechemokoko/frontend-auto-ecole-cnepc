@@ -15,7 +15,7 @@ import {
   DossierFormData,
   AutoEcoleFilters,
   DossierFilters,
-  CandidatFilters
+  CandidatFilters,
 } from '../types/auto-ecole';
 
 export class AutoEcoleService {
@@ -167,13 +167,60 @@ export class AutoEcoleService {
 
   /**
    * Crée un nouveau candidat
+   * L'API gère automatiquement la création de la personne associée
    */
-  async createCandidat(data: CandidatFormData): Promise<{ success: boolean; message: string; data: Candidat }> {
+  async createCandidat(data: any): Promise<{ success: boolean; message: string; data: Candidat }> {
     try {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📤 [AUTO-ECOLE SERVICE] CRÉATION D\'UN CANDIDAT');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📋 Payload envoyé à POST /candidats:');
+      console.log(JSON.stringify(data, null, 2));
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
       const response = await axiosClient.post('/candidats', data);
+      
+      console.log('✅ [AUTO-ECOLE SERVICE] Candidat créé avec succès !');
+      console.log('📄 Réponse de l\'API:', response.data);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
       return response.data;
-    } catch (error) {
-      console.error('Erreur lors de la création du candidat:', error);
+    } catch (error: any) {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('❌ [AUTO-ECOLE SERVICE] ERREUR LORS DE LA CRÉATION DU CANDIDAT');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('🔴 Type d\'erreur:', error.name);
+      console.error('🔴 Code d\'erreur:', error.code);
+      console.error('🔴 Message:', error.message);
+      console.error('🔴 Status HTTP:', error.response?.status);
+      
+      if (error.response?.data) {
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.error('📋 RÉPONSE COMPLÈTE DE L\'API:');
+        console.error(JSON.stringify(error.response.data, null, 2));
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        
+        if (error.response.data.errors) {
+          console.log('🔍 DÉTAILS DES ERREURS DE VALIDATION (champ par champ):');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          
+          Object.entries(error.response.data.errors).forEach(([field, messages]: [string, any]) => {
+            const messageList = Array.isArray(messages) ? messages : [messages];
+            console.error(`   ❌ Champ: "${field}"`);
+            messageList.forEach((msg: string, index: number) => {
+              console.error(`      ${index + 1}. ${msg}`);
+            });
+            console.log('   ───────────────────────────────────────────────────────────');
+          });
+        }
+        
+        if (error.response.data.message) {
+          console.error('💬 Message général de l\'API:', error.response.data.message);
+        }
+      }
+      
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
       throw error;
     }
   }
@@ -191,7 +238,151 @@ export class AutoEcoleService {
     }
   }
 
+  /**
+   * Inscrit un candidat à une formation dans une auto-école
+   */
+  async inscrireCandidatFormation(data: {
+    auto_ecole_id: string;
+    formation_id: string;
+    commentaires?: string;
+  }): Promise<{ success: boolean; message: string; dossier: Dossier }> {
+    try {
+      console.log('📝 Inscription du candidat à la formation:', data);
+      const response = await axiosClient.post('/candidats/inscription-formation', data);
+      console.log('✅ Inscription réussie:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Erreur lors de l\'inscription du candidat:', error);
+      throw error;
+    }
+  }
+
   // ===== GESTION DES DOSSIERS (CANDIDATS INSCRITS) =====
+
+  /**
+   * Crée un nouveau dossier pour inscrire un candidat à une formation dans une auto-école
+   */
+  async createDossier(data: {
+    candidat_id: string;
+    auto_ecole_id: string;
+    formation_id: string;
+    statut?: string;
+    date_creation?: string;
+    commentaires?: string;
+  }): Promise<{ success: boolean; message: string; data: Dossier }> {
+    try {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📤 [AUTO-ECOLE SERVICE] CRÉATION D\'UN DOSSIER');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📋 Payload envoyé à POST /dossiers:');
+      console.log(JSON.stringify(data, null, 2));
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      const response = await axiosClient.post('/dossiers', data);
+      
+      console.log('✅ [AUTO-ECOLE SERVICE] Dossier créé avec succès !');
+      console.log('📄 Réponse de l\'API:', response.data);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      return response.data;
+    } catch (error: any) {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('❌ [AUTO-ECOLE SERVICE] ERREUR LORS DE LA CRÉATION DU DOSSIER');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('🔴 Type d\'erreur:', error.name);
+      console.error('🔴 Code d\'erreur:', error.code);
+      console.error('🔴 Message:', error.message);
+      console.error('🔴 Status HTTP:', error.response?.status);
+      
+      if (error.response?.data) {
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.error('📋 RÉPONSE COMPLÈTE DE L\'API:');
+        console.error(JSON.stringify(error.response.data, null, 2));
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        
+        if (error.response.data.errors) {
+          console.log('🔍 DÉTAILS DES ERREURS DE VALIDATION (champ par champ):');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          
+          Object.entries(error.response.data.errors).forEach(([field, messages]: [string, any]) => {
+            const messageList = Array.isArray(messages) ? messages : [messages];
+            console.error(`   ❌ Champ: "${field}"`);
+            messageList.forEach((msg: string, index: number) => {
+              console.error(`      ${index + 1}. ${msg}`);
+            });
+            console.log('   ───────────────────────────────────────────────────────────');
+          });
+        }
+        
+        if (error.response.data.message) {
+          console.error('💬 Message général de l\'API:', error.response.data.message);
+        }
+      }
+      
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère tous les dossiers d'une auto-école spécifique par son ID
+   * Utilisé pour afficher les dossiers d'une auto-école sélectionnée (vue admin)
+   */
+  async getDossiersByAutoEcoleId(autoEcoleId: string, filters?: DossierFilters): Promise<{ success: boolean; dossiers: Dossier[]; auto_ecole?: AutoEcole; statistiques?: any }> {
+    try {
+      const params = new URLSearchParams();
+      params.append('auto_ecole_id', autoEcoleId);
+      if (filters?.statut) params.append('statut', filters.statut);
+      if (filters?.formation_id) params.append('formation_id', filters.formation_id);
+      if (filters?.candidat_id) params.append('candidat_id', filters.candidat_id);
+
+      const queryString = params.toString();
+      const endpoint = `/dossiers${queryString ? `?${queryString}` : ''}`;
+      
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📋 [AUTO-ECOLE SERVICE] RÉCUPÉRATION DES DOSSIERS PAR ID');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🏫 Auto-École ID:', autoEcoleId);
+      console.log('🔗 Endpoint:', endpoint);
+      console.log('🔗 URL complète:', `${axiosClient.defaults.baseURL}${endpoint}`);
+      console.log('🔍 Filtres:', filters);
+      console.log('🔑 Token présent:', !!localStorage.getItem('access_token'));
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      const response = await axiosClient.get(endpoint);
+      
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('✅ [AUTO-ECOLE SERVICE] DOSSIERS RÉCUPÉRÉS AVEC SUCCÈS !');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📋 Nombre de dossiers:', response.data.data?.length || response.data.length || 0);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      // L'endpoint /dossiers retourne un format différent de /auto-ecoles/mes-dossiers
+      // Normaliser la réponse pour la compatibilité
+      return {
+        success: true,
+        dossiers: response.data.data || response.data || [],
+        auto_ecole: undefined, // Pas d'info auto-école dans /dossiers
+        statistiques: undefined
+      };
+    } catch (error: any) {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('❌ [AUTO-ECOLE SERVICE] ERREUR LORS DE LA RÉCUPÉRATION DES DOSSIERS');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('🔴 Status HTTP:', error.response?.status);
+      console.error('🔴 Message:', error.message);
+      console.error('🔴 URL appelée:', error.config?.url);
+      
+      if (error.response?.data) {
+        console.error('📋 Réponse du backend:', JSON.stringify(error.response.data, null, 2));
+      }
+      
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      throw error;
+    }
+  }
 
   /**
    * Récupère tous les dossiers (candidats inscrits) de l'auto-école du responsable connecté
@@ -203,10 +394,57 @@ export class AutoEcoleService {
       if (filters?.formation_id) params.append('formation_id', filters.formation_id);
       if (filters?.candidat_id) params.append('candidat_id', filters.candidat_id);
 
-      const response = await axiosClient.get(`/api/auto-ecoles/mes-dossiers?${params}`);
+      const queryString = params.toString();
+      const endpoint = `/auto-ecoles/mes-dossiers${queryString ? `?${queryString}` : ''}`;
+      
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📋 [AUTO-ECOLE SERVICE] RÉCUPÉRATION DE MES DOSSIERS');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔗 Endpoint:', endpoint);
+      console.log('🔗 URL complète:', `${axiosClient.defaults.baseURL}${endpoint}`);
+      console.log('🔍 Filtres:', filters);
+      console.log('🔑 Token présent:', !!localStorage.getItem('access_token'));
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      const response = await axiosClient.get(endpoint);
+      
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('✅ [AUTO-ECOLE SERVICE] DOSSIERS RÉCUPÉRÉS AVEC SUCCÈS !');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📊 Statistiques:', response.data.statistiques);
+      console.log('🏫 Auto-école:', response.data.auto_ecole?.nom_auto_ecole);
+      console.log('📋 Nombre de dossiers:', response.data.dossiers?.length || 0);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
       return response.data;
-    } catch (error) {
-      console.error('Erreur lors de la récupération des dossiers:', error);
+    } catch (error: any) {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('❌ [AUTO-ECOLE SERVICE] ERREUR LORS DE LA RÉCUPÉRATION DES DOSSIERS');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('🔴 Status HTTP:', error.response?.status);
+      console.error('🔴 Message:', error.message);
+      console.error('🔴 URL appelée:', error.config?.url);
+      console.error('🔴 Méthode:', error.config?.method?.toUpperCase());
+      
+      if (error.response?.status === 404) {
+        console.error('❌ ERREUR 404 - Endpoint non trouvé !');
+        console.error('💡 Vérifications à faire:');
+        console.error('   1. L\'endpoint existe-t-il sur le backend ?');
+        console.error('   2. Le rôle de l\'utilisateur est-il correct ? (ROLE_AUTO_ECOLE)');
+        console.error('   3. L\'utilisateur est-il responsable d\'une auto-école ?');
+      }
+      
+      if (error.response?.status === 401) {
+        console.error('❌ ERREUR 401 - Non authentifié !');
+        console.error('💡 Le token est peut-être expiré ou invalide');
+      }
+      
+      if (error.response?.data) {
+        console.error('📋 Réponse du backend:', JSON.stringify(error.response.data, null, 2));
+      }
+      
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
       throw error;
     }
   }
@@ -216,23 +454,10 @@ export class AutoEcoleService {
    */
   async getDossierById(id: string): Promise<Dossier> {
     try {
-      const response = await axiosClient.get(`/api/dossiers/${id}`);
+      const response = await axiosClient.get(`/dossiers/${id}`);
       return response.data.data;
     } catch (error) {
       console.error('Erreur lors de la récupération du dossier:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Crée un nouveau dossier de candidature
-   */
-  async createDossier(data: DossierFormData): Promise<{ success: boolean; message: string; data: Dossier }> {
-    try {
-      const response = await axiosClient.post('/api/dossiers', data);
-      return response.data;
-    } catch (error) {
-      console.error('Erreur lors de la création du dossier:', error);
       throw error;
     }
   }
@@ -242,7 +467,7 @@ export class AutoEcoleService {
    */
   async updateDossier(id: string, data: Partial<DossierFormData>): Promise<{ success: boolean; message: string; data: Dossier }> {
     try {
-      const response = await axiosClient.put(`/api/dossiers/${id}`, data);
+      const response = await axiosClient.put(`/dossiers/${id}`, data);
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la mise à jour du dossier:', error);
@@ -257,8 +482,9 @@ export class AutoEcoleService {
    */
   async getFormationsByAutoEcole(autoEcoleId: string): Promise<Formation[]> {
     try {
-      const response = await axiosClient.get(`/api/formations?auto_ecole_id=${autoEcoleId}`);
-      return response.data.data;
+      const response = await axiosClient.get(`/formations?auto_ecole_id=${autoEcoleId}`);
+      // La réponse peut être soit { data: [...] } soit directement un array
+      return Array.isArray(response.data) ? response.data : (response.data.data || []);
     } catch (error) {
       console.error('Erreur lors de la récupération des formations:', error);
       throw error;
@@ -270,7 +496,7 @@ export class AutoEcoleService {
    */
   async createFormation(data: FormationFormData): Promise<{ success: boolean; message: string; data: Formation }> {
     try {
-      const response = await axiosClient.post('/api/formations', data);
+      const response = await axiosClient.post('/formations', data);
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la création de la formation:', error);
@@ -283,7 +509,7 @@ export class AutoEcoleService {
    */
   async updateFormation(id: string, data: Partial<FormationFormData>): Promise<{ success: boolean; message: string; data: Formation }> {
     try {
-      const response = await axiosClient.put(`/api/formations/${id}`, data);
+      const response = await axiosClient.put(`/formations/${id}`, data);
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la mise à jour de la formation:', error);
@@ -298,7 +524,7 @@ export class AutoEcoleService {
    */
   async checkAutoEcoleResponsable(): Promise<boolean> {
     try {
-      const response = await axiosClient.get('/api/auto-ecoles/mes-dossiers');
+      const response = await axiosClient.get('/auto-ecoles/mes-dossiers');
       return response.data.success;
     } catch (error) {
       console.error('Erreur lors de la vérification du responsable:', error);
@@ -317,7 +543,7 @@ export class AutoEcoleService {
     dossiers_rejetes: number;
   }> {
     try {
-      const response = await axiosClient.get(`/api/auto-ecoles/${autoEcoleId}/statistiques`);
+      const response = await axiosClient.get(`/auto-ecoles/${autoEcoleId}/statistiques`);
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la récupération des statistiques:', error);
