@@ -29,8 +29,6 @@ import {
   ExpandMore as ChevronDownIcon,
   Settings as SettingsIcon,
   Person as PersonIcon,
-  School as SchoolIcon,
-  Password,
 } from '@mui/icons-material';
 import { ROUTES } from '../constants';
 import tokenService from '../../modules/auth/services/tokenService';
