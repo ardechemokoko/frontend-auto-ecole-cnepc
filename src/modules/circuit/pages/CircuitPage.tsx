@@ -25,7 +25,7 @@ const CircuitPage: React.FC = () => {
   const [openDialog, setOpenDialog] = useState(false)
   const [editingCircuit, setEditingCircuit] = useState<Circuit | null>(null)
   const [formData, setFormData] = useState<Partial<Circuit>>({
-    nom: '',
+    libelle: '',
     description: '',
     actif: true,
     nom_entite: '',
@@ -59,7 +59,7 @@ const CircuitPage: React.FC = () => {
     if (circuit) {
       setEditingCircuit(circuit)
       setFormData({
-        nom: circuit.nom,
+        libelle: circuit.libelle,
         description: circuit.description,
         actif: circuit.actif,
         nom_entite: circuit.nom_entite,
@@ -67,7 +67,7 @@ const CircuitPage: React.FC = () => {
     } else {
       setEditingCircuit(null)
       setFormData({
-        nom: '',
+        libelle: '',
         description: '',
         actif: true,
         nom_entite: '',
@@ -80,7 +80,7 @@ const CircuitPage: React.FC = () => {
     setOpenDialog(false)
     setEditingCircuit(null)
     setFormData({
-      nom: '',
+      libelle: '',
       description: '',
       actif: true,
       nom_entite: '',
@@ -183,12 +183,12 @@ const CircuitPage: React.FC = () => {
             <TextField
               fullWidth
               label="Nom"
-              value={formData.nom ?? ''}
+              value={formData.libelle ?? ''}
               onChange={(e) => {
                 let value = e.target.value
                 // Met la première lettre en majuscule, le reste reste tel quel
                 value = value.charAt(0).toUpperCase() + value.slice(1)
-                setFormData({ ...formData, nom: value })
+                setFormData({ ...formData, libelle: value })
               }}
               margin="normal"
             />

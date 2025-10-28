@@ -1,11 +1,11 @@
 // Service des documents avec mocks
-import axiosAuthentifcation from '../../../shared/environment/envauth';
+import axiosClient from '../../../shared/environment/envdev';
 import { Circuit } from '../types/circuit';
 
 export class CircuitService {
 
     constructor(
-    private axios = axiosAuthentifcation, // ton instance axios avec interceptors
+    private axios = axiosClient, // ton instance axios avec interceptors
         private url = '/workflow/circuits'       // base URL de la ressource
     ) {}
   

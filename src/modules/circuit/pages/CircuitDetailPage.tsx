@@ -21,6 +21,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Tabs,
+  Tab,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
@@ -33,18 +35,58 @@ import { circuitService } from '../services/circuit.service'
 import { etapeService } from '../services/etape.service'
 import { statutService } from '../../statut/services/statut.service'
 import { typeDocumentService } from '../services/type-document.service'
+import { roleService } from '../services/role.service'
 import { TypeDocument } from '../types'
+import { Transition } from '../types/transition'
+import { transitionService } from '../services/transition.service'
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function CustomTabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  );
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `simple-tab-${index}`,
+    'aria-controls': `simple-tabpanel-${index}`,
+  };
+}
 
 const CircuitDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [value, setValue] = React.useState(0);
+
+  const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+    setValue(newValue);
+  };
 
   const [circuit, setCircuit] = useState<Circuit | null>(null)
   const [etapes, setEtapes] = useState<Etape[]>([])
   const [statuts, setStatuts] = useState<Statut[]>([])
+  const [transitions, setTransitions] = useState<Transition[]>([])
   const [typeDocuments, setTypeDocuments] = useState<TypeDocument[]>([])
+  const [roles, setRoles] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [errorForm, setErrorForm] = useState<string | null>(null)
   const [openAddEtape, setOpenAddEtape] = useState(false)
   const [formEtape, setFormEtape] = useState<Partial<Etape>>({
     code: '',
@@ -52,7 +94,17 @@ const CircuitDetailPage: React.FC = () => {
     ordre: 0,
     auto_advance: false,
     statut_id: '',
-    exigences: [],
+    pieces: [],
+    roles: []
+  })
+  const [openAddTransition, setOpenAddTransition] = useState(false)
+  const [formTransition, setFormTransition] = useState<Partial<Transition>>({
+    // id?: string,
+    circuit_id: "",
+    code: "",
+    libelle: "",
+    source_etape_id: "",
+    cible_etape_id: "",
   })
 
   // === Charger circuit, étapes et statuts ===
@@ -65,17 +117,22 @@ const CircuitDetailPage: React.FC = () => {
 
     try {
       setLoading(true)
-      const [circuitData, etapesData, statutsData, typeDocuments] = await Promise.all([
+      const [circuitData, etapesData, statutsData, typeDocuments, /*rolesData,*/ transitionsData] = await Promise.all([
         circuitService.getById(id),
         etapeService.getByCircuitId(id),
         statutService.getAll(),
-        statutService.getAll(),
-        typeDocumentService.getTypeDocuments(),
+        typeDocumentService.getAll({
+          type_ref: "TYPE_DOCUMENT"
+        }),
+        // roleService.getAll(),
+        transitionService.getByCircuitId(id),
       ])
       setCircuit(circuitData)
       setEtapes(etapesData)
       setStatuts(statutsData?.data || statutsData)
-      setTypeDocuments(typeDocuments)
+      setTypeDocuments(typeDocuments?.data);
+      setRoles(["role_admin", "role_cnepc", "role_auto_ecole"]);
+      setTransitions(transitionsData);
     } catch (err: any) {
       setError(err.message ?? 'Erreur lors du chargement des données')
     } finally {
@@ -98,12 +155,13 @@ const CircuitDetailPage: React.FC = () => {
         ordre: 0,
         auto_advance: false,
         statut_id: '',
-        exigences: [],
+        pieces: [],
+        roles: []
       })
       setOpenAddEtape(false)
       await fetchData()
     } catch (err: any) {
-      setError(err.message ?? 'Erreur lors de l’ajout de l’étape')
+      setErrorForm(err.message ?? 'Erreur lors de l’ajout de l’étape')
     }
   }
 
@@ -111,6 +169,35 @@ const CircuitDetailPage: React.FC = () => {
     if (!confirm('Supprimer cette étape ?')) return
     try {
       await etapeService.remove(etapeId)
+      await fetchData()
+    } catch (err: any) {
+      setError(err.message ?? 'Erreur lors de la suppression')
+    }
+  }
+
+  // === Ajouter une transition ===
+  const handleAddTransition = async () => {
+    try {
+      const payload = { ...formTransition, circuit_id: id }
+      await transitionService.create(payload)
+      setFormTransition({
+        circuit_id: "",
+        code: "",
+        libelle: "",
+        source_etape_id: "",
+        cible_etape_id: "",
+      })
+      setOpenAddTransition(false)
+      await fetchData()
+    } catch (err: any) {
+      setErrorForm(err.message ?? 'Erreur lors de l’ajout de la transition')
+    }
+  }
+  // === Supprimer une transition ===
+  const handleDeleteTransition = async (etapeId: string) => {
+    if (!confirm('Supprimer cette transition ?')) return
+    try {
+      await transitionService.remove(etapeId)
       await fetchData()
     } catch (err: any) {
       setError(err.message ?? 'Erreur lors de la suppression')
@@ -175,7 +262,7 @@ const CircuitDetailPage: React.FC = () => {
               Nom du circuit
             </Typography>
             <Typography variant="body1" sx={{ mb: 2 }}>
-              {circuit.nom || '—'}
+              {circuit.libelle || '—'}
             </Typography>
           </Grid>
 
@@ -208,85 +295,158 @@ const CircuitDetailPage: React.FC = () => {
         </Grid>
       </Paper>
 
-      {/* === SECTION ÉTAPES === */}
-      <Paper sx={{ p: 3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6">Étapes du circuit</Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setOpenAddEtape(true)}
-          >
-            Nouvelle étape
-          </Button>
-        </Box>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs value={value} onChange={handleChange} aria-label="basic tabs example">
+          <Tab label="Etapes du circuit" {...a11yProps(0)} />
+          <Tab label="Transitions du circuit" {...a11yProps(1)} />
+        </Tabs>
+      </Box>
 
-        {etapes.length === 0 ? (
-          <Typography color="text.secondary">Aucune étape enregistrée.</Typography>
-        ) : (
-          <Box>
-            {etapes.map((etape) => (
-              <Paper
-                key={etape.id}
-                sx={{
-                  p: 2,
-                  mb: 1,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  flexDirection: 'column',
-                }}
-              >
-                <Box width="100%">
-                  <Typography variant="subtitle1" fontWeight="bold">
-                    {etape.libelle}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Code : {etape.code} — Ordre : {etape.ordre}
-                  </Typography>
-                  <Typography variant="body2">
-                    {etape.auto_advance ? '⏩ Passage automatique' : '🕹️ Manuel'}
-                  </Typography>
-                  {etape.statut && (
-                    <Typography variant="body2" color="primary">
-                      Statut associé : {etape.statut.libelle} ({etape.statut.code})
-                    </Typography>
-                  )}
-
-                  {/* Exigences */}
-                  {etape.exigences && etape.exigences.length > 0 && (
-                    <Box mt={1}>
-                      <Typography variant="subtitle2">Exigences :</Typography>
-                      <ul>
-                        {etape.exigences.map((ex, idx) => (
-                          <li key={idx}>
-                            {ex.piece_code} — {ex.origine || 'Inconnue'} —{' '}
-                            {ex.obligatoire ? 'Obligatoire' : 'Optionnelle'} (min :{' '}
-                            {ex.nombre_min})
-                          </li>
-                        ))}
-                      </ul>
-                    </Box>
-                  )}
-                </Box>
-
-                <Box alignSelf="flex-end">
-                  <Tooltip title="Supprimer">
-                    <IconButton color="error" onClick={() => handleDeleteEtape(etape.id!)}>
-                      <DeleteIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </Paper>
-            ))}
+      <CustomTabPanel value={value} index={0}>
+        <Paper sx={{ p: 3 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6"></Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setOpenAddEtape(true)}
+            >
+              Nouvelle étape
+            </Button>
           </Box>
-        )}
-      </Paper>
+
+          {etapes.length === 0 ? (
+            <Typography color="text.secondary">Aucune étape enregistrée.</Typography>
+          ) : (
+            <Box>
+              {etapes.map((etape) => (
+                <Paper
+                  key={etape.id}
+                  sx={{
+                    p: 2,
+                    mb: 1,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <Box width="100%">
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      {etape.libelle}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Code : {etape.code} — Ordre : {etape.ordre}
+                    </Typography>
+                    <Typography variant="body2">
+                      {etape.auto_advance ? '⏩ Passage automatique' : '🕹️ Manuel'}
+                    </Typography>
+                    {etape.statut && (
+                      <Typography variant="body2" color="primary">
+                        Statut associé : {etape.statut.libelle} ({etape.statut.code})
+                      </Typography>
+                    )}
+
+                    {/* Exigences */}
+                    {etape.pieces && etape.pieces.length > 0 && (
+                      <Box mt={1}>
+                        <Typography variant="subtitle2">Exigences :</Typography>
+                        <ul>
+                          {etape.pieces.map((ex, idx) => (
+                            <li key={idx}>
+                              {ex.piece_code} — {ex.origine || 'Inconnue'} —{' '}
+                              {ex.obligatoire ? 'Obligatoire' : 'Optionnelle'}
+                            </li>
+                          ))}
+                        </ul>
+                      </Box>
+                    )}
+                  </Box>
+
+                  <Box alignSelf="flex-end">
+                    <Tooltip title="Supprimer">
+                      <IconButton color="error" onClick={() => handleDeleteEtape(etape.id!)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </Paper>
+              ))}
+            </Box>
+          )}
+        </Paper>
+      </CustomTabPanel>
+      <CustomTabPanel value={value} index={1}>
+        <Paper sx={{ p: 3 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6"></Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setOpenAddTransition(true)}
+            >
+              Nouvelle transition
+            </Button>
+          </Box>
+
+          {transitions.length === 0 ? (
+            <Typography color="text.secondary">Aucune transition enregistrée.</Typography>
+          ) : (
+            <Box>
+              {transitions.map((transition) => (
+                <Paper
+                  key={transition.id}
+                  sx={{
+                    p: 2,
+                    mb: 1,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <Box width="100%">
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      {transition.libelle}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Code : {transition.code}
+                    </Typography>
+                    <Typography variant="body2">
+                      Parcours : {transition.source?.libelle} - {transition.cible?.libelle}
+                    </Typography>
+                  </Box>
+
+                  <Box alignSelf="flex-end">
+                    <Tooltip title="Supprimer">
+                      <IconButton color="error" onClick={() => handleDeleteTransition(transition.id!)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </Paper>
+              ))}
+            </Box>
+          )}
+        </Paper>
+      </CustomTabPanel>
+
+      {/* === SECTION ÉTAPES === */}
+      
+
+      {/* === SECTION TRANSITIONS === */}
+      
 
       {/* === DIALOG AJOUT ÉTAPE === */}
       <Dialog open={openAddEtape} onClose={() => setOpenAddEtape(false)} maxWidth="md" fullWidth>
         <DialogTitle>Ajouter une étape</DialogTitle>
         <DialogContent>
+          {errorForm && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {errorForm}
+            </Alert>
+          )}
+          
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
               <TextField
@@ -350,6 +510,33 @@ const CircuitDetailPage: React.FC = () => {
               </FormControl>
             </Grid>
 
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Rôles</InputLabel>
+                <Select
+                  multiple
+                  value={formEtape.roles ?? []}
+                  label="Rôles"
+                  onChange={(e) =>
+                    setFormEtape({ ...formEtape, roles: e.target.value as string[] })
+                  }
+                  renderValue={(selected) => (selected as string[]).join(', ')} // affichage lisible
+                >
+                  {Array.isArray(roles) && roles.length > 0 ? (
+                    roles.map((role) => (
+                      <MenuItem key={role} value={role}>
+                        <Checkbox checked={formEtape.roles?.includes(role) ?? false} />
+                        <Typography>{role}</Typography>
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled>Aucun rôle disponible</MenuItem>
+                  )}
+                </Select>
+              </FormControl>
+            </Grid>
+
+
             <Grid item xs={12}>
               <FormControlLabel
                 control={
@@ -367,10 +554,10 @@ const CircuitDetailPage: React.FC = () => {
             {/* === Section Exigences === */}
             <Grid item xs={12}>
               <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
-                Exigences de pièces justificatives
+                Ppièces justificatives
               </Typography>
 
-              {(formEtape.exigences ?? []).map((exigence, index) => (
+              {(formEtape.pieces ?? []).map((piece, index) => (
                 <Grid
                   container
                   key={index}
@@ -383,55 +570,71 @@ const CircuitDetailPage: React.FC = () => {
                     backgroundColor: '#fafafa',
                   }}
                 >
-                  <Grid item xs={12} md={3}>
-                    <TextField
-                      fullWidth
-                      label="Code pièce"
-                      value={exigence.piece_code ?? ''}
-                      onChange={(e) => {
-                        const newEx = [...(formEtape.exigences ?? [])]
-                        newEx[index].piece_code = e.target.value.toUpperCase()
-                        setFormEtape({ ...formEtape, exigences: newEx })
-                      }}
-                    />
+                  {/* === Sélecteur de type de document === */}
+                  <Grid item xs={12} md={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Type de document</InputLabel>
+                      <Select
+                        value={piece.type_document ?? ''}
+                        label="Type de document"
+                        onChange={(e) => {
+                          const newEx = [...(formEtape.pieces ?? [])]
+                          newEx[index].type_document = e.target.value // code du document
+                          setFormEtape({ ...formEtape, pieces: newEx })
+                        }}
+                      >
+                        {Array.isArray(typeDocuments) && typeDocuments.length > 0 ? (
+                          typeDocuments.map((doc) => (
+                            <MenuItem key={doc.id} value={doc.id}>
+                              {doc.libelle} ({doc.code})
+                            </MenuItem>
+                          ))
+                        ) : (
+                          <MenuItem disabled>Aucun type de document</MenuItem>
+                        )}
+                      </Select>
+                    </FormControl>
                   </Grid>
 
-                  <Grid item xs={12} md={3}>
+                  {/* === Nombre minimum === */}
+                  {/* <Grid item xs={12} md={3}>
                     <TextField
                       fullWidth
                       type="number"
                       label="Nombre minimum"
-                      value={exigence.nombre_min ?? 0}
+                      value={piece.nombre_min ?? 0}
                       onChange={(e) => {
-                        const newEx = [...(formEtape.exigences ?? [])]
+                        const newEx = [...(formEtape.pieces ?? [])]
                         newEx[index].nombre_min = Number(e.target.value)
-                        setFormEtape({ ...formEtape, exigences: newEx })
+                        setFormEtape({ ...formEtape, pieces: newEx })
                       }}
                     />
-                  </Grid>
+                  </Grid> */}
 
-                  <Grid item xs={12} md={3}>
+                  {/* === Origine === */}
+                  {/* <Grid item xs={12} md={3}>
                     <TextField
                       fullWidth
                       label="Origine"
-                      value={exigence.origine ?? ''}
+                      value={piece.origine ?? ''}
                       onChange={(e) => {
-                        const newEx = [...(formEtape.exigences ?? [])]
+                        const newEx = [...(formEtape.pieces ?? [])]
                         newEx[index].origine = e.target.value
-                        setFormEtape({ ...formEtape, exigences: newEx })
+                        setFormEtape({ ...formEtape, pieces: newEx })
                       }}
                     />
-                  </Grid>
+                  </Grid> */}
 
-                  <Grid item xs={12} md={2} display="flex" alignItems="center">
+                  {/* === Checkbox obligatoire === */}
+                  <Grid item xs={12} md={5} display="flex" alignItems="center">
                     <FormControlLabel
                       control={
                         <Checkbox
-                          checked={exigence.obligatoire ?? false}
+                          checked={piece.obligatoire ?? false}
                           onChange={(e) => {
-                            const newEx = [...(formEtape.exigences ?? [])]
+                            const newEx = [...(formEtape.pieces ?? [])]
                             newEx[index].obligatoire = e.target.checked
-                            setFormEtape({ ...formEtape, exigences: newEx })
+                            setFormEtape({ ...formEtape, pieces: newEx })
                           }}
                         />
                       }
@@ -439,15 +642,14 @@ const CircuitDetailPage: React.FC = () => {
                     />
                   </Grid>
 
+                  {/* === Bouton suppression === */}
                   <Grid item xs={12} md={1} display="flex" alignItems="center">
                     <Button
                       variant="outlined"
                       color="error"
                       onClick={() => {
-                        const newEx = (formEtape.exigences ?? []).filter(
-                          (_, i) => i !== index
-                        )
-                        setFormEtape({ ...formEtape, exigences: newEx })
+                        const newEx = (formEtape.pieces ?? []).filter((_, i) => i !== index)
+                        setFormEtape({ ...formEtape, pieces: newEx })
                       }}
                     >
                       Suppr.
@@ -456,6 +658,7 @@ const CircuitDetailPage: React.FC = () => {
                 </Grid>
               ))}
 
+              {/* === Bouton d'ajout === */}
               <Button
                 variant="outlined"
                 size="small"
@@ -468,11 +671,11 @@ const CircuitDetailPage: React.FC = () => {
                   }
                   setFormEtape({
                     ...formEtape,
-                    exigences: [...(formEtape.exigences ?? []), newEx],
+                    pieces: [...(formEtape.pieces ?? []), newEx],
                   })
                 }}
               >
-                + Ajouter une exigence
+                + Ajouter une piece
               </Button>
             </Grid>
           </Grid>
@@ -481,6 +684,100 @@ const CircuitDetailPage: React.FC = () => {
         <DialogActions>
           <Button onClick={() => setOpenAddEtape(false)}>Annuler</Button>
           <Button variant="contained" onClick={handleAddEtape}>
+            Ajouter
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={openAddTransition} onClose={() => setOpenAddTransition(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Ajouter une transition</DialogTitle>
+        <DialogContent>
+          {errorForm && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {errorForm}
+            </Alert>
+          )}
+          
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Code"
+                value={formTransition.code ?? ''}
+                onChange={(e) =>
+                  setFormTransition({ ...formTransition, code: e.target.value.toUpperCase() })
+                }
+                margin="normal"
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Libellé"
+                value={formTransition.libelle ?? ''}
+                onChange={(e) => {
+                  let v = e.target.value
+                  v = v.charAt(0).toUpperCase() + v.slice(1)
+                  setFormTransition({ ...formTransition, libelle: v })
+                }}
+                margin="normal"
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Etape de départ</InputLabel>
+                <Select
+                  value={formTransition.source_etape_id ?? ''}
+                  label="Etape de départ"
+                  onChange={(e) =>
+                    setFormTransition({ ...formTransition, source_etape_id: e.target.value as string })
+                  }
+                >
+                  {Array.isArray(etapes) && etapes.length > 0 ? (
+                    etapes.map((etape) => (
+                      <MenuItem key={etape.id} value={etape.id}>
+                        {etape.libelle}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled>Aucun étape disponible</MenuItem>
+                  )}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Etape de fin</InputLabel>
+                <Select
+                  value={formTransition.cible_etape_id ?? ''}
+                  label="Etape de fin"
+                  onChange={(e) =>
+                    setFormTransition({ ...formTransition, cible_etape_id: e.target.value as string })
+                  }
+                >
+                  {Array.isArray(etapes) && etapes.length > 0 ? (
+                    etapes.map((etape) => (
+                      <MenuItem key={etape.id} value={etape.id}>
+                        {etape.libelle}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled>Aucun étape disponible</MenuItem>
+                  )}
+                </Select>
+              </FormControl>
+            </Grid>
+
+
+          </Grid>
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={() => setOpenAddTransition(false)}>Annuler</Button>
+          <Button variant="contained" onClick={handleAddTransition}>
             Ajouter
           </Button>
         </DialogActions>
