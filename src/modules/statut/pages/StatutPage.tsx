@@ -48,7 +48,7 @@ const StatutPage: React.FC = () => {
     try {
       setLoading(true)
       const response: any = await statutService.getAll()
-      setStatuts(response?.data)
+      setStatuts(response)
     } catch (err: any) {
       setError(err.message ?? 'Erreur lors du chargement des statuts')
     } finally {

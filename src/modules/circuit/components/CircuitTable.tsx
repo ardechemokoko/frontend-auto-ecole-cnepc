@@ -73,7 +73,7 @@ const CircuitTable: React.FC<CircuitTableProps> = ({
               <TableRow key={circuit.id} hover>
                 <TableCell>
                   <Typography variant="body2" fontWeight="bold">
-                    {circuit.nom}
+                    {circuit.libelle}
                   </Typography>
                 </TableCell>
 

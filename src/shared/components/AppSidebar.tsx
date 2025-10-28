@@ -47,6 +47,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
   const [candidatsOpen, setCandidatsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cnepcOpen, setCnepcOpen] = useState(false);
+  const [workflowOpen, setWorkflowOpen] = useState(false);
 
   // Définition de tous les menus possibles avec leurs clés
   const allMenuItems = [
@@ -266,6 +267,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
               const isCandidatsItem = item.title === 'Gestion des Candidats';
               const isSettingsItem = item.title === 'Paramètres';
               const isCnepcItem = item.title === 'CNEPC';
+              const isWorkflowItem = item.title === 'Workflow';
               return (
                 <React.Fragment key={item.path}>
                   <ListItem disablePadding>
@@ -277,6 +279,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                           setSettingsOpen(!settingsOpen);
                         } else if (isCnepcItem && item.hasSubmenu) {
                           setCnepcOpen(!cnepcOpen);
+                        }else if (isWorkflowItem && item.hasSubmenu) {
+                          setWorkflowOpen(!workflowOpen);
                         } else {
                           handleNavigation(item.path);
                         }
@@ -314,10 +318,10 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                               color: 'white',
                             }}
                           />
-                          {(isCandidatsItem || isSettingsItem || isCnepcItem) && item.hasSubmenu && (
+                          {(isCandidatsItem || isSettingsItem || isCnepcItem || isWorkflowItem) && item.hasSubmenu && (
                             <ChevronDownIcon
                               sx={{
-                                transform: (isCandidatsItem ? candidatsOpen : (isSettingsItem ? settingsOpen : cnepcOpen)) ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transform: (isCandidatsItem ? candidatsOpen : (isSettingsItem ? settingsOpen : (isCnepcItem ? cnepcOpen : workflowOpen))) ? 'rotate(180deg)' : 'rotate(0deg)',
                                 transition: 'transform 0.2s ease-in-out',
                               }}
                             />
@@ -443,6 +447,46 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                       </List>
                     </Collapse>
                   )}
+
+                  {/* Submenu for settings */}
+                  {open && isWorkflowItem && item.hasSubmenu && (
+                    <Collapse in={workflowOpen} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding>
+                        {item.submenu?.map((subItem) => {
+                          const subActive = isActive(subItem.path);
+                          return (
+                            <ListItem key={subItem.path} disablePadding>
+                              <ListItemButton
+                                onClick={() => handleNavigation(subItem.path)}
+                                sx={{
+                                  ml: 4,
+                                  mr: 1,
+                                  borderRadius: 2,
+                                  mb: 0.5,
+                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    color: 'white',
+                                  },
+                                  transition: 'all 0.2s ease-in-out',
+                                }}
+                              >
+                                <ListItemText
+                                  primary={subItem.title}
+                                  primaryTypographyProps={{
+                                    variant: 'body2',
+                                    fontSize: '0.875rem',
+                                  }}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          );
+                        })}
+                      </List>
+                    </Collapse>
+                  )}
+
                 </React.Fragment>
               );
             })}
