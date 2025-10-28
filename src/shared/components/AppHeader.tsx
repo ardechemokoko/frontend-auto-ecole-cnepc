@@ -40,7 +40,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ sidebarOpen }) => {
                 <div className="text-sm font-medium text-gray-800">
                   Bonjour, {user?.name || 'Utilisateur'}
                 </div>
-                <div className="text-xs text-gray-500">Administrateur</div>
+                <div className="text-xs text-gray-500">{ user?.role}</div>
               </div>
               <div className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center">
                 <span className="text-sm font-bold text-white">

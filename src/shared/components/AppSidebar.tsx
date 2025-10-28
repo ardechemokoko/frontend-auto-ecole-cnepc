@@ -29,6 +29,7 @@ import {
   ExpandMore as ChevronDownIcon,
   Settings as SettingsIcon,
   Person as PersonIcon,
+  Password,
 } from '@mui/icons-material';
 import { ROUTES } from '../constants';
 import tokenService from '../../modules/auth/services/tokenService';
@@ -47,8 +48,69 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
   const [candidatsOpen, setCandidatsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cnepcOpen, setCnepcOpen] = useState(false);
+  const [workflowOpen, setWorkflowOpen] = useState(false);
 
   // Définition de tous les menus possibles avec leurs clés
+   const allMenuItemsAutoEcole = [
+      {
+      title: 'Tableau de bord',
+      icon: HomeIcon,
+      path: ROUTES.DASHBOARD,
+      description: 'Vue d\'ensemble de l\'application',
+      key: 'dashboard'
+    },
+       {
+      title: 'Modifier Vos informations personnelles',
+      icon: PersonIcon,
+      path: ROUTES.UPDATE,
+      description: 'modifier les informations de l\' auto-école',
+      key: 'update'
+    },
+     {
+      title: 'Referentiel',
+      icon: Ref,
+      path: ROUTES.REF,
+      description: 'reference de l\' auto-école'
+    },
+     {
+      title: 'Change mot de passe',
+      icon: Password,
+      path: ROUTES.CPW,
+      description: 'changement de mot de passe'
+    },
+     {
+      title: 'Gestion des Candidats',
+      icon: UserGroupIcon,
+      path: ROUTES.ELEVES,
+      description: 'Inscrire et gérer les dossiers des candidats',
+      key: 'candidates',
+      hasSubmenu: true,
+      submenu: [
+        {
+          path: `${ROUTES.ELEVES}/demandes`,
+          title: 'Demandes d\'inscription',
+          description: 'Voir les demandes d\'inscription'
+        },
+        {
+          path: `${ROUTES.ELEVES}/inscrits`,
+          title: 'Candidats inscrits',
+          description: 'Voir les candidats inscrits'
+        },
+        {
+          path: `${ROUTES.ELEVES}/nouvelle`,
+          title: 'Nouvelle inscription',
+          description: 'Créer une nouvelle inscription'
+        }
+      ]
+    },
+      {
+      title: 'Validation des Dossiers',
+      icon: CheckCircleIcon,
+      path: ROUTES.VALIDATION,
+      description: 'Valider les dossiers complets des élèves',
+      key: 'validation'
+    },
+   ]
   const allMenuItems = [
     {
       title: 'Tableau de bord',
@@ -64,11 +126,17 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       description: 'modifier les informations de l\' auto-école',
       key: 'update'
     },
-        {
-      title: 'Referenciel',
+    {
+      title: 'Referentiel',
       icon: Ref,
       path: ROUTES.REF,
       description: 'reference de l\' auto-école'
+    },
+    {
+      title: 'Change mot de passe',
+      icon: Password,
+      path: ROUTES.CPW,
+      description: 'changement de mot de passe'
     },
     {
       title: 'Gestion des Candidats',
@@ -165,7 +233,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
   });
   
   const menuItems = allMenuItems.filter(item => {
-    const hasAccess = canAccessMenu(user, item.key);
+    const hasAccess = canAccessMenu(user, item.key!);
     console.log('🎭 AppSidebar: Menu', item.title, '->', hasAccess ? 'AUTORISÉ' : 'REFUSÉ');
     return hasAccess;
   });
@@ -261,11 +329,12 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
         {/* Navigation */}
         <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
           <List sx={{ px: 1, py: 2 }}>
-            {menuItems.map((item) => {
+            {user?.role !== "responsable_auto_ecole" ? menuItems.map((item) => {
               const IconComponent = item.icon;
               const isCandidatsItem = item.title === 'Gestion des Candidats';
               const isSettingsItem = item.title === 'Paramètres';
               const isCnepcItem = item.title === 'CNEPC';
+              const isWorkflowItem = item.title === 'Workflow';
               return (
                 <React.Fragment key={item.path}>
                   <ListItem disablePadding>
@@ -277,6 +346,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                           setSettingsOpen(!settingsOpen);
                         } else if (isCnepcItem && item.hasSubmenu) {
                           setCnepcOpen(!cnepcOpen);
+                        }else if (isWorkflowItem && item.hasSubmenu) {
+                          setWorkflowOpen(!workflowOpen);
                         } else {
                           handleNavigation(item.path);
                         }
@@ -314,10 +385,10 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                               color: 'white',
                             }}
                           />
-                          {(isCandidatsItem || isSettingsItem || isCnepcItem) && item.hasSubmenu && (
+                          {(isCandidatsItem || isSettingsItem || isCnepcItem || isWorkflowItem) && item.hasSubmenu && (
                             <ChevronDownIcon
                               sx={{
-                                transform: (isCandidatsItem ? candidatsOpen : (isSettingsItem ? settingsOpen : cnepcOpen)) ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transform: (isCandidatsItem ? candidatsOpen : (isSettingsItem ? settingsOpen : (isCnepcItem ? cnepcOpen : workflowOpen))) ? 'rotate(180deg)' : 'rotate(0deg)',
                                 transition: 'transform 0.2s ease-in-out',
                               }}
                             />
@@ -443,6 +514,273 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                       </List>
                     </Collapse>
                   )}
+
+                  {/* Submenu for settings */}
+                  {open && isWorkflowItem && item.hasSubmenu && (
+                    <Collapse in={workflowOpen} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding>
+                        {item.submenu?.map((subItem) => {
+                          const subActive = isActive(subItem.path);
+                          return (
+                            <ListItem key={subItem.path} disablePadding>
+                              <ListItemButton
+                                onClick={() => handleNavigation(subItem.path)}
+                                sx={{
+                                  ml: 4,
+                                  mr: 1,
+                                  borderRadius: 2,
+                                  mb: 0.5,
+                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    color: 'white',
+                                  },
+                                  transition: 'all 0.2s ease-in-out',
+                                }}
+                              >
+                                <ListItemText
+                                  primary={subItem.title}
+                                  primaryTypographyProps={{
+                                    variant: 'body2',
+                                    fontSize: '0.875rem',
+                                  }}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          );
+                        })}
+                      </List>
+                    </Collapse>
+                  )}
+
+                </React.Fragment>
+              );
+            }): allMenuItemsAutoEcole.map((item) => {
+              const IconComponent = item.icon;
+              const isCandidatsItem = item.title === 'Gestion des Candidats';
+              const isSettingsItem = item.title === 'Paramètres';
+              const isCnepcItem = item.title === 'CNEPC';
+              const isWorkflowItem = item.title === 'Workflow';
+              return (
+                <React.Fragment key={item.path}>
+                  <ListItem disablePadding>
+                    <ListItemButton
+                      onClick={() => {
+                        if (isCandidatsItem && item.hasSubmenu) {
+                          setCandidatsOpen(!candidatsOpen);
+                        } else if (isSettingsItem && item.hasSubmenu) {
+                          setSettingsOpen(!settingsOpen);
+                        } else if (isCnepcItem && item.hasSubmenu) {
+                          setCnepcOpen(!cnepcOpen);
+                        }else if (isWorkflowItem && item.hasSubmenu) {
+                          setWorkflowOpen(!workflowOpen);
+                        } else {
+                          handleNavigation(item.path);
+                        }
+                      }}
+                      sx={{
+                        mx: 1,
+                        borderRadius: 2,
+                        mb: 0.5,
+                        backgroundColor: isActive(item.path) ? 'rgba(255, 255, 255, 0.3)' : 'transparent',
+                        borderLeft: isActive(item.path) ? '4px solid white' : 'none',
+                        color: 'white',
+                        '&:hover': {
+                          backgroundColor: isActive(item.path) ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.2)',
+                        },
+                        transition: 'all 0.2s ease-in-out',
+                      }}
+                      title={open ? item.description : item.title}
+                    >
+                      <ListItemIcon
+                        sx={{
+                          minWidth: open ? 40 : 'auto',
+                          justifyContent: 'center',
+                          color: 'white',
+                        }}
+                      >
+                        <IconComponent />
+                      </ListItemIcon>
+                      {open && (
+                        <>
+                          <ListItemText
+                            primary={item.title}
+                            primaryTypographyProps={{
+                              variant: 'body2',
+                              fontWeight: isActive(item.path) ? 'medium' : 'normal',
+                              color: 'white',
+                            }}
+                          />
+                          {(isCandidatsItem || isSettingsItem || isCnepcItem || isWorkflowItem) && item.hasSubmenu && (
+                            <ChevronDownIcon
+                              sx={{
+                                transform: (isCandidatsItem ? candidatsOpen : (isSettingsItem ? settingsOpen : (isCnepcItem ? cnepcOpen : workflowOpen))) ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transition: 'transform 0.2s ease-in-out',
+                              }}
+                            />
+                          )}
+                        </>
+                      )}
+                    </ListItemButton>
+                  </ListItem>
+
+                  {/* Submenu for candidats */}
+                  {open && isCandidatsItem && item.hasSubmenu && (
+                    <Collapse in={candidatsOpen} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding>
+                        {item.submenu?.map((subItem) => {
+                          const subActive = isActive(subItem.path);
+                          return (
+                            <ListItem key={subItem.path} disablePadding>
+                              <ListItemButton
+                                onClick={() => handleNavigation(subItem.path)}
+                                sx={{
+                                  ml: 4,
+                                  mr: 1,
+                                  borderRadius: 2,
+                                  mb: 0.5,
+                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    color: 'white',
+                                  },
+                                  transition: 'all 0.2s ease-in-out',
+                                }}
+                              >
+                                <ListItemText
+                                  primary={subItem.title}
+                                  primaryTypographyProps={{
+                                    variant: 'body2',
+                                    fontSize: '0.875rem',
+                                  }}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          );
+                        })}
+                      </List>
+                    </Collapse>
+                  )}
+
+                  {/* Submenu for settings */}
+                  {open && isSettingsItem && item.hasSubmenu && (
+                    <Collapse in={settingsOpen} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding>
+                        {item.submenu?.map((subItem) => {
+                          const subActive = isActive(subItem.path);
+                          return (
+                            <ListItem key={subItem.path} disablePadding>
+                              <ListItemButton
+                                onClick={() => handleNavigation(subItem.path)}
+                                sx={{
+                                  ml: 4,
+                                  mr: 1,
+                                  borderRadius: 2,
+                                  mb: 0.5,
+                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    color: 'white',
+                                  },
+                                  transition: 'all 0.2s ease-in-out',
+                                }}
+                              >
+                                <ListItemText
+                                  primary={subItem.title}
+                                  primaryTypographyProps={{
+                                    variant: 'body2',
+                                    fontSize: '0.875rem',
+                                  }}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          );
+                        })}
+                      </List>
+                    </Collapse>
+                  )}
+
+                  {/* Submenu for CNEPC */}
+                  {open && isCnepcItem && item.hasSubmenu && (
+                    <Collapse in={cnepcOpen} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding>
+                        {item.submenu?.map((subItem) => {
+                          const subActive = isActive(subItem.path);
+                          return (
+                            <ListItem key={subItem.path} disablePadding>
+                              <ListItemButton
+                                onClick={() => handleNavigation(subItem.path)}
+                                sx={{
+                                  ml: 4,
+                                  mr: 1,
+                                  borderRadius: 2,
+                                  mb: 0.5,
+                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    color: 'white',
+                                  },
+                                  transition: 'all 0.2s ease-in-out',
+                                }}
+                              >
+                                <ListItemText
+                                  primary={subItem.title}
+                                  primaryTypographyProps={{
+                                    variant: 'body2',
+                                    fontSize: '0.875rem',
+                                  }}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          );
+                        })}
+                      </List>
+                    </Collapse>
+                  )}
+
+                  {/* Submenu for settings */}
+                  {open && isWorkflowItem && item.hasSubmenu && (
+                    <Collapse in={workflowOpen} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding>
+                        {item.submenu?.map((subItem) => {
+                          const subActive = isActive(subItem.path);
+                          return (
+                            <ListItem key={subItem.path} disablePadding>
+                              <ListItemButton
+                                onClick={() => handleNavigation(subItem.path)}
+                                sx={{
+                                  ml: 4,
+                                  mr: 1,
+                                  borderRadius: 2,
+                                  mb: 0.5,
+                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    color: 'white',
+                                  },
+                                  transition: 'all 0.2s ease-in-out',
+                                }}
+                              >
+                                <ListItemText
+                                  primary={subItem.title}
+                                  primaryTypographyProps={{
+                                    variant: 'body2',
+                                    fontSize: '0.875rem',
+                                  }}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          );
+                        })}
+                      </List>
+                    </Collapse>
+                  )}
+
                 </React.Fragment>
               );
             })}
@@ -475,7 +813,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                     {user?.name || 'Utilisateur'}
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                    Administrateur
+                   {user?.role}
                   </Typography>
                 </Box>
               )}

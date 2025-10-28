@@ -1,17 +1,16 @@
 // Service des documents avec mocks
 import axiosClient from '../../../shared/environment/envdev';
-// import { TypeDocument } from '../types/type-document';
 
-export class TypeDocumentService {
+export class RoleService {
 
     constructor(
-    private axios = axiosClient, // ton instance axios avec interceptors
-        private url = '/referentiels'       // base URL de la ressource
+        private axios = axiosClient, // ton instance axios avec interceptors
+        // private url = '/referentiels'       // base URL de la ressource
     ) {}
   
     async getAll(params?: Record<string, any>): Promise<any[]> {
         try {
-            const res = await this.axios.get<any[]>(this.url, { params: params })
+            const res = await this.axios.get<any[]>(`auth/group/DGTT/roles`, { params: params })
         return res.data
         } catch (error) {
             throw new Error(`Erreur de connexion (GET all): ${this.humanize(error)}`)
@@ -34,4 +33,4 @@ export class TypeDocumentService {
     }
 }
 
-export const typeDocumentService = new TypeDocumentService();
+export const roleService = new RoleService();

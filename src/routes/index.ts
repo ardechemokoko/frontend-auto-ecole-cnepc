@@ -12,12 +12,23 @@ import ValidationPage from './ValidationPage';
 import ElevesPage from './ElevesPage';
 import CNEPCPage from './CNEPCPage';
 
+
 import PageUpdateAutoecole from '../modules/cnepc/forms/updateinfoAutoEcole'
 import PageReferenciel from '../modules/cnepc/forms/referentiel';
+
+
+// import { SettingsPage, UserManagementPage } from '../modules/settings';
+import CircuitPage from '../modules/circuit/pages/CircuitPage';
+import CircuitDetailPage from '../modules/circuit/pages/CircuitDetailPage';
+import StatutPage from '../modules/statut/pages/StatutPage';
+
 import { CandidateDetailsPage } from '../modules/cnepc/pages';
 import SettingsPage from '../modules/settings/pages/SettingsPage';
 import UserManagementPage from '../modules/settings/pages/UserManagementPage';
 import AutoEcolePage from './AutoEcolePage';
+import ResetPasswordForm from '../modules/auth/forms/resetpassword';
+import PageChangePassWord from '../modules/cnepc/forms/changePassword';
+
 
 // Composant de protection des routes
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -34,6 +45,9 @@ const AppRoutes: React.FC = () => {
     }),
     // Route de connexion
     React.createElement(Route, { path: ROUTES.LOGIN, element: React.createElement(LoginPage) }),
+
+       // reset password 
+    React.createElement(Route, { path: ROUTES.RPW, element: React.createElement(ResetPasswordForm) }),
 
      //   React.createElement(Route, { path: ROUTES.UPDATE, element: React.createElement(PageUpdateAutoecole) }),
     // Routes protégées avec layout
@@ -85,7 +99,47 @@ const AppRoutes: React.FC = () => {
         React.createElement(AppLayout, null, React.createElement(PageUpdateAutoecole))
       ) 
     }),
+        // Routes changement de mot de passe
+    React.createElement(Route, { 
+      path: ROUTES.CPW, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(PageChangePassWord))
+      ) 
+    }),
     // Routes Settings
+
+
+
+    // React.createElement(Route, { 
+    //   path: ROUTES.SETTINGS, 
+    //   element: React.createElement(ProtectedRoute, null, 
+    //     React.createElement(AppLayout, null, React.createElement(SettingsPage))
+    //   ) 
+    // }),
+    // React.createElement(Route, { 
+    //   path: ROUTES.USER_MANAGEMENT, 
+    //   element: React.createElement(ProtectedRoute, null, 
+    //     React.createElement(AppLayout, null, React.createElement(UserManagementPage))
+    //   ) 
+    // }),
+
+    React.createElement(Route, { 
+      path: ROUTES.WORKFLOW_CIRCUIT, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CircuitPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.WORKFLOW_CIRCUIT_DETAIL, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CircuitDetailPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.WORKFLOW_STATUT, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(StatutPage))
+  )}),
     React.createElement(Route, { 
       path: ROUTES.SETTINGS, 
       element: React.createElement(ProtectedRoute, null, 
@@ -96,8 +150,10 @@ const AppRoutes: React.FC = () => {
       path: ROUTES.USER_MANAGEMENT, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(UserManagementPage))
+
       ) 
     }),
+
     // Route 404
     React.createElement(Route, { 
       path: "*", 

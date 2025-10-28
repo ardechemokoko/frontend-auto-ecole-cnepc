@@ -1,6 +1,6 @@
 export interface Circuit { 
     'id': string,
-    'nom': string,
+    'libelle': string,
     'actif': boolean,
     'nom_entite': string,
     'description'?: string,

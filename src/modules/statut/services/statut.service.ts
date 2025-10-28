@@ -1,11 +1,11 @@
-import axiosAuthentifcation from '../../../shared/environment/envauth'
+import axiosClient from '../../../shared/environment/envdev';
 import { Statut } from '../types'
 
 
 // ✅ Service CRUD Statut
 export class StatutService {
   constructor(
-    private axios = axiosAuthentifcation,
+    private axios = axiosClient,
     private url = '/workflow/statuts' // base URL (ex: /api/statuts)
   ) {}
 
