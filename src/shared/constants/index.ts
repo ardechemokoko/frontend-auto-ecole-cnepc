@@ -9,9 +9,12 @@ export const ROUTES = {
   SETTINGS: '/settings',
   USER_MANAGEMENT: '/user-management',
   UPDATE: '/updateinfo',
-  REF: '/referenciel',
+  REF: '/referentiel',
   CPW: '/change-password',
   RPW: '/reset-password',
+  WORKFLOW: 't',
+  WORKFLOW_CIRCUIT: '/change-password',
+  WORKFLOW_STATUT: '/reset-password',
 } as const;
 
 export const STATUS = {

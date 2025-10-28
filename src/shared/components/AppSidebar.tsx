@@ -29,6 +29,7 @@ import {
   ExpandMore as ChevronDownIcon,
   Settings as SettingsIcon,
   Person as PersonIcon,
+  Password,
 } from '@mui/icons-material';
 import { ROUTES } from '../constants';
 import tokenService from '../../modules/auth/services/tokenService';
@@ -65,7 +66,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       key: 'update'
     },
     {
-      title: 'Referenciel',
+      title: 'Referentiel',
       icon: Ref,
       path: ROUTES.REF,
       description: 'reference de l\' auto-école'
@@ -171,7 +172,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
   });
   
   const menuItems = allMenuItems.filter(item => {
-    const hasAccess = canAccessMenu(user, item.key);
+    const hasAccess = canAccessMenu(user, item.key!);
     console.log('🎭 AppSidebar: Menu', item.title, '->', hasAccess ? 'AUTORISÉ' : 'REFUSÉ');
     return hasAccess;
   });

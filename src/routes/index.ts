@@ -19,6 +19,8 @@ import { CandidateDetailsPage } from '../modules/cnepc/pages';
 import SettingsPage from '../modules/settings/pages/SettingsPage';
 import UserManagementPage from '../modules/settings/pages/UserManagementPage';
 import AutoEcolePage from './AutoEcolePage';
+import ResetPasswordForm from '../modules/auth/forms/resetpassword';
+import PageChangePassWord from '../modules/cnepc/forms/changePassword';
 
 // Composant de protection des routes
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
