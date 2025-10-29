@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../../store';
 import { BellIcon } from '@heroicons/react/24/outline';
+import CustomizedList from './customizedlist';
 
 interface AppHeaderProps {
   sidebarOpen: boolean;
@@ -8,6 +9,11 @@ interface AppHeaderProps {
 
 const AppHeader: React.FC<AppHeaderProps> = ({ sidebarOpen }) => {
   const { user } = useAppStore();
+  const [showmenu, setShowmenu] = React.useState(false);
+
+  const handleMenuToggle = () => {
+    setShowmenu(!showmenu);
+  };
 
   return (
     <header 
@@ -35,6 +41,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ sidebarOpen }) => {
             </div>
 
             {/* Informations utilisateur */}
+            <CustomizedList />
             <div className="flex items-center space-x-3">
               <div className="text-right">
                 <div className="text-sm font-medium text-gray-800">
@@ -47,6 +54,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ sidebarOpen }) => {
                   {user?.name?.charAt(0) || 'U'}
                 </span>
               </div>
+                
             </div>
           </div>
         </div>

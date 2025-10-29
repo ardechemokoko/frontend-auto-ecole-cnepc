@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Button, TextField, Card, CardContent, Typography, Box, Alert, CircularProgress, Link, tabClasses } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, CircularProgress, Link, TextField, Typography } from '@mui/material';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppStore } from '../../../store';
-import { authService } from '../services/authService';
-import { tokenService } from '../services';
-import { User } from '../types';
 import { ROUTES } from '../../../shared/constants';
-import ForgotPasswordLink from './forgotpasswordtext';
+import { useAppStore } from '../../../store';
+import { tokenService } from '../services';
+import { authService } from '../services/authService';
+import { User } from '../types';
 
 interface LoginFormData {
   email: string;
@@ -23,13 +22,11 @@ interface FormErrorsEmail {
 const LoginForm: React.FC = () => {
   const { login, setLoading, isLoading, isAuthenticated } = useAppStore();
   const [isLoadingSendEmail, setIsLoadingSendEmail] = useState<boolean>(false);
-  const [isLoadingSendEmailError, setIsLoadingSendEmailError] = useState<boolean>(false);
   const navigate = useNavigate();
   const [formData, setFormData] = useState<LoginFormData>({ email: '', password: '' });
   const [errors, setErrors] = useState<Partial<LoginFormData>>({});
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [forgotPassword, setForgotPassword] = useState<boolean>(false);
-  const [email, setMail] = useState<string>('');
   const [emailerrors, setMailerrors] = useState<String>('');
   const [emailData, setEmailFormData] = useState<FormDataEmail>({
     email: "",
@@ -222,17 +219,21 @@ const LoginForm: React.FC = () => {
         personne: authResponse.data.user.personne
 
       };
+      if (user.role !== 'candidat') {
+        login(user, token);
+        setMessage({ type: 'success', text: 'Connexion réussie !' });
+        tokenService.setAuthData(token, user);
 
-      login(user, token);
-      setMessage({ type: 'success', text: 'Connexion réussie !' });
-      tokenService.setAuthData(token, user);
+        console.log('✅ Token sauvegardé dans localStorage avec la clé "access_token"');
 
-      console.log('✅ Token sauvegardé dans localStorage avec la clé "access_token"');
+        // Redirection vers le dashboard après connexion réussie
+        setTimeout(() => {
+          navigate(ROUTES.DASHBOARD);
+        }, 1000);
+      }else{
+        setMessage({ type: 'error', text: 'Accès refusé. Vous n\'êtes pas autorisé à accéder à cette application.' });
+      }
 
-      // Redirection vers le dashboard après connexion réussie
-      setTimeout(() => {
-        navigate(ROUTES.DASHBOARD);
-      }, 1000);
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message || 'Erreur de connexion' });
     } finally {
