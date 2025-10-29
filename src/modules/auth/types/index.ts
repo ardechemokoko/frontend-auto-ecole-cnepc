@@ -18,6 +18,26 @@ export interface User {
   };
 }
 
+// Interface pour la réponse de l'endpoint /auth/me
+export interface MeResponse {
+  success: boolean;
+  user: {
+    id: string;
+    email: string;
+    role: string;
+    created_at: string;
+    personne: {
+      id: string;
+      nom: string;
+      prenom: string;
+      nom_complet: string;
+      email: string;
+      contact: string;
+      adresse: string;
+    };
+  };
+}
+
 export interface LoginCredentials {
   email: string;
   password: string;

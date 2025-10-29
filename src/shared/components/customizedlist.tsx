@@ -18,12 +18,13 @@ import People from '@mui/icons-material/People';
 import PermMedia from '@mui/icons-material/PermMedia';
 import Dns from '@mui/icons-material/Dns';
 import Public from '@mui/icons-material/Public';
+import { Close, Password } from '@mui/icons-material';
 
 const data = [
-  { icon: <People />, label: 'Authentication' },
-  { icon: <Dns />, label: 'Database' },
-  { icon: <PermMedia />, label: 'Storage' },
-  { icon: <Public />, label: 'Hosting' },
+  { icon: <People />, label: 'Modifier Vos informations personnelles' },
+  { icon: <Password />, label: 'Change mot de passe' },
+  // { icon: <PermMedia />, label: 'Storage' },
+   { icon: <Close />, label: 'Close' },
 ];
 
 const FireNav = styled(List)<{ component?: React.ElementType }>({
@@ -62,95 +63,7 @@ export default function CustomizedList() {
       >
         <Paper elevation={0} sx={{ maxWidth: 256 }}>
             <Divider />
-          {/* <FireNav component="nav" disablePadding>
-           
-            <Divider />
-            <ListItem component="div" disablePadding>
-              <ListItemButton sx={{ height: 56 }}>
-                <ListItemIcon>
-                  <Home color="primary" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="Project Overview"
-                  primaryTypographyProps={{
-                    color: 'primary',
-                    fontWeight: 'medium',
-                    variant: 'body2',
-                  }}
-                />
-              </ListItemButton>
-              <Tooltip title="Project Settings">
-                <IconButton
-                  size="large"
-                  sx={{
-                    '& svg': {
-                      color: 'rgba(255,255,255,0.8)',
-                      transition: '0.2s',
-                      transform: 'translateX(0) rotate(0)',
-                    },
-                    '&:hover, &:focus': {
-                      bgcolor: 'unset',
-                      '& svg:first-of-type': {
-                        transform: 'translateX(-4px) rotate(-20deg)',
-                      },
-                      '& svg:last-of-type': {
-                        right: 0,
-                        opacity: 1,
-                      },
-                    },
-                    '&::after': {
-                      content: '""',
-                      position: 'absolute',
-                      height: '80%',
-                      display: 'block',
-                      left: 0,
-                      width: '1px',
-                      bgcolor: 'divider',
-                    },
-                  }}
-                >
-                  <Settings />
-                  <ArrowRight sx={{ position: 'absolute', right: 4, opacity: 0 }} />
-                </IconButton>
-              </Tooltip>
-            </ListItem>
-            <Divider />
-            <Box
-              sx={[
-                open
-                  ? {
-                      bgcolor: 'rgba(71, 98, 130, 0.2)',
-                    }
-                  : {
-                      bgcolor: null,
-                    },
-                open
-                  ? {
-                      pb: 2,
-                    }
-                  : {
-                      pb: 0,
-                    },
-              ]}
-            >
-           
-              {open &&
-                data.map((item) => (
-                  <ListItemButton
-                    key={item.label}
-                    sx={{ py: 0, minHeight: 32, color: 'rgba(255,255,255,.8)' }}
-                  >
-                    <ListItemIcon sx={{ color: 'inherit' }}>
-                      {item.icon}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={item.label}
-                      primaryTypographyProps={{ fontSize: 14, fontWeight: 'medium' }}
-                    />
-                  </ListItemButton>
-                ))}
-            </Box>
-          </FireNav> */}
+      
           {open &&
                 data.map((item) => (
                   <ListItemButton

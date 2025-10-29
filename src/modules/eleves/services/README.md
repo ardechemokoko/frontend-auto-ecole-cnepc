@@ -1,187 +1,123 @@
-# DocumentService - Service de gestion des documents
+# Services Élèves - Documentation
 
-## Vue d'ensemble
+## Nouveaux Services
 
-Le `DocumentService` est un service complet pour la gestion des documents des élèves dans l'application DGTT Auto-École. Il fournit toutes les fonctionnalités nécessaires pour l'upload, la récupération, la suppression et la prévisualisation des documents.
+### 1. Service Candidats (`candidats.service.ts`)
 
-## Fonctionnalités
+Service pour la gestion des candidats via l'API `/candidats`.
 
-### ✅ Upload de documents
-- Upload avec progression en temps réel
-- Validation des types de fichiers
-- Validation de la taille des fichiers
-- Gestion des erreurs spécifiques
+#### Méthodes disponibles :
 
-### ✅ Gestion des documents
-- Récupération des documents d'un élève
-- Suppression sécurisée avec vérification des droits
-- Téléchargement avec gestion des blobs
-- Prévisualisation avec URLs sécurisées
+- `getAllCandidats(token, page?, perPage?)` : Récupère tous les candidats
+- `getCandidatById(id, token)` : Récupère un candidat par son ID
 
-### ✅ Validation et sécurité
-- Validation des types de fichiers autorisés
-- Validation de la taille maximale
-- Gestion des autorisations (403, 404)
-- Gestion des erreurs réseau
+#### Types principaux :
 
-## Utilisation
+- `CandidatApiItem` : Structure d'un candidat
+- `CandidatApiResponse` : Réponse de l'API pour la liste des candidats
 
-### Import du service
+#### Exemple d'utilisation :
 
 ```typescript
-import documentService from './documentService';
+import { candidatsService } from './candidats.service';
+
+// Récupérer tous les candidats
+const token = localStorage.getItem('access_token');
+const response = await candidatsService.getAllCandidats(token);
+console.log('Candidats:', response.data);
+
+// Récupérer un candidat spécifique
+const candidat = await candidatsService.getCandidatById('candidat-id', token);
+console.log('Candidat:', candidat);
 ```
 
-### Upload d'un document
+### 2. Service Formations (`formations.service.ts`)
+
+Service pour la gestion des formations via l'API `/formations`.
+
+#### Méthodes disponibles :
+
+- `getAllFormations(token, page?, perPage?)` : Récupère toutes les formations
+- `getFormationById(id, token)` : Récupère une formation par son ID
+- `getFormationsByAutoEcole(autoEcoleId, token)` : Récupère les formations d'une auto-école
+
+#### Types principaux :
+
+- `FormationApiItem` : Structure d'une formation
+- `FormationApiResponse` : Réponse de l'API pour une formation
+- `FormationListApiResponse` : Réponse de l'API pour la liste des formations
+
+#### Exemple d'utilisation :
 
 ```typescript
-const handleUpload = async (file: File) => {
-  try {
-    const result = await documentService.uploadDocument(
-      'student-123',           // ID de l'élève
-      file,                    // Fichier à uploader
-      'identity',             // Type de document
-      (progress) => {         // Callback de progression
-        console.log(`Upload: ${progress}%`);
-      }
-    );
-    console.log('Document uploadé:', result);
-  } catch (error) {
-    console.error('Erreur upload:', error.message);
-  }
-};
+import { formationsService } from './formations.service';
+import { getAutoEcoleId } from '../../../shared/utils/autoEcoleUtils';
+
+// Récupérer les formations de l'auto-école connectée
+const token = localStorage.getItem('access_token');
+const autoEcoleId = getAutoEcoleId();
+const formations = await formationsService.getFormationsByAutoEcole(autoEcoleId, token);
+console.log('Formations:', formations);
+
+// Récupérer une formation spécifique
+const formation = await formationsService.getFormationById('formation-id', token);
+console.log('Formation:', formation.data);
 ```
 
-### Récupération des documents
+## Intégration dans DemandesInscriptionTable
 
-```typescript
-const loadDocuments = async () => {
-  try {
-    const documents = await documentService.getStudentDocuments('student-123');
-    setDocuments(documents);
-  } catch (error) {
-    console.error('Erreur chargement:', error.message);
-  }
-};
-```
+Le composant `DemandesInscriptionTable` utilise maintenant ces services pour :
 
-### Suppression d'un document
+1. **Charger les candidats** : Récupère tous les candidats via `/candidats`
+2. **Charger les formations** : Récupère les formations de l'auto-école connectée via `/formations?auto_ecole_id={id}`
+3. **Afficher les vrais noms** : Utilise les données récupérées pour afficher les noms corrects des candidats et formations
 
-```typescript
-const handleDelete = async (documentId: string) => {
-  try {
-    await documentService.deleteDocument(documentId);
-    console.log('Document supprimé');
-  } catch (error) {
-    console.error('Erreur suppression:', error.message);
-  }
-};
-```
+### Flux de données :
 
-### Téléchargement d'un document
+1. **Connexion** → Informations auto-école sauvegardées dans localStorage
+2. **Chargement candidats** → Appel à `/candidats` avec le token
+3. **Chargement formations** → Appel à `/formations?auto_ecole_id={id}` avec le token
+4. **Affichage** → Les dossiers utilisent les vrais noms des candidats et formations
 
-```typescript
-const handleDownload = async (documentId: string) => {
-  try {
-    // Téléchargement simple
-    const blob = await documentService.downloadDocument(documentId);
-    
-    // Ou téléchargement avec sauvegarde automatique
-    await documentService.downloadAndSaveDocument(documentId, 'mon-document.pdf');
-  } catch (error) {
-    console.error('Erreur téléchargement:', error.message);
-  }
-};
-```
+### Avantages :
 
-### Prévisualisation d'un document
+- ✅ **Noms corrects** : Affichage des vrais noms des candidats et formations
+- ✅ **Données à jour** : Récupération en temps réel depuis l'API
+- ✅ **Performance** : Chargement parallèle des données
+- ✅ **Gestion d'erreurs** : Gestion robuste des erreurs API
+- ✅ **Logs détaillés** : Logs complets pour le débogage
 
-```typescript
-const handlePreview = async (documentId: string) => {
-  try {
-    const previewUrl = await documentService.previewDocument(documentId);
-    window.open(previewUrl, '_blank');
-  } catch (error) {
-    console.error('Erreur prévisualisation:', error.message);
-  }
-};
-```
+## Composants d'exemple
 
-## Validation des fichiers
+### DebugInfo (`components/DebugInfo.tsx`)
 
-### Types de fichiers autorisés
+Composant de débogage qui affiche :
+- Informations de l'auto-école connectée
+- Liste des candidats chargés
+- Liste des formations chargées
 
-```typescript
-const allowedTypes = [
-  'application/pdf',
-  'image/jpeg',
-  'image/png'
-];
+### CandidatsFormationsExample (`examples/CandidatsFormationsExample.tsx`)
 
-const isValid = documentService.validateFileType(file, allowedTypes);
-```
+Exemple complet d'utilisation des services avec :
+- Boutons pour charger les données
+- Affichage des résultats
+- Gestion des erreurs
+- Informations de débogage
 
-### Taille maximale
+## Configuration requise
 
-```typescript
-const maxSizeInMB = 5; // 5MB maximum
-const isValidSize = documentService.validateFileSize(file, maxSizeInMB);
-```
+1. **Token d'authentification** : Doit être présent dans localStorage avec la clé `access_token`
+2. **Auto-école connectée** : Les informations doivent être dans localStorage avec la clé `auto_ecole_info`
+3. **Endpoints API** : Les endpoints `/candidats` et `/formations` doivent être accessibles
 
-## Gestion des erreurs
+## Logs de débogage
 
-Le service gère automatiquement différents types d'erreurs :
+Les services incluent des logs détaillés pour faciliter le débogage :
 
-- **413** : Fichier trop volumineux
-- **415** : Type de fichier non supporté
-- **404** : Document/élève non trouvé
-- **403** : Droits insuffisants
-- **Erreurs réseau** : Problèmes de connectivité
+- 🔍 Début des opérations
+- ✅ Succès des opérations
+- ❌ Erreurs détaillées
+- 📋 Informations sur les données récupérées
+- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Séparateurs visuels
 
-## Types TypeScript
-
-### UploadDocumentResponse
-
-```typescript
-interface UploadDocumentResponse {
-  id: string;
-  name: string;
-  url: string;
-  size: string;
-  type: 'identity' | 'photo' | 'medical' | 'aptitude';
-  uploadedAt: string;
-}
-```
-
-### Document
-
-```typescript
-interface Document {
-  id: string;
-  type: 'identity' | 'photo' | 'medical' | 'aptitude';
-  name: string;
-  url: string;
-  size: string;
-  uploadedAt: string;
-  status: 'uploaded' | 'processing' | 'error';
-}
-```
-
-## Exemple complet
-
-Voir `DocumentServiceExample.tsx` pour un exemple complet d'utilisation avec interface utilisateur.
-
-## Configuration
-
-Le service utilise la configuration centralisée :
-- **Base URL** : Définie dans `shared/constants/api.ts`
-- **Client HTTP** : Configuration axios dans `shared/utils/axiosConfig.ts`
-- **Gestion des tokens** : Automatique via les intercepteurs
-
-## Sécurité
-
-- ✅ Validation des types de fichiers
-- ✅ Validation de la taille
-- ✅ Gestion des autorisations
-- ✅ URLs sécurisées pour la prévisualisation
-- ✅ Tokens d'authentification automatiques
+Consultez la console du navigateur pour voir tous les logs.

@@ -18,7 +18,6 @@ import {
 } from '@mui/material';
 import {
   Home as HomeIcon,
-  Edit as EditIcon,
   Refresh as Ref,
   People as UserGroupIcon,
   CheckCircle as CheckCircleIcon,
@@ -59,25 +58,25 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       description: 'Vue d\'ensemble de l\'application',
       key: 'dashboard'
     },
-       {
-      title: 'Modifier Vos informations personnelles',
-      icon: PersonIcon,
-      path: ROUTES.UPDATE,
-      description: 'modifier les informations de l\' auto-école',
-      key: 'update'
-    },
+    //    {
+    //   title: 'Modifier Vos informations personnelles',
+    //   icon: PersonIcon,
+    //   path: ROUTES.UPDATE,
+    //   description: 'modifier les informations de l\' auto-école',
+    //   key: 'update'
+    // },
      {
       title: 'Referentiel',
       icon: Ref,
       path: ROUTES.REF,
       description: 'reference de l\' auto-école'
     },
-     {
-      title: 'Change mot de passe',
-      icon: Password,
-      path: ROUTES.CPW,
-      description: 'changement de mot de passe'
-    },
+    //  {
+    //   title: 'Change mot de passe',
+    //   icon: Password,
+    //   path: ROUTES.CPW,
+    //   description: 'changement de mot de passe'
+    // },
      {
       title: 'Gestion des Candidats',
       icon: UserGroupIcon,
@@ -119,25 +118,25 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       description: 'Vue d\'ensemble de l\'application',
       key: 'dashboard'
     },
-    {
-      title: 'Modifier Vos informations personnelles',
-      icon: PersonIcon,
-      path: ROUTES.UPDATE,
-      description: 'modifier les informations de l\' auto-école',
-      key: 'update'
-    },
+    // {
+    //   title: 'Modifier Vos informations personnelles',
+    //   icon: PersonIcon,
+    //   path: ROUTES.UPDATE,
+    //   description: 'modifier les informations de l\' auto-école',
+    //   key: 'update'
+    // },
     {
       title: 'Referentiel',
       icon: Ref,
       path: ROUTES.REF,
       description: 'reference de l\' auto-école'
     },
-    {
-      title: 'Change mot de passe',
-      icon: Password,
-      path: ROUTES.CPW,
-      description: 'changement de mot de passe'
-    },
+    // {
+    //   title: 'Change mot de passe',
+    //   icon: Password,
+    //   path: ROUTES.CPW,
+    //   description: 'changement de mot de passe'
+    // },
     {
       title: 'Gestion des Candidats',
       icon: UserGroupIcon,

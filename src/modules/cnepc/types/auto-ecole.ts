@@ -256,3 +256,252 @@ export interface CandidatFilters {
   statut?: string;
   search?: string;
 }
+
+// Type pour les candidats inscrits à des formations
+export interface CandidatInscription {
+  id: string;
+  candidat_id: string;
+  auto_ecole_id: string;
+  formation_id: string;
+  statut: string;
+  date_creation: string;
+  date_modification: string;
+  commentaires: string[] | null;
+  candidat: {
+    id: string;
+    personne_id: string;
+    numero_candidat: string;
+    date_naissance: string;
+    lieu_naissance: string;
+    nip: string;
+    type_piece: string;
+    numero_piece: string;
+    nationalite: string;
+    genre: string;
+    age: string;
+    personne: {
+      id: string;
+      utilisateur_id: string;
+      nom: string;
+      prenom: string;
+      nom_complet: string;
+      email: string;
+      contact: string;
+      adresse: string;
+      created_at: string;
+      updated_at: string;
+    };
+    dossiers: any[];
+  };
+  formation?: {
+    id: string;
+    nom: string;
+    type_permis_id: string;
+    montant?: number;
+    description?: string;
+  };
+}
+
+// Types pour les nouvelles réponses API
+export interface AutoEcoleDetailResponse {
+  success: boolean;
+  data: {
+    id: string;
+    nom_auto_ecole: string;
+    adresse: string;
+    email: string;
+    responsable_id: string;
+    contact: string;
+    statut: boolean;
+    statut_libelle: string;
+    responsable: {
+      id: string;
+      utilisateur_id: string;
+      nom: string;
+      prenom: string;
+      nom_complet: string;
+      email: string;
+      contact: string;
+      adresse: string;
+      created_at: string;
+      updated_at: string;
+    };
+    formations: FormationDetail[];
+    dossiers: DossierDetail[];
+    created_at: string;
+    updated_at: string;
+  };
+}
+
+export interface AutoEcoleListApiResponse {
+  data: AutoEcoleApiItem[];
+  links: {
+    first: string;
+    last: string;
+    prev: string;
+    next: string;
+  };
+  meta: {
+    current_page: number;
+    from: number;
+    last_page: number;
+    links: Array<{
+      url: string;
+      label: string;
+      active: boolean;
+    }>;
+    path: string;
+    per_page: number;
+    to: number;
+    total: number;
+  };
+}
+
+export interface AutoEcoleApiItem {
+  id: string;
+  nom_auto_ecole: string;
+  adresse: string;
+  email: string;
+  responsable_id: string;
+  contact: string;
+  statut: boolean;
+  statut_libelle: string;
+  responsable: {
+    id: string;
+    utilisateur_id: string;
+    nom: string;
+    prenom: string;
+    nom_complet: string;
+    email: string;
+    contact: string;
+    adresse: string;
+    created_at: string;
+    updated_at: string;
+  };
+  formations: FormationDetail[];
+  dossiers: DossierDetail[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FormationDetail {
+  id: string;
+  auto_ecole_id: string;
+  type_permis_id: string;
+  montant: number;
+  montant_formate: string;
+  description: string;
+  session_id: string;
+  statut: boolean;
+  statut_libelle: string;
+  auto_ecole: any;
+  type_permis: {
+    id: string;
+    libelle: string;
+    code: string;
+    type_ref: string;
+    description: string;
+    statut: boolean;
+    statut_libelle: string;
+    created_at: string;
+    updated_at: string;
+  };
+  session: {
+    id: string;
+    libelle: string;
+    code: string;
+    type_ref: string;
+    description: string;
+    statut: boolean;
+    statut_libelle: string;
+    created_at: string;
+    updated_at: string;
+  };
+  dossiers: DossierDetail[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DossierDetail {
+  id: string;
+  candidat_id: string;
+  auto_ecole_id: string;
+  formation_id: string;
+  statut: string;
+  date_creation: string;
+  date_modification: string;
+  commentaires: string;
+  candidat: {
+    id: string;
+    personne_id: string;
+    numero_candidat: string;
+    date_naissance: string;
+    lieu_naissance: string;
+    nip: string;
+    type_piece: string;
+    numero_piece: string;
+    nationalite: string;
+    genre: string;
+    age: string;
+    personne: {
+      id: string;
+      utilisateur_id: string;
+      nom: string;
+      prenom: string;
+      nom_complet: string;
+      email: string;
+      contact: string;
+      adresse: string;
+      created_at: string;
+      updated_at: string;
+    };
+    dossiers: any[];
+    created_at: string;
+    updated_at: string;
+  };
+  auto_ecole: any;
+  formation: FormationDetail;
+  documents: DocumentDetail[];
+  etape: {
+    id: string;
+    code: string;
+    libelle: string;
+    ordre: number;
+    auto_advance: boolean;
+    statut_systeme: string;
+    circuit_id: string;
+    statut_id: string;
+    created_at: string;
+    updated_at: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentDetail {
+  id: string;
+  dossier_id: string;
+  type_document_id: string;
+  nom_fichier: string;
+  chemin_fichier: string;
+  type_mime: string;
+  taille_fichier: number;
+  taille_fichier_formate: string;
+  valide: boolean;
+  valide_libelle: string;
+  commentaires: string;
+  dossier: any;
+  type_document: {
+    id: string;
+    libelle: string;
+    code: string;
+    type_ref: string;
+    description: string;
+    statut: boolean;
+    statut_libelle: string;
+    created_at: string;
+    updated_at: string;
+  };
+  created_at: string;
+  updated_at: string;
+}

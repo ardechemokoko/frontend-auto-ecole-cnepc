@@ -36,7 +36,7 @@ const DemandesInscriptionPage: React.FC = () => {
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }} className="font-primary p-4 ">
         Gestion des demandes d'inscription des élèves
       </Typography>
-    
+
       <DemandesInscriptionTable 
         onCandidatSelect={handleCandidatSelect} 
         refreshTrigger={refreshTrigger}

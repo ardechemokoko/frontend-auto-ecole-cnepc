@@ -5,7 +5,10 @@ import { ROUTES } from '../../../shared/constants';
 import { useAppStore } from '../../../store';
 import { tokenService } from '../services';
 import { authService } from '../services/authService';
-import { User } from '../types';
+
+import { User, MeResponse } from '../types';
+import { AutoEcoleDetailResponse } from '../../cnepc/types/auto-ecole';
+
 
 interface LoginFormData {
   email: string;
@@ -13,10 +16,6 @@ interface LoginFormData {
 }
 export interface FormDataEmail {
   email: string;
-}
-
-interface FormErrorsEmail {
-  email?: string;
 }
 
 const LoginForm: React.FC = () => {
@@ -209,22 +208,63 @@ const LoginForm: React.FC = () => {
 
       // Vérifier si le token est bien un JWT
       const token = authResponse.data.access_token;
-      // Conversion du type pour correspondre au store
-      const user: User = {
-        id: authResponse.data.user.id,
-        email: authResponse.data.user.email,
-        name: authResponse.data.user.personne.nom_complet,
-        role: authResponse.data.user.role,
-        createdAt: authResponse.data.user.created_at,
-        personne: authResponse.data.user.personne
+      
+      // Vérifier le rôle utilisateur via l'endpoint /auth/me
+      console.log('🔍 Vérification du rôle utilisateur...');
+      const meResponse: MeResponse = await authService.getCurrentUser(token);
+      
+      if (!meResponse.success) {
+        throw new Error('Erreur lors de la vérification du rôle utilisateur');
+      }
 
+      // Conversion du type pour correspondre au store avec les données vérifiées
+      const user: User = {
+        id: meResponse.user.id,
+        email: meResponse.user.email,
+        name: meResponse.user.personne.nom_complet,
+        role: meResponse.user.role as 'admin' | 'instructor' | 'student' | 'candidat' | 'responsable_auto_ecole',
+        createdAt: new Date(meResponse.user.created_at),
+        created_at: meResponse.user.created_at,
+        personne: meResponse.user.personne
       };
+
+      // Si l'utilisateur est responsable d'auto-école, récupérer les informations de l'auto-école
+      let autoEcoleInfo: AutoEcoleDetailResponse | null = null;
+      if (user.role === 'responsable_auto_ecole') {
+        console.log('🏫 Récupération des informations de l\'auto-école...');
+        try {
+          // Trouver l'ID du responsable dans les données utilisateur
+          const responsableId = meResponse.user.personne.id;
+          autoEcoleInfo = await authService.findAutoEcoleByResponsableId(responsableId, token);
+          
+          if (autoEcoleInfo) {
+            console.log('✅ Informations auto-école récupérées:', autoEcoleInfo.data.nom_auto_ecole);
+            // Stocker les informations de l'auto-école dans le localStorage
+            localStorage.setItem('auto_ecole_info', JSON.stringify(autoEcoleInfo.data));
+          } else {
+            console.warn('⚠️ Aucune auto-école trouvée pour ce responsable');
+          }
+        } catch (error) {
+          console.error('❌ Erreur lors de la récupération des informations auto-école:', error);
+          // Ne pas bloquer la connexion si la récupération de l'auto-école échoue
+        }
+      }
+
+      // login(user, token);
+      // setMessage({ type: 'success', text: 'Connexion réussie !' });
+      // tokenService.setAuthData(token, user);
+   
       if (user.role !== 'candidat') {
         login(user, token);
         setMessage({ type: 'success', text: 'Connexion réussie !' });
         tokenService.setAuthData(token, user);
 
         console.log('✅ Token sauvegardé dans localStorage avec la clé "access_token"');
+      console.log('✅ Token sauvegardé dans localStorage avec la clé "access_token"');
+      console.log('✅ Rôle utilisateur vérifié:', user.role);
+      if (autoEcoleInfo) {
+        console.log('✅ Informations auto-école sauvegardées');
+      }
 
         // Redirection vers le dashboard après connexion réussie
         setTimeout(() => {
@@ -232,6 +272,8 @@ const LoginForm: React.FC = () => {
         }, 1000);
       }else{
         setMessage({ type: 'error', text: 'Accès refusé. Vous n\'êtes pas autorisé à accéder à cette application.' });
+        tokenService.clearAll()
+        //authService.logoutBackEnd();
       }
 
     } catch (error: any) {
