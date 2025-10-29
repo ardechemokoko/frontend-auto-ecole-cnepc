@@ -14,8 +14,8 @@ export const ROUTES = {
   CPW: '/change-password',
   RPW: '/reset-password',
   WORKFLOW: 't',
-  WORKFLOW_CIRCUIT: '/change-password',
-  WORKFLOW_STATUT: '/reset-password',
+  WORKFLOW_CIRCUIT: '/workflow/circuits',
+  WORKFLOW_STATUT: '/workflow/statuts',
 
   
   // SETTINGS: '/settings',
