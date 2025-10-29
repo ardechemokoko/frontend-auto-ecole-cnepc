@@ -16,6 +16,7 @@ import {
   AutoEcoleFilters,
   DossierFilters,
   CandidatFilters,
+  CandidatInscription,
 } from '../types/auto-ecole';
 
 export class AutoEcoleService {
@@ -547,6 +548,40 @@ export class AutoEcoleService {
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la récupération des statistiques:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère la liste des candidats inscrits à des formations
+   * Pour l'affichage dans les demandes d'inscription
+   */
+  async getCandidatsInscrits(): Promise<CandidatInscription[]> {
+    try {
+      console.log('🔄 Récupération des candidats inscrits...');
+      const response = await axiosClient.get('/candidats/inscription-formation');
+      
+      console.log('📋 Réponse candidats inscrits:', response.data);
+      
+      if (response.data.success && response.data.data) {
+        console.log('✅ Candidats inscrits récupérés:', response.data.data.length);
+        return response.data.data;
+      } else if (Array.isArray(response.data)) {
+        console.log('✅ Candidats inscrits récupérés (format array):', response.data.length);
+        return response.data;
+      } else {
+        console.warn('⚠️ Format de réponse inattendu:', response.data);
+        return [];
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur lors de la récupération des candidats inscrits:', error);
+      console.error('🔴 Status HTTP:', error.response?.status);
+      console.error('🔴 Message:', error.message);
+      
+      if (error.response?.data) {
+        console.error('📋 Réponse du backend:', JSON.stringify(error.response.data, null, 2));
+      }
+      
       throw error;
     }
   }
