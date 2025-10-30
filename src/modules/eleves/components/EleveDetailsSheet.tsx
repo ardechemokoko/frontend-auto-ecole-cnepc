@@ -29,6 +29,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { EleveValide } from '../services/validationService';
 import DossierCompletionSheet from './DossierCompletionSheet';
+import ValidationService from '../services/validationService';
+import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert } from '@mui/material';
 
 interface EleveDetailsSheetProps {
   open: boolean;
@@ -46,6 +48,12 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   const [replacingDocumentId, setReplacingDocumentId] = useState<string | null>(null);
   const [completionSheetOpen, setCompletionSheetOpen] = useState(false);
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [sendDate, setSendDate] = useState<string>('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendSuccess, setSendSuccess] = useState<string | null>(null);
+  const [sendResp, setSendResp] = useState<any>(null);
 
   if (!eleve) return null;
 
@@ -173,10 +181,7 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
   };
 
 
-  // Fonction pour ouvrir le sheet de complétion
-  const handleOpenCompletionSheet = () => {
-    setCompletionSheetOpen(true);
-  };
+  // (supprimé) Ouverture du sheet de complétion désormais non utilisée
 
   // Fonction pour fermer le sheet de complétion
   const handleCloseCompletionSheet = () => {
@@ -575,19 +580,16 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
         {/* Actions */}
         <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
           <Stack direction="row" spacing={2} justifyContent="flex-end">
-            <Button variant="outlined" onClick={onClose} className="font-primary">
-              Fermer
-            </Button>
             <Button 
               variant="contained" 
-              color="success"
-              onClick={handleOpenCompletionSheet}
-              sx={{ 
-                minWidth: 140
-              }}
+              color="primary"
+              onClick={() => setSendDialogOpen(true)}
               className="font-primary"
             >
-              Compléter le dossier
+              Envoyer à la CNEPC
+            </Button>
+            <Button variant="outlined" onClick={onClose} className="font-primary">
+              Fermer
             </Button>
           </Stack>
         </Box>
@@ -601,6 +603,116 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
         eleve={eleve}
         onCompletionSuccess={handleCompletionSuccess}
       />
+
+  {/* Modal d'envoi à la CNEPC */}
+  <Dialog open={sendDialogOpen} onClose={() => setSendDialogOpen(false)} maxWidth="xs" fullWidth>
+    <DialogTitle>Envoyer à la CNEPC</DialogTitle>
+    <DialogContent>
+      {sendError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSendError(null)}>
+          {sendError}
+        </Alert>
+      )}
+      {sendSuccess && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSendSuccess(null)}>
+          {sendSuccess}
+        </Alert>
+      )}
+      {sendResp && (
+        <Box sx={{ mb: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>Réponse CNEPC (résumé)</Typography>
+          <Typography variant="body2">ID programme: {sendResp?.programme_session?.id || '-'}</Typography>
+          <Typography variant="body2">Dossier: {sendResp?.programme_session?.dossier_id || '-'}</Typography>
+          <Typography variant="body2">Date examen: {sendResp?.programme_session?.date_examen || '-'}</Typography>
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="caption" color="text.secondary">JSON complet:</Typography>
+            <Box component="pre" sx={{ maxHeight: 200, overflow: 'auto', p: 1, backgroundColor: '#f7f7f7', borderRadius: 1 }}>
+{`${JSON.stringify(sendResp, null, 2)}`}
+            </Box>
+          </Box>
+        </Box>
+      )}
+      <TextField
+        label="Date d'examen"
+        type="datetime-local"
+        value={sendDate}
+        onChange={(e) => setSendDate(e.target.value)}
+        InputLabelProps={{ shrink: true }}
+        fullWidth
+      />
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={() => setSendDialogOpen(false)}>Annuler</Button>
+      <Button
+        variant="contained"
+        onClick={async () => {
+          try {
+            setSending(true);
+            setSendError(null);
+            if (!sendDate) {
+              setSendError('Veuillez sélectionner la date d\'examen.');
+              setSending(false);
+              return;
+            }
+            const payload = {
+              dossier_id: eleve.demandeId,
+              date_examen: new Date(sendDate).toISOString(),
+            };
+            console.log('🚚 Envoi à la CNEPC - payload:', payload);
+            const resp = await ValidationService.envoyerAuCNEPC(payload);
+            console.log('✅ Réponse CNEPC (raw):', resp);
+            try {
+              const ps = resp?.programme_session;
+              console.log('🧾 Programme session résumé:', {
+                id: ps?.id,
+                dossier_id: ps?.dossier_id,
+                date_examen: ps?.date_examen,
+                created_at: ps?.created_at,
+              });
+              const dossier = ps?.dossier;
+              if (dossier) {
+                console.log('👤 Candidat.personne:', dossier?.candidat?.personne);
+                console.log('🏫 Auto-école:', dossier?.auto_ecole || dossier?.formation?.auto_ecole);
+                console.log('📚 Formation:', dossier?.formation);
+                console.log('📄 Documents (count):', Array.isArray(dossier?.documents) ? dossier.documents.length : 0);
+              }
+            } catch {}
+            setSendResp(resp);
+            // Persister une entrée locale enrichie avec les infos élève/auto-école si la réponse ne les inclut pas
+            try {
+              const ps = resp?.programme_session || {};
+              const key = 'reception_incoming';
+              const raw = localStorage.getItem(key);
+              const arr = raw ? JSON.parse(raw) : [];
+              const incomingItem = {
+                id: ps.id || `ps-${Date.now()}`,
+                reference: ps.dossier_id || eleve.demandeId,
+                candidatNom: eleve.lastName || '',
+                candidatPrenom: eleve.firstName || '',
+                autoEcoleNom: eleve.autoEcole?.name || '',
+                dateEnvoi: new Date().toISOString(),
+                statut: 'envoye',
+                dateExamen: ps.date_examen || new Date(sendDate).toISOString(),
+                details: ps,
+              };
+              const filtered = Array.isArray(arr) ? arr.filter((x: any) => x.id !== incomingItem.id) : [];
+              filtered.unshift(incomingItem);
+              localStorage.setItem(key, JSON.stringify(filtered));
+            } catch {}
+            setSendSuccess('Dossier envoyé avec succès.');
+            setTimeout(() => setSendDialogOpen(false), 1000);
+          } catch (e: any) {
+            setSendError(e?.message || 'Erreur lors de l\'envoi');
+          } finally {
+            setSending(false);
+          }
+        }}
+        disabled={sending}
+      >
+        {sending ? 'Envoi...' : 'Envoyer'}
+      </Button>
+    </DialogActions>
+  </Dialog>
     </Drawer>
   );
 };

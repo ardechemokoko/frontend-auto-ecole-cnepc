@@ -16,6 +16,7 @@ import {
   AutoEcoleFilters,
   DossierFilters,
   CandidatFilters,
+  CandidatInscription,
 } from '../types/auto-ecole';
 
 export class AutoEcoleService {
@@ -475,6 +476,26 @@ export class AutoEcoleService {
     }
   }
 
+  /**
+   * Supprime un dossier (demande d'inscription)
+   */
+  async deleteDossier(id: string): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log(`🗑️ Suppression du dossier ID: ${id}...`);
+      const response = await axiosClient.delete(`/dossiers/${id}`);
+      console.log('✅ Dossier supprimé avec succès:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Erreur lors de la suppression du dossier:', error);
+      console.error('🔴 Status HTTP:', error.response?.status);
+      console.error('🔴 Message:', error.message);
+      if (error.response?.data) {
+        console.error('📋 Réponse du backend:', JSON.stringify(error.response.data, null, 2));
+      }
+      throw error;
+    }
+  }
+
   // ===== GESTION DES FORMATIONS =====
 
   /**
@@ -487,6 +508,95 @@ export class AutoEcoleService {
       return Array.isArray(response.data) ? response.data : (response.data.data || []);
     } catch (error) {
       console.error('Erreur lors de la récupération des formations:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère toutes les auto-écoles disponibles
+   */
+  async getAllAutoEcoles(): Promise<any[]> {
+    try {
+      console.log('🏫 Récupération de toutes les auto-écoles...');
+      const response = await axiosClient.get('/auto-ecoles');
+      
+      // Format de réponse peut varier
+      if (response.data.success && response.data.data) {
+        return Array.isArray(response.data.data) ? response.data.data : [response.data.data];
+      } else if (Array.isArray(response.data)) {
+        return response.data;
+      } else if (response.data.data && Array.isArray(response.data.data)) {
+        return response.data.data;
+      }
+      
+      return [];
+    } catch (error: any) {
+      console.error('❌ Erreur lors de la récupération des auto-écoles:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère toutes les formations disponibles
+   */
+  async getAllFormations(): Promise<any[]> {
+    try {
+      console.log('📚 Récupération de toutes les formations...');
+      const response = await axiosClient.get('/formations');
+      
+      // Format de réponse peut varier
+      if (response.data.success && response.data.data) {
+        return Array.isArray(response.data.data) ? response.data.data : [response.data.data];
+      } else if (Array.isArray(response.data)) {
+        return response.data;
+      } else if (response.data.data && Array.isArray(response.data.data)) {
+        return response.data.data;
+      }
+      
+      return [];
+    } catch (error: any) {
+      console.error('❌ Erreur lors de la récupération des formations:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère une formation par son ID
+   */
+  async getFormationById(id: string): Promise<any> {
+    try {
+      console.log(`📚 Récupération de la formation ID: ${id}...`);
+      const response = await axiosClient.get(`/formations/${id}`);
+      
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      console.error(`❌ Erreur lors de la récupération de la formation ${id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère tous les candidats avec leurs informations complètes
+   */
+  async getAllCandidats(): Promise<any[]> {
+    try {
+      console.log('👥 Récupération de tous les candidats...');
+      const response = await axiosClient.get('/candidats');
+      
+      // Format de réponse peut varier
+      if (response.data.data && Array.isArray(response.data.data)) {
+        return response.data.data;
+      } else if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      
+      return [];
+    } catch (error: any) {
+      console.error('❌ Erreur lors de la récupération des candidats:', error);
       throw error;
     }
   }
@@ -547,6 +657,40 @@ export class AutoEcoleService {
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la récupération des statistiques:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère la liste des candidats inscrits à des formations
+   * Pour l'affichage dans les demandes d'inscription
+   */
+  async getCandidatsInscrits(): Promise<CandidatInscription[]> {
+    try {
+      console.log('🔄 Récupération des candidats inscrits...');
+      const response = await axiosClient.get('/candidats/inscription-formation');
+      
+      console.log('📋 Réponse candidats inscrits:', response.data);
+      
+      if (response.data.success && response.data.data) {
+        console.log('✅ Candidats inscrits récupérés:', response.data.data.length);
+        return response.data.data;
+      } else if (Array.isArray(response.data)) {
+        console.log('✅ Candidats inscrits récupérés (format array):', response.data.length);
+        return response.data;
+      } else {
+        console.warn('⚠️ Format de réponse inattendu:', response.data);
+        return [];
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur lors de la récupération des candidats inscrits:', error);
+      console.error('🔴 Status HTTP:', error.response?.status);
+      console.error('🔴 Message:', error.message);
+      
+      if (error.response?.data) {
+        console.error('📋 Réponse du backend:', JSON.stringify(error.response.data, null, 2));
+      }
+      
       throw error;
     }
   }

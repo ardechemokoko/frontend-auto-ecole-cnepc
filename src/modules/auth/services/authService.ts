@@ -7,6 +7,7 @@ import { Person } from '../../cnepc/forms/updateinfoAutoEcole';
 import { ChangePasswordForm } from '../../eleves/types/changepassword';
 import { FormDataEmail } from '../forms/LoginForm';
 import { ResetPasswordFormData } from '../forms/resetpassword';
+import { AutoEcoleListApiResponse, AutoEcoleDetailResponse } from '../../cnepc/types/auto-ecole';
 
 export class AuthService {
   async login(credentials: LoginRequest): Promise<any> {
@@ -283,6 +284,216 @@ export class AuthService {
       return response.data;
     } catch (e) {
       console.log(e)
+    }
+  }
+
+  async getCurrentUser(token: string): Promise<any> {
+    try {
+      console.log('🔍 Vérification du rôle utilisateur via /auth/me...');
+      
+      const response = await axiosClient.get("/auth/me", {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('✅ Informations utilisateur récupérées avec succès');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('👤 INFORMATIONS UTILISATEUR ACTUEL');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      if (response.data && response.data.user) {
+        const user = response.data.user;
+        
+        console.log('📋 Identité:');
+        console.log('  • ID Utilisateur:', user.id);
+        console.log('  • Email:', user.email);
+        console.log('  • Rôle:', user.role);
+        console.log('  • Date de création:', user.created_at);
+        
+        if (user.personne) {
+          console.log('\n👨‍💼 Informations Personnelles:');
+          console.log('  • ID Personne:', user.personne.id);
+          console.log('  • Nom:', user.personne.nom);
+          console.log('  • Prénom:', user.personne.prenom);
+          console.log('  • Nom complet:', user.personne.nom_complet);
+          console.log('  • Email:', user.personne.email);
+          console.log('  • Contact:', user.personne.contact);
+          console.log('  • Adresse:', user.personne.adresse || 'Non renseignée');
+        }
+        
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ ERREUR LORS DE LA VÉRIFICATION DU RÔLE');
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('Message:', error.message);
+      
+      if (error.response) {
+        console.error('Statut HTTP:', error.response.status);
+        console.error('Données:', error.response.data);
+      }
+      
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      throw new Error(`Erreur lors de la vérification du rôle: ${error.message}`);
+    }
+  }
+
+  async getAllAutoEcoles(token: string): Promise<AutoEcoleListApiResponse> {
+    try {
+      console.log('🏫 Récupération de toutes les auto-écoles...');
+      
+      const response = await axiosClient.get("/auto-ecoles", {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('✅ Liste des auto-écoles récupérée avec succès');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🏫 AUTO-ÉCOLES DISPONIBLES');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      if (response.data && response.data.data) {
+        console.log('📋 Nombre d\'auto-écoles:', response.data.data.length);
+        
+        response.data.data.forEach((autoEcole: any, index: number) => {
+          console.log(`\n${index + 1}. ${autoEcole.nom_auto_ecole}`);
+          console.log('   • ID:', autoEcole.id);
+          console.log('   • Adresse:', autoEcole.adresse);
+          console.log('   • Email:', autoEcole.email);
+          console.log('   • Contact:', autoEcole.contact);
+          console.log('   • Statut:', autoEcole.statut_libelle);
+          console.log('   • Responsable:', autoEcole.responsable?.nom_complet || 'N/A');
+          console.log('   • ID Responsable:', autoEcole.responsable_id);
+        });
+        
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ ERREUR LORS DE LA RÉCUPÉRATION DES AUTO-ÉCOLES');
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('Message:', error.message);
+      
+      if (error.response) {
+        console.error('Statut HTTP:', error.response.status);
+        console.error('Données:', error.response.data);
+      }
+      
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      throw new Error(`Erreur lors de la récupération des auto-écoles: ${error.message}`);
+    }
+  }
+
+  async getAutoEcoleById(id: string, token: string): Promise<AutoEcoleDetailResponse> {
+    try {
+      console.log(`🏫 Récupération des détails de l'auto-école ID: ${id}...`);
+      
+      const response = await axiosClient.get(`/auto-ecoles/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('✅ Détails de l\'auto-école récupérés avec succès');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🏫 DÉTAILS AUTO-ÉCOLE');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      if (response.data && response.data.success && response.data.data) {
+        const autoEcole = response.data.data;
+        
+        console.log('📋 Informations générales:');
+        console.log('  • ID:', autoEcole.id);
+        console.log('  • Nom:', autoEcole.nom_auto_ecole);
+        console.log('  • Adresse:', autoEcole.adresse);
+        console.log('  • Email:', autoEcole.email);
+        console.log('  • Contact:', autoEcole.contact);
+        console.log('  • Statut:', autoEcole.statut_libelle);
+        console.log('  • ID Responsable:', autoEcole.responsable_id);
+        
+        if (autoEcole.responsable) {
+          console.log('\n👨‍💼 Responsable:');
+          console.log('  • ID:', autoEcole.responsable.id);
+          console.log('  • Nom complet:', autoEcole.responsable.nom_complet);
+          console.log('  • Email:', autoEcole.responsable.email);
+          console.log('  • Contact:', autoEcole.responsable.contact);
+        }
+        
+        if (autoEcole.formations && autoEcole.formations.length > 0) {
+          console.log('\n📚 Formations disponibles:');
+          autoEcole.formations.forEach((formation: any, index: number) => {
+            console.log(`  ${index + 1}. ${formation.type_permis?.libelle || 'Formation'} - ${formation.montant_formate || 'N/A'}`);
+          });
+        }
+        
+        if (autoEcole.dossiers && autoEcole.dossiers.length > 0) {
+          console.log('\n📁 Dossiers:');
+          console.log('  • Nombre total:', autoEcole.dossiers.length);
+        }
+        
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ ERREUR LORS DE LA RÉCUPÉRATION DES DÉTAILS AUTO-ÉCOLE');
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('Message:', error.message);
+      
+      if (error.response) {
+        console.error('Statut HTTP:', error.response.status);
+        console.error('Données:', error.response.data);
+      }
+      
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      throw new Error(`Erreur lors de la récupération des détails auto-école: ${error.message}`);
+    }
+  }
+
+  async findAutoEcoleByResponsableId(responsableId: string, token: string): Promise<AutoEcoleDetailResponse | null> {
+    try {
+      console.log(`🔍 Recherche de l'auto-école pour le responsable ID: ${responsableId}...`);
+      
+      // Récupérer toutes les auto-écoles
+      const autoEcolesResponse = await this.getAllAutoEcoles(token);
+      
+      // Chercher l'auto-école correspondant au responsable
+      const autoEcole = autoEcolesResponse.data.find(ae => ae.responsable_id === responsableId);
+      
+      if (!autoEcole) {
+        console.log('⚠️ Aucune auto-école trouvée pour ce responsable');
+        return null;
+      }
+      
+      console.log(`✅ Auto-école trouvée: ${autoEcole.nom_auto_ecole} (ID: ${autoEcole.id})`);
+      
+      // Récupérer les détails complets de l'auto-école
+      return await this.getAutoEcoleById(autoEcole.id, token);
+      
+    } catch (error: any) {
+      console.error('❌ ERREUR LORS DE LA RECHERCHE AUTO-ÉCOLE PAR RESPONSABLE');
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('Message:', error.message);
+      
+      if (error.response) {
+        console.error('Statut HTTP:', error.response.status);
+        console.error('Données:', error.response.data);
+      }
+      
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      throw new Error(`Erreur lors de la recherche auto-école par responsable: ${error.message}`);
     }
   }
 }

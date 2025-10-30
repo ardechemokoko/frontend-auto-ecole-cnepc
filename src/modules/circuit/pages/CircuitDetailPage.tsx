@@ -118,21 +118,21 @@ const CircuitDetailPage: React.FC = () => {
 
     try {
       setLoading(true)
-      const [circuitData, etapesData, statutsData, typeDocuments, /*rolesData,*/ transitionsData] = await Promise.all([
+      const [circuitData, etapesData, statutsData, typeDocuments, rolesData, transitionsData] = await Promise.all([
         circuitService.getById(id),
         etapeService.getByCircuitId(id),
         statutService.getAll(),
         typeDocumentService.getAll({
           type_ref: "TYPE_DOCUMENT"
         }),
-        // roleService.getAll(),
+        roleService.getAll(),
         transitionService.getByCircuitId(id),
       ])
       setCircuit(circuitData)
       setEtapes(etapesData)
       setStatuts(statutsData?.data || statutsData)
       setTypeDocuments(typeDocuments?.data);
-      setRoles(["role_admin", "role_cnepc", "role_auto_ecole"]);
+      setRoles(rolesData);
       setTransitions(transitionsData);
     } catch (err: any) {
       setError(err.message ?? 'Erreur lors du chargement des données')

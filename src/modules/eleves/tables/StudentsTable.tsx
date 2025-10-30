@@ -10,7 +10,6 @@ import {
   Chip, 
   TextField, 
   Box,
-  Button,
   IconButton,
   Typography,
   Grid,
@@ -43,7 +42,19 @@ const StudentsTable: React.FC = () => {
   const chargerElevesValides = async () => {
     try {
       setLoading(true);
-      const eleves = await ValidationService.getElevesValides();
+      let eleves = await ValidationService.getElevesValides();
+      // Fallback localStorage direct si nécessaire
+      if (!eleves || eleves.length === 0) {
+        try {
+          const raw = localStorage.getItem('eleves_valides_storage');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              eleves = parsed;
+            }
+          }
+        } catch {}
+      }
       const stats = await ValidationService.getStatistiquesElevesValides();
       setElevesValides(eleves);
       setStatistiques(stats);

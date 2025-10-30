@@ -283,7 +283,7 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
               startIcon={<Add />}
               onClick={() => setInscriptionDialogOpen(true)}
             >
-              Inscrire un candidat
+              Inscrire un candidats
             </Button>
           </Box>
           
