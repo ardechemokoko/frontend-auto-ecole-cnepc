@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, TextField, Card, CardContent, Typography, Box, Alert, CircularProgress, Link } from '@mui/material';
+import { Button, TextField, Typography, Box, Alert, CircularProgress } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../../store';
 import { authService } from '../services/authService';
@@ -18,16 +18,13 @@ export interface FormDataEmail {
 
 const LoginForm: React.FC = () => {
   const { login, setLoading, isLoading, isAuthenticated } = useAppStore();
-  const [isLoadingSendEmail, setIsLoadingSendEmail] = useState<boolean>(false);
+  const [isLoadingSendEmail,] = useState<boolean>(false);
   const navigate = useNavigate();
   const [formData, setFormData] = useState<LoginFormData>({ email: '', password: '' });
   const [errors, setErrors] = useState<Partial<LoginFormData>>({});
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [forgotPassword, setForgotPassword] = useState<boolean>(false);
-  const [emailerrors, setMailerrors] = useState<String>('');
-  const [emailData, setEmailFormData] = useState<FormDataEmail>({
-    email: "",
-  });
+  
+  
 
 
   // Redirection automatique si déjà connecté
@@ -50,7 +47,7 @@ const LoginForm: React.FC = () => {
         }}
       >
         <Box sx={{ textAlign: 'center' }}>
-          <CircularProgress size={60} sx={{ color: '#50C786', mb: 2 }} />
+          <CircularProgress size={60} sx={{ color: '#1976D2', mb: 2 }} />
           <Typography variant="h6" color="text.secondary">
             Vérification de l'authentification...
           </Typography>
@@ -72,7 +69,7 @@ const LoginForm: React.FC = () => {
         }}
       >
         <Box sx={{ textAlign: 'center' }}>
-          <CircularProgress size={60} sx={{ color: '#50C786', mb: 2 }} />
+          <CircularProgress size={60} sx={{ color: '#1976D2', mb: 2 }} />
           <Typography variant="h6" color="text.secondary">
             Envoi de Mail En cours...
           </Typography>
@@ -101,15 +98,6 @@ const LoginForm: React.FC = () => {
   //     </Box>
   //   );
   // }
-  const validateEmail = (): boolean => {
-    const newErrors: Partial<String> = {};
-    if (!emailData.email) {
-      setMailerrors('L\'email est requis')
-    } else if (!/\S+@\S+\.\S+/.test(emailData.email)) {
-      setMailerrors('Email invalide')
-    }
-    return Object.keys(newErrors).length === 0;
-  }
 
   const validateForm = (): boolean => {
     const newErrors: Partial<LoginFormData> = {};
@@ -138,49 +126,7 @@ const LoginForm: React.FC = () => {
     }
   };
 
-  const handleEmailChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value.trim();
 
-    setEmailFormData({
-      email: value
-    });
-    if (!emailData.email) {
-      setMailerrors('L\'email est requis')
-    } else if (!/\S+@\S+\.\S+/.test(emailData.email)) {
-      setMailerrors('Email invalide')
-    } else {
-      setMailerrors('')
-    }
-    if (emailData.email = "") {
-      setMailerrors('')
-    }
-  };
-
-  const onSubmitForgotPassword = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!validateEmail()) {
-      return;
-    }
-    try {
-      if (emailData.email != "") {
-        setIsLoadingSendEmail(true);
-      }
-      //
-      const rest = await authService.forgotPassword(emailData);
-      if (rest) {
-        setMessage({ type: 'success', text: 'Veuillez consulter votre email' });
-
-      }
-      // console.log(rest)
-    } catch (e) {
-      setIsLoadingSendEmail(false);
-      console.log(e)
-    }
-    setTimeout(() => {
-      navigate(ROUTES.RPW);
-    }, 1000);
-    // console.log(emailData.email)
-  }
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -262,8 +208,9 @@ const LoginForm: React.FC = () => {
       setTimeout(() => {
         navigate(ROUTES.DASHBOARD);
       }, 1000);
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || 'Erreur de connexion' });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
+      setMessage({ type: 'error', text: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -274,258 +221,150 @@ const LoginForm: React.FC = () => {
       sx={{
         minHeight: '100vh',
         display: 'flex',
-        flexDirection: { xs: 'column', lg: 'row' },
-        backgroundColor: '#f5f5f5'
+        flexDirection: { xs: 'column', md: 'row' },
+        backgroundColor: '#eee'
       }}
     >
-      {/* Section gauche - Présentation */}
+      {/* Panneau gauche avec image + voile bleu */}
       <Box
         sx={{
-          flex: { xs: 'none', lg: 1 },
-          height: { xs: '40vh', lg: 'auto' },
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          background: 'linear-gradient(135deg, #50C786 0%, #40B676 100%)',
+          flex: 1,
+          minHeight: { xs: 300, md: '100vh' },
+          backgroundImage: 'url(/src/assets/img/img1.avif)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          position: 'relative',
           color: 'white',
-          p: { xs: 3, sm: 4 },
-          position: 'relative'
+          overflow: 'hidden'
         }}
       >
-        <Box sx={{
-          textAlign: 'center',
-          maxWidth: { xs: '100%', sm: 500 },
-          px: { xs: 2, sm: 0 }
-        }}>
-          {/* Images officielles */}
-          <Box sx={{
+        {/* Voile bleu */}
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: 'rgba(25, 118, 210, 0.85)',
+            opacity: 0.85
+          }}
+        />
+
+        {/* Contenu */}
+        <Box
+          sx={{
+            position: 'relative',
+            height: '100%',
             display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: { xs: 2, sm: 3, md: 4 },
-            mb: { xs: 2, sm: 3 },
-            flexWrap: 'wrap'
-          }}>
-            <Box sx={{
-              width: { xs: 60, sm: 80, md: 100 },
-              height: { xs: 60, sm: 80, md: 100 },
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <img
-                src="/src/assets/img/blason.png"
-                alt="Blason du Gabon"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain'
-                }}
-              />
-            </Box>
-            <Box sx={{
-              width: { xs: 60, sm: 80, md: 100 },
-              height: { xs: 60, sm: 80, md: 100 },
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <img
-                src="/src/assets/img/mtt.png"
-                alt="Ministère des Transports"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain'
-                }}
-              />
-            </Box>
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            padding: 4,
+            zIndex: 1,
+          }}
+        >
+          {/* Header */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box
+              component="img"
+              src="/src/assets/img/drapeau_sceau.jpg"
+              alt="Drapeau Gabon"
+              sx={{
+                width: 70,
+                height: 45,
+                borderRadius: '2px',
+              }}
+            />
+            <Typography
+              variant="body1"
+              sx={{
+                color: 'white',
+                fontWeight: 600,
+                fontSize: '1rem',
+              }}
+            >
+              Portail National des Titres <br/>
+              et Actes de Transport Terrestre Sécurisé
+            </Typography>
           </Box>
 
-          <Typography
-            variant="h2"
-            component="h1"
-            sx={{
-              mb: { xs: 2, sm: 3 },
-              fontWeight: 'bold',
-              fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem', lg: '3rem' }
-            }}
-            className="font-display"
-          >
-            Portail Auto-École
-          </Typography>
-
-          <Typography
-            variant="h5"
-            sx={{
-              mb: { xs: 3, sm: 4 },
-              fontWeight: 400,
-              lineHeight: 1.6,
-              fontSize: { xs: '0.9rem', sm: '1.1rem', md: '1.3rem' },
-              display: { xs: 'none', sm: 'block' }
-            }}
-            className="font-primary"
-          >
-            Logiciel officiel du Ministère des Transports, de la Marine Marchande et de la Logistique
-          </Typography>
-
-          {/* Version mobile du texte */}
-          <Typography
-            variant="body1"
-            sx={{
-              mb: { xs: 3, sm: 4 },
-              fontWeight: 400,
-              lineHeight: 1.4,
-              fontSize: '0.9rem',
-              display: { xs: 'block', sm: 'none' }
-            }}
-            className="font-primary"
-          >
-            Logiciel officiel du Ministère des Transports
-          </Typography>
-
-          {/* <Box sx={{ mt: { xs: 3, sm: 6 } }}>
+          {/* Main Content */}
+          <Box sx={{ maxWidth: '500px' }}>
             <Typography
-              variant="h6"
+              variant="h3"
               sx={{
-                fontWeight: 600,
-                color: 'rgba(255, 255, 255, 0.9)',
-                fontSize: { xs: '0.9rem', sm: '1.1rem' }
-              }}
-            >
-              Développé par
-            </Typography>
-            <Typography
-              variant="h4"
-              sx={{
-                fontWeight: 'bold',
                 color: 'white',
-                mt: 1,
-                fontSize: { xs: '1.2rem', sm: '1.5rem', md: '2rem' }
+                fontWeight: 700,
+                fontSize: { md: '2.5rem', lg: '3rem' },
+                lineHeight: 1.2,
+                mb: 3,
               }}
             >
-              Rengus Digital
+              Bienvenue dans l'espace de gestion des auto-écoles
+              et des examens de permis de conduire !
             </Typography>
-          </Box> */}
 
+            <Typography
+              variant="body1"
+              sx={{
+                color: 'white',
+                fontSize: '1.1rem',
+                lineHeight: 1.7,
+                opacity: 0.95,
+              }}
+            >
+              Connectez-vous pour gérer les dossiers, inscrire des candidats, gérer les examens,
+              accéder à vos documents officiels ou utiliser les services en
+              ligne du ministère des Transports. Votre compte vous ouvre les
+              portes d'une administration plus rapide, plus simple et entièrement
+              numérique.
+            </Typography>
+          </Box>
+
+
+          {/* Footer */}
+          <Typography
+            variant="body2"
+            sx={{
+              color: 'white',
+              fontSize: '0.875rem',
+              opacity: 0.8,
+            }}
+          >
+            Copyright © 2025. Rengus Digital, tous droits reservés.
+          </Typography>
         </Box>
       </Box>
 
-      {/* Section droite - Formulaire de connexion */}
+      {/* Panneau droit: formulaire sur fond blanc */}
       <Box
         sx={{
-          flex: { xs: 1, lg: 1 },
+          flex: 1,
+          backgroundColor: '#fff',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          p: { xs: 2, sm: 3, md: 4 },
-          minHeight: { xs: '60vh', lg: 'auto' },
-          position: 'relative',
-          backgroundImage: 'url(/src/assets/img/back-driver.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundImage: 'url(/src/assets/img/back-driver.jpg)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            filter: 'blur(8px)',
-            zIndex: -1
-          }
+          p: { xs: 3, md: 6 }
         }}
       >
-        <Card sx={{
-          width: '100%',
-          maxWidth: { xs: '100%', sm: 400 },
-          boxShadow: { xs: 1, sm: 3 },
-          mx: { xs: 1, sm: 0 },
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(10px)',
-          zIndex: 1
-        }}>
-          <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
-            <Typography
-              variant="h4"
-              component="h1"
-              sx={{
-                textAlign: 'center',
-                mb: 2,
-                fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }
-              }}
-              className="font-display"
+        <Box sx={{ width: '100%', maxWidth: 520 }}>
+          <Typography
+            variant="h5"
+            sx={{ mb: 3, fontWeight: 700 }}
+          >
+            Se connecter
+          </Typography>
+
+          {message && (
+            <Alert
+              severity={message.type}
+              sx={{ mb: 2 }}
+              onClose={() => setMessage(null)}
             >
-              {forgotPassword ? "Mot de passe oublié" : "Connexion"}
+              {message.text}
+            </Alert>
+          )}
 
-            </Typography>
-
-
-            {message && (
-              <Alert
-                severity={message.type}
-                sx={{ mb: 2 }}
-                onClose={() => setMessage(null)}
-              >
-                {message.text}
-              </Alert>
-            )}
-            {forgotPassword ? <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1.5, sm: 2 } }}>
-              <form onSubmit={onSubmitForgotPassword}>
-                <TextField
-                  label="Email"
-                  type="email"
-
-                  fullWidth
-                  value={emailData.email}
-                  onChange={handleEmailChange}
-                  error={!!emailerrors}
-                  helperText={emailerrors}
-                  size={window.innerWidth < 600 ? 'small' : 'medium'}
-                />
-
-                <Button
-                  type="submit"
-                  variant="contained"
-                  fullWidth
-                  size={window.innerWidth < 600 ? 'medium' : 'large'}
-                  disabled={isLoading}
-                  sx={{
-                    mt: { xs: 1.5, sm: 2 },
-                    backgroundColor: '#50C786',
-                    '&:hover': { backgroundColor: '#40B676' },
-                    fontSize: { xs: '0.9rem', sm: '1rem' },
-                    py: { xs: 1.5, sm: 2 }
-                  }}
-                >
-                  Envoi Email
-                </Button>
-              </form>
-
-              <Box textAlign="right" mt={1}>
-                <Link
-                  component="button"
-                  variant="body2"
-                  onClick={() => {
-                    setForgotPassword((prev) => !prev)
-                  }}
-                  underline="hover"
-                  sx={{
-                    fontSize: "0.85rem",
-                    color: "text.secondary",
-                    "&:hover": { color: "primary.main" },
-                  }}
-                >
-                  connexion
-                </Link>
-              </Box>
-            </Box> : <form onSubmit={onSubmit}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1.5, sm: 2 } }}>
+          {(
+            <form onSubmit={onSubmit}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <TextField
                   label="Email"
                   type="email"
@@ -548,6 +387,7 @@ const LoginForm: React.FC = () => {
                   size={window.innerWidth < 600 ? 'small' : 'medium'}
                 />
 
+
                 <Button
                   type="submit"
                   variant="contained"
@@ -555,50 +395,18 @@ const LoginForm: React.FC = () => {
                   size={window.innerWidth < 600 ? 'medium' : 'large'}
                   disabled={isLoading}
                   sx={{
-                    mt: { xs: 1.5, sm: 2 },
-                    backgroundColor: '#50C786',
-                    '&:hover': { backgroundColor: '#40B676' },
-                    fontSize: { xs: '0.9rem', sm: '1rem' },
-                    py: { xs: 1.5, sm: 2 }
+                    mt: 1,
+                    backgroundColor: '#1976D2',
+                    '&:hover': { backgroundColor: '#1565C0' }
                   }}
                 >
                   {isLoading ? 'Connexion...' : 'Se connecter'}
                 </Button>
-                {/* <Box textAlign="right" mt={1}>
-                  <Link
-                    component="button"
-                    variant="body2"
-                    onClick={() => {
-                      setForgotPassword((prev) => !prev)
-                    }}
-                    underline="hover"
-                    sx={{
-                      fontSize: "0.85rem",
-                      color: "text.secondary",
-                      "&:hover": { color: "primary.main" },
-                    }}
-                  >
-                    Mot de passe oublié
-                  </Link>
-                </Box> */}
+
+                
               </Box>
-            </form>}
-
-          </CardContent>
-        </Card>
-
-        {/* Lignes colorées décoratives en bas de la section droite */}
-        <Box sx={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          display: 'flex',
-          height: 8
-        }}>
-          <Box sx={{ flex: 1, backgroundColor: '#2E8B57', height: '100%' }} />
-          <Box sx={{ flex: 1, backgroundColor: '#FFD700', height: '100%' }} />
-          <Box sx={{ flex: 1, backgroundColor: '#1E90FF', height: '100%' }} />
+            </form>
+          )}
         </Box>
       </Box>
     </Box>
