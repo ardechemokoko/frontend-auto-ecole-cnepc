@@ -29,6 +29,15 @@ import AutoEcolePage from './AutoEcolePage';
 import ResetPasswordForm from '../modules/auth/forms/resetpassword';
 import PageChangePassWord from '../modules/cnepc/forms/changePassword';
 
+// Import des pages du module candidat_examen
+import { 
+  CandidatExamenListPage,
+  SessionExamenListPage,
+  PlanificationPage,
+  TestPage
+} from '../modules/candidat_examen/pages';
+import { ReceptionDossiersPage } from '../modules/reception';
+
 
 // Composant de protection des routes
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -85,6 +94,12 @@ const AppRoutes: React.FC = () => {
       path: ROUTES.CNEPC, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(CNEPCPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.RECEPTION, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(ReceptionDossiersPage))
       ) 
     }),
     React.createElement(Route, { 
@@ -151,6 +166,39 @@ const AppRoutes: React.FC = () => {
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(UserManagementPage))
 
+      ) 
+    }),
+
+    // Routes du module candidat_examen
+    React.createElement(Route, { 
+      path: ROUTES.CANDIDATS_EXAMEN, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CandidatExamenListPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.CANDIDATS_EXAMEN_CANDIDATS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CandidatExamenListPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.CANDIDATS_EXAMEN_SESSIONS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(SessionExamenListPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.CANDIDATS_EXAMEN_PLANIFICATION, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(PlanificationPage))
+      ) 
+    }),
+    // Route de test temporaire
+    React.createElement(Route, { 
+      path: "/test-candidats-examen", 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(TestPage))
       ) 
     }),
 

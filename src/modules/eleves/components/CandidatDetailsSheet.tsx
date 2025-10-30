@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Drawer,
   Box,
@@ -48,6 +48,71 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   const [replacingDocumentId, setReplacingDocumentId] = useState<string | null>(null);
   const [validating, setValidating] = useState(false);
+  const [selectedDocType, setSelectedDocType] = useState<string>('');
+  const storageKey = useMemo(() => `candidat_docs_${candidat?.id || 'unknown'}`, [candidat?.id]);
+
+  // Déplacé en haut et déclaré en function pour être disponible avant usage (hoisted)
+  function getAllDocuments() {
+    const existingDocs = candidat?.documents.filter(doc => 
+      !uploadedDocuments.some(uploaded => uploaded.id === doc.id)
+    ) || [];
+    const allDocs = [...existingDocs, ...uploadedDocuments];
+    console.log('Documents existants:', existingDocs);
+    console.log('Documents uploadés:', uploadedDocuments);
+    console.log('Tous les documents:', allDocs);
+    return allDocs;
+  }
+
+  // Déterminer les pièces requises selon la nationalité
+  const isGabonais = useMemo(() => {
+    const nat = (candidat?.eleve?.nationality || '').toLowerCase();
+    return nat.includes('gabon');
+  }, [candidat]);
+
+  const requiredDocs = useMemo(() => {
+    return isGabonais
+      ? ["pièce d'identité", 'acte de naissance']
+      : ['carte de séjour', 'passeport', 'certificat de résidence', 'acte de naissance'];
+  }, [isGabonais]);
+
+  const normalize = (v: any) => (v || '').toString().toLowerCase();
+
+  const hasDocument = (label: string) => {
+    const allDocsLocal = getAllDocuments();
+    return allDocsLocal.some((d: any) => {
+      const byName = normalize(d.nom).includes(label);
+      const byType = normalize(d.type_document?.libelle).includes(label) || normalize(d.type).includes(label) || normalize(d.selectedDocType).includes(label);
+      return byName || byType;
+    });
+  };
+
+  const missingDocs = useMemo(() => requiredDocs.filter(l => !hasDocument(l)), [requiredDocs, uploadedDocuments, candidat]);
+
+  // Persistance: charger depuis localStorage au montage/au changement de candidat
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setUploadedDocuments(parsed);
+        }
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  // Persistance: sauvegarder à chaque changement
+  useEffect(() => {
+    try {
+      // Retirer les objets File avant persistance
+      const serializable = uploadedDocuments.map((d: any) => {
+        const { file, ...rest } = d || {};
+        return rest;
+      });
+      localStorage.setItem(storageKey, JSON.stringify(serializable));
+    } catch {}
+  }, [uploadedDocuments, storageKey]);
 
   if (!candidat) return null;
 
@@ -70,17 +135,7 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
   };
 
 
-  // Fonction pour obtenir tous les documents (existants + uploadés)
-  const getAllDocuments = () => {
-    const existingDocs = candidat.documents.filter(doc => 
-      !uploadedDocuments.some(uploaded => uploaded.id === doc.id)
-    );
-    const allDocs = [...existingDocs, ...uploadedDocuments];
-    console.log('Documents existants:', existingDocs);
-    console.log('Documents uploadés:', uploadedDocuments);
-    console.log('Tous les documents:', allDocs);
-    return allDocs;
-  };
+  // (supprimé - redéfini plus haut en function hoisted)
 
   const handleViewDocument = (document: any) => {
     // Si le document a un fichier (document uploadé), créer une URL temporaire
@@ -131,6 +186,10 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
   };
 
   const handleUploadNewDocument = () => {
+    if (!selectedDocType) {
+      alert('Veuillez sélectionner le type de document à uploader.');
+      return;
+    }
     if (fileInputRef) {
       fileInputRef.click();
     }
@@ -153,7 +212,10 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
             type: file.type,
             url: e.target?.result as string,
             file: file,
-            isReplacement: !!replacingDocumentId
+            isReplacement: !!replacingDocumentId,
+            selectedDocType,
+            type_document: { libelle: selectedDocType },
+            status: 'téléchargé'
           };
           
           if (replacingDocumentId) {
@@ -200,6 +262,15 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
 
     try {
       setValidating(true);
+
+      // Vérifier les pièces requises avant validation
+      if (missingDocs.length > 0) {
+        alert(
+          `Documents manquants pour la nationalité ${isGabonais ? 'Gabonais' : 'Étrangère'}:\n- ${missingDocs.join('\n- ')}`
+        );
+        setValidating(false);
+        return;
+      }
       
       // Valider la demande et la transférer vers les élèves validés
       const eleveValide = await ValidationService.validerDemande(candidat);
@@ -391,6 +462,50 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
           {/* Documents */}
           <Card>
             <CardContent>
+              {/* Choix du type de document à uploader */}
+              <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Typography variant="subtitle2" color="primary">
+                  Sélectionner le type de document à uploader
+                </Typography>
+                <Box>
+                  <select
+                    value={selectedDocType}
+                    onChange={(e) => setSelectedDocType(e.target.value)}
+                    style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid #e0e0e0' }}
+                  >
+                    <option value="">-- Choisir --</option>
+                    {requiredDocs.map((doc) => {
+                      const present = hasDocument(doc);
+                      return (
+                        <option key={doc} value={doc}>
+                          {doc}{present ? ' - Téléchargé' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </Box>
+              </Box>
+            {/* Exigences documentaires selon nationalité */}
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" color="primary" gutterBottom>
+                Pièces requises ({isGabonais ? 'Candidat Gabonais' : 'Candidat Étranger'})
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                {requiredDocs.map((doc) => {
+                  const present = hasDocument(doc);
+                  return (
+                    <Chip
+                      key={doc}
+                      label={`${doc}${present ? '' : ' (manquant)'}`}
+                      color={present ? 'success' : 'warning'}
+                      size="small"
+                      variant={present ? 'filled' : 'outlined'}
+                      sx={{ textTransform: 'capitalize' }}
+                    />
+                  );
+                })}
+              </Stack>
+            </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <DocumentTextIcon className="w-5 h-5 mr-2 text-blue-600" />
@@ -531,6 +646,23 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
                                 sx={{ ml: 1, fontSize: '0.7rem' }}
                               />
                             )}
+                            {doc.selectedDocType && (
+                              <Chip 
+                                label={doc.selectedDocType}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                                sx={{ ml: 1, fontSize: '0.7rem', textTransform: 'capitalize' }}
+                              />
+                            )}
+                            {doc.status === 'téléchargé' && (
+                              <Chip 
+                                label="Téléchargé"
+                                size="small"
+                                color="success"
+                                sx={{ ml: 1, fontSize: '0.7rem' }}
+                              />
+                            )}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
                             Taille: {doc.taille}
@@ -626,7 +758,7 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
               variant="contained" 
               color="primary"
               onClick={handleValidation}
-              disabled={validating}
+              disabled={validating || missingDocs.length > 0}
               sx={{ 
                 minWidth: 120,
                 '&:disabled': {

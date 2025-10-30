@@ -5,6 +5,7 @@ export const ROUTES = {
   VALIDATION: '/validation',
   ELEVES: '/eleves',
   CNEPC: '/cnepc',
+  RECEPTION: '/reception',
   AUTO_ECOLES: '/auto-ecoles',
   SETTINGS: '/settings',
   USER_MANAGEMENT: '/user-management',
@@ -17,6 +18,12 @@ export const ROUTES = {
   WORKFLOW_CIRCUIT: '/workflow/circuits',
   WORKFLOW_STATUT: '/workflow/statuts',
 
+  // Routes pour le module candidat_examen
+  CANDIDATS_EXAMEN: '/candidats-examen',
+  CANDIDATS_EXAMEN_CANDIDATS: '/candidats-examen/candidats',
+  CANDIDATS_EXAMEN_SESSIONS: '/candidats-examen/sessions',
+  CANDIDATS_EXAMEN_PLANIFICATION: '/candidats-examen/planification',
+  CANDIDATS_EXAMEN_DEMO: '/candidats-examen/demo',
   
   // SETTINGS: '/settings',
   //USER_MANAGEMENT: '/settings/users',

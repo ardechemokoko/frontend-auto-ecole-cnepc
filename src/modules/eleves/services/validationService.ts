@@ -27,9 +27,98 @@ export interface EleveValide {
 export class ValidationService {
   private static elevesValides: EleveValide[] = [];
   private static demandesValidees: string[] = []; // IDs des demandes validées
+  private static readonly STORAGE_KEY = 'eleves_valides_storage';
+
+  private static loadFromStorage() {
+    try {
+      const raw = localStorage.getItem(this.STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          this.elevesValides = parsed;
+        }
+      }
+    } catch {}
+  }
+
+  // Envoyer un dossier au CNEPC (programmation de session)
+  static async envoyerAuCNEPC(payload: { dossier_id: string; date_examen: string }): Promise<any> {
+    try {
+      // Utiliser le client principal (proxy / baseURL configuré)
+      const { default: axiosClient } = await import('../../../shared/environment/envdev');
+      const response = await axiosClient.post('/programme-sessions', payload);
+      const data = response.data;
+
+      // Persister pour le module Réception si success et objet disponible
+      try {
+        if (data?.success && data?.programme_session?.dossier) {
+          const ps = data.programme_session;
+          const dossier = ps.dossier;
+          const personne = dossier?.candidat?.personne || {};
+          const autoEcole = dossier?.auto_ecole || dossier?.formation?.auto_ecole;
+
+          const incomingItem = {
+            id: ps.id,
+            reference: dossier.id,
+            candidatNom: personne.nom || '',
+            candidatPrenom: personne.prenom || '',
+            autoEcoleNom: autoEcole?.nom_auto_ecole || autoEcole?.nom || '',
+            dateEnvoi: new Date().toISOString(),
+            statut: 'envoye'
+          };
+
+          const key = 'reception_incoming';
+          const raw = localStorage.getItem(key);
+          const arr = raw ? JSON.parse(raw) : [];
+          // éviter doublons par id
+          const filtered = Array.isArray(arr) ? arr.filter((x: any) => x.id !== incomingItem.id) : [];
+          filtered.unshift(incomingItem);
+          localStorage.setItem(key, JSON.stringify(filtered));
+          // garder la dernière réponse complète aussi
+          localStorage.setItem('reception_last_response', JSON.stringify(data));
+        }
+      } catch {}
+
+      return data;
+    } catch (error: any) {
+      console.error('Erreur envoi CNEPC:', error);
+      throw new Error(error?.response?.data?.message || error?.message || 'Erreur lors de l\'envoi au CNEPC');
+    }
+  }
+
+  private static saveToStorage() {
+    try {
+      // Sanitize non-serializable fields (e.g., File) before saving
+      const serializable = this.elevesValides.map(e => ({
+        ...e,
+        originalDocuments: (e.originalDocuments || []).map((d: any) => {
+          const { file, ...rest } = d || {};
+          return rest; // drop File reference
+        })
+      }));
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(serializable));
+    } catch {}
+  }
+
+  private static getUploadedDocsForDemande(demandeId: string): any[] {
+    try {
+      const raw = localStorage.getItem(`candidat_docs_${demandeId}`);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
 
   // Valider une demande et la transférer vers les élèves validés
   static async validerDemande(demande: DemandeInscription): Promise<EleveValide> {
+    // Charger état persistant
+    this.loadFromStorage();
+
+    // Récupérer les documents uploadés côté candidat (persistés)
+    const uploadedDocs = this.getUploadedDocsForDemande(demande.id);
+    const mergedDocuments = [...(demande.documents || []), ...uploadedDocs];
     // Créer un nouvel élève validé à partir de la demande
     const nouvelEleve: EleveValide = {
       id: `eleve-${Date.now()}`,
@@ -43,18 +132,41 @@ export class ValidationService {
       nationality: demande.eleve.nationality,
       nationaliteEtrangere: demande.eleve.nationaliteEtrangere,
       status: 'validated',
-      documentsCount: demande.documents.length,
+      documentsCount: mergedDocuments.length,
       validatedAt: new Date().toISOString(),
       demandeId: demande.id,
-      originalDocuments: demande.documents, // Transmettre les documents de la demande
+      originalDocuments: mergedDocuments, // Transmettre tous les documents (origine + uploadés)
       autoEcole: demande.autoEcole
     };
 
     // Ajouter à la liste des élèves validés
     this.elevesValides.push(nouvelEleve);
+    this.saveToStorage();
 
     // Marquer la demande comme validée
     this.demandesValidees.push(demande.id);
+
+    // Mettre à jour le dossier dans auto_ecole_info (localStorage) pour refléter l'envoi
+    try {
+      const autoRaw = localStorage.getItem('auto_ecole_info');
+      if (autoRaw) {
+        const autoData = JSON.parse(autoRaw);
+        if (autoData && Array.isArray(autoData.dossiers)) {
+          autoData.dossiers = autoData.dossiers.map((d: any) => {
+            if (d.id === demande.id) {
+              return {
+                ...d,
+                statut: 'eleve_inscrit',
+                documents: mergedDocuments,
+                date_modification: new Date().toISOString(),
+              };
+            }
+            return d;
+          });
+          localStorage.setItem('auto_ecole_info', JSON.stringify(autoData));
+        }
+      }
+    } catch {}
 
     // Simuler une mise à jour de la demande (marquer comme validée)
     console.log('Demande validée et transférée:', nouvelEleve);
@@ -64,6 +176,7 @@ export class ValidationService {
 
   // Récupérer tous les élèves validés
   static async getElevesValides(): Promise<EleveValide[]> {
+    this.loadFromStorage();
     return [...this.elevesValides];
   }
 
@@ -77,6 +190,7 @@ export class ValidationService {
     const index = this.elevesValides.findIndex(eleve => eleve.id === id);
     if (index !== -1) {
       this.elevesValides.splice(index, 1);
+      this.saveToStorage();
       return true;
     }
     return false;
@@ -87,6 +201,7 @@ export class ValidationService {
     const index = this.elevesValides.findIndex(eleve => eleve.id === id);
     if (index !== -1) {
       this.elevesValides[index] = { ...this.elevesValides[index], ...updates };
+      this.saveToStorage();
       return this.elevesValides[index];
     }
     return null;

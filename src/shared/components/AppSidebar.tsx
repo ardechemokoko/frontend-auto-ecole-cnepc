@@ -185,6 +185,11 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
           path: ROUTES.CNEPC,
           title: 'Management',
           description: 'Transmettre les dossiers validés au CNEPC'
+        },
+        {
+          path: ROUTES.RECEPTION,
+          title: 'Réception des dossiers',
+          description: 'Réceptionner les dossiers envoyés par les auto-écoles'
         }
       ]
     },
@@ -224,15 +229,22 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
     },
   ];
 
+  // Préparer la liste des menus selon le rôle
+  const baseMenuItems = user?.role === "responsable_auto_ecole" ? allMenuItemsAutoEcole : allMenuItems;
+  // Pour l'administrateur: n'afficher que le menu CNEPC (sans sous-menu)
+  const roleAdjustedMenuItems = user?.role === 'admin'
+    ? allMenuItems.filter(item => item.title === 'CNEPC')
+    : baseMenuItems;
+
   // Filtrer les menus selon les permissions de l'utilisateur
   console.log('🎭 AppSidebar: Filtrage des menus pour l\'utilisateur', {
     userRole: user?.role,
     userName: user?.name || user?.email,
-    totalMenus: allMenuItems.length
+    totalMenus: roleAdjustedMenuItems.length
   });
   
-  const menuItems = allMenuItems.filter(item => {
-    const hasAccess = canAccessMenu(user, item.key!);
+  const menuItems = roleAdjustedMenuItems.filter(item => {
+    const hasAccess = item.key ? canAccessMenu(user, item.key) : true;
     console.log('🎭 AppSidebar: Menu', item.title, '->', hasAccess ? 'AUTORISÉ' : 'REFUSÉ');
     return hasAccess;
   });
