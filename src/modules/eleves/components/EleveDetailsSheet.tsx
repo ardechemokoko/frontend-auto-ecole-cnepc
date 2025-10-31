@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Drawer,
   Box,
@@ -31,6 +31,8 @@ import { EleveValide } from '../services/validationService';
 import DossierCompletionSheet from './DossierCompletionSheet';
 import ValidationService from '../services/validationService';
 import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert } from '@mui/material';
+import axiosClient from '../../../shared/environment/envdev';
+import { autoEcoleService } from '../../cnepc/services/auto-ecole.service';
 
 interface EleveDetailsSheetProps {
   open: boolean;
@@ -54,6 +56,71 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
   const [sendResp, setSendResp] = useState<any>(null);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [documentsFromApi, setDocumentsFromApi] = useState<any[]>([]);
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Charger les documents depuis l'API quand le sheet s'ouvre
+  useEffect(() => {
+    if (open && eleve && eleve.demandeId) {
+      chargerDocuments();
+    }
+  }, [open, eleve]);
+
+  // Fonction pour charger les documents depuis l'API
+  const chargerDocuments = async () => {
+    if (!eleve?.demandeId) return;
+
+    try {
+      setLoadingDocuments(true);
+      // Utiliser l'endpoint GET /documents?dossier_id={dossierId}
+      const response = await axiosClient.get('/documents', {
+        params: {
+          dossier_id: eleve.demandeId
+        }
+      });
+
+      if (response.data.success && response.data.data) {
+        const documents = Array.isArray(response.data.data) 
+          ? response.data.data 
+          : [response.data.data];
+        
+        // Mapper les documents pour correspondre au format attendu
+        const mappedDocuments = documents.map((doc: any) => ({
+          id: doc.id,
+          nom: doc.nom_fichier || doc.nom,
+          nom_fichier: doc.nom_fichier || doc.nom,
+          chemin_fichier: doc.chemin_fichier,
+          url: doc.chemin_fichier,
+          taille: doc.taille_fichier_formate || formatFileSize(doc.taille_fichier || 0),
+          taille_fichier: doc.taille_fichier,
+          type_mime: doc.type_mime,
+          type: doc.type_mime,
+          valide: doc.valide,
+          valide_libelle: doc.valide_libelle || (doc.valide ? 'Validé' : 'Non validé'),
+          dateUpload: doc.created_at || doc.date_upload,
+          created_at: doc.created_at,
+          commentaires: doc.commentaires
+        }));
+
+        setDocumentsFromApi(mappedDocuments);
+        console.log('✅ Documents chargés depuis l\'API:', mappedDocuments.length);
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur lors du chargement des documents:', error);
+      // Ne pas bloquer l'affichage si le chargement échoue
+      setDocumentsFromApi([]);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
 
   if (!eleve) return null;
 
@@ -72,45 +139,212 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
   };
 
 
-  const handleViewDocument = (document: any) => {
-    // Si le document a un fichier (document uploadé), créer une URL temporaire
-    if (document.file) {
-      const url = URL.createObjectURL(document.file);
-      window.open(url, '_blank');
-      // Nettoyer l'URL après un délai pour libérer la mémoire
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } else if (document.url && !document.url.startsWith('#')) {
-      // Si le document a une URL valide
-      window.open(document.url, '_blank');
-    } else {
-      // Pour les documents existants sans fichier ni URL valide
-      console.log('Document sans fichier ou URL valide:', document.nom);
-      alert(`Impossible d'ouvrir le document: ${document.nom}\n\nCe document nécessite une connexion au serveur pour être visualisé.`);
+  const handleViewDocument = async (document: any) => {
+    try {
+      // Si le document a un fichier (document uploadé localement), créer une URL temporaire
+      if (document.file) {
+        const url = URL.createObjectURL(document.file);
+        window.open(url, '_blank');
+        // Nettoyer l'URL après un délai pour libérer la mémoire
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return;
+      }
+
+      // Pour ouvrir un document depuis le serveur
+      if (!document.id) {
+        alert(`Impossible d'ouvrir le document: ${document.nom || document.nom_fichier}\n\nLe document n'a pas d'ID valide.`);
+        return;
+      }
+
+      console.log('📄 Ouverture du document PDF:', {
+        nom: document.nom || document.nom_fichier,
+        id: document.id,
+        chemin_fichier: document.chemin_fichier,
+        type_mime: document.type_mime
+      });
+
+      // Essayer différentes méthodes pour récupérer le fichier PDF
+      const endpoints = [
+        // Méthode 1: Endpoint direct avec Accept header pour forcer le binaire
+        { url: `/documents/${document.id}`, headers: { 'Accept': 'application/pdf,application/octet-stream,*/*' } },
+        // Méthode 2: Endpoint de téléchargement
+        { url: `/documents/${document.id}/download`, headers: {} },
+        // Méthode 3: Endpoint file
+        { url: `/documents/${document.id}/file`, headers: {} },
+        // Méthode 4: Via chemin_fichier
+        ...(document.chemin_fichier ? [{ url: `/storage/${document.chemin_fichier}`, headers: {} }] : []),
+        // Méthode 5: Via files endpoint
+        ...(document.chemin_fichier ? [{ url: `/files/${document.chemin_fichier}`, headers: {} }] : [])
+      ];
+
+      let lastError: any = null;
+      
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`🔄 Tentative avec: ${endpoint.url}`);
+          
+          // Télécharger le document avec axios pour inclure le token d'authentification
+          const response = await axiosClient.get(endpoint.url, {
+            responseType: 'blob', // Important : récupérer le fichier en tant que blob
+            headers: endpoint.headers
+          });
+
+          // Vérifier que la réponse est bien un blob (pas du JSON)
+          // Si le Content-Type est application/json, c'est que c'est les métadonnées, pas le fichier
+          const contentType = response.headers['content-type'] || '';
+          if (contentType.includes('application/json')) {
+            console.log('⚠️ Réponse JSON reçue au lieu du fichier, essai de la méthode suivante');
+            continue; // Essayer la méthode suivante
+          }
+
+          if (response.data instanceof Blob && response.data.size > 0) {
+            // Créer une URL blob à partir de la réponse
+            const blob = new Blob([response.data], {
+              type: response.headers['content-type'] || document.type_mime || 'application/pdf'
+            });
+            const url = URL.createObjectURL(blob);
+            
+            // Ouvrir le document dans un nouvel onglet (le navigateur ouvrira le PDF avec son viewer intégré)
+            window.open(url, '_blank');
+            
+            // Nettoyer l'URL après un délai plus long pour permettre l'ouverture
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+            
+            console.log('✅ Document ouvert avec succès');
+            return; // Succès, sortir de la fonction
+          }
+        } catch (error: any) {
+          console.log(`❌ Erreur avec ${endpoint.url}:`, error?.response?.status || error?.message);
+          lastError = error;
+          continue; // Essayer la méthode suivante
+        }
+      }
+
+      // Si toutes les méthodes ont échoué
+      throw lastError || new Error('Toutes les méthodes de récupération du fichier ont échoué');
+    } catch (error: any) {
+      console.error('❌ Erreur lors de l\'ouverture du document:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Erreur lors de l\'ouverture du document';
+      alert(`Erreur lors de l'ouverture du document: ${document.nom || document.nom_fichier}\n\n${errorMessage}`);
     }
   };
 
-  // Fonction pour obtenir tous les documents (existants + uploadés)
+  // Fonction pour obtenir tous les documents (depuis API + origine + uploadés)
   const getAllDocuments = () => {
-    // Les documents proviennent de la demande d'inscription originale
-    const existingDocs = eleve.originalDocuments || [];
-    const allDocs = [...existingDocs, ...uploadedDocuments];
-    return allDocs;
+    // Priorité : documents depuis l'API > documents originaux > documents uploadés localement
+    const apiDocs = documentsFromApi || [];
+    const originalDocs = eleve.originalDocuments || [];
+    const uploadedDocs = uploadedDocuments || [];
+    
+    // Fusionner tous les documents en évitant les doublons (par ID)
+    const allDocsMap = new Map();
+    
+    // D'abord les documents depuis l'API (les plus à jour)
+    apiDocs.forEach((doc: any) => {
+      if (doc.id) {
+        allDocsMap.set(doc.id, doc);
+      }
+    });
+    
+    // Ensuite les documents originaux (si pas déjà présents)
+    originalDocs.forEach((doc: any) => {
+      if (doc.id && !allDocsMap.has(doc.id)) {
+        allDocsMap.set(doc.id, doc);
+      }
+    });
+    
+    // Enfin les documents uploadés localement
+    uploadedDocs.forEach((doc: any) => {
+      if (doc.id && !allDocsMap.has(doc.id)) {
+        allDocsMap.set(doc.id, doc);
+      }
+    });
+    
+    return Array.from(allDocsMap.values());
   };
 
-  const handleDownloadDocument = (document: any) => {
-    // Si le document a un fichier (document uploadé), on peut le télécharger directement
-    if (document.file) {
-      const url = URL.createObjectURL(document.file);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = document.nom;
-      a.click();
-      URL.revokeObjectURL(url);
-    } else {
-      // Pour les documents existants, simulation du téléchargement
-      console.log('Téléchargement du document existant:', document.nom);
-      // En réalité, ici vous devriez faire un appel API pour télécharger le document
-      alert(`Téléchargement du document: ${document.nom}\n\nEn production, ceci ferait un appel API pour récupérer le fichier depuis le serveur.`);
+  const handleDownloadDocument = async (document: any) => {
+    try {
+      // Si le document a un fichier (document uploadé localement), télécharger directement
+      if (document.file) {
+        const url = URL.createObjectURL(document.file);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = document.nom || document.nom_fichier;
+        a.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      // Pour télécharger un document depuis le serveur, utiliser le chemin_fichier ou l'endpoint de téléchargement
+      if (document.id) {
+        console.log('📥 Téléchargement du document via API avec authentification:', {
+          nom: document.nom || document.nom_fichier,
+          id: document.id,
+          chemin_fichier: document.chemin_fichier
+        });
+
+        // Essayer d'abord avec le chemin_fichier via /storage/{chemin_fichier}
+        // Sinon utiliser l'endpoint /documents/{id}/download
+        let documentUrl = '';
+        
+        if (document.chemin_fichier) {
+          documentUrl = `/storage/${document.chemin_fichier}`;
+        } else {
+          documentUrl = `/documents/${document.id}/download`;
+        }
+
+        try {
+          // Télécharger le document avec axios pour inclure le token d'authentification
+          const response = await axiosClient.get(documentUrl, {
+            responseType: 'blob', // Important : récupérer le fichier en tant que blob
+          });
+
+          // Créer une URL blob à partir de la réponse
+          const blob = new Blob([response.data], {
+            type: response.headers['content-type'] || document.type_mime || 'application/pdf'
+          });
+          const url = URL.createObjectURL(blob);
+          
+          // Créer un lien de téléchargement
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = document.nom || document.nom_fichier || 'document';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          
+          // Nettoyer l'URL après un délai
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch (error: any) {
+          // Si l'erreur est 404, essayer l'autre méthode
+          if (error?.response?.status === 404 && document.chemin_fichier) {
+            const altUrl = `/documents/${document.id}/download`;
+            const altResponse = await axiosClient.get(altUrl, {
+              responseType: 'blob',
+            });
+            const blob = new Blob([altResponse.data], {
+              type: altResponse.headers['content-type'] || document.type_mime || 'application/pdf'
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = document.nom || document.nom_fichier || 'document';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          } else {
+            throw error;
+          }
+        }
+      } else {
+        alert(`Impossible de télécharger le document: ${document.nom || document.nom_fichier}\n\nLe document n'a pas d'ID valide.`);
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur lors du téléchargement du document:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Erreur lors du téléchargement du document';
+      alert(`Erreur lors du téléchargement du document: ${document.nom || document.nom_fichier}\n\n${errorMessage}`);
     }
   };
 
@@ -131,55 +365,89 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
     }
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files && files.length > 0) {
-      setUploading(true);
-      
-      Array.from(files).forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const newDocument = {
-            id: replacingDocumentId || (Date.now() + Math.random()),
-            nom: file.name,
-            taille: formatFileSize(file.size),
-            dateUpload: new Date().toISOString(),
-            type: file.type,
-            url: e.target?.result as string,
-            file: file,
-            isReplacement: !!replacingDocumentId
-          };
-          
-          if (replacingDocumentId) {
-            setUploadedDocuments(prev => 
-              prev.map(doc => doc.id === replacingDocumentId ? newDocument : doc)
-            );
-            setReplacingDocumentId(null);
-          } else {
-            setUploadedDocuments(prev => [...prev, newDocument]);
-          }
-        };
-        reader.readAsDataURL(file);
-      });
-      
-      setTimeout(() => {
+    if (!files || files.length === 0 || !eleve) return;
+
+    const file = files[0];
+    setUploading(true);
+
+    try {
+      // Validation du fichier avant upload
+      const maxSize = 5 * 1024 * 1024; // 5 MB
+      if (file.size > maxSize) {
+        alert('Le fichier ne doit pas dépasser 5 MB');
         setUploading(false);
-      }, 1000);
-    }
-    
-    if (event.target) {
-      event.target.value = '';
+        return;
+      }
+
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+      if (!allowedTypes.includes(file.type)) {
+        alert('Format non autorisé. Utilisez PDF, JPG ou PNG');
+        setUploading(false);
+        return;
+      }
+
+      // Import dynamique d'axiosClient
+      const { default: axiosClient } = await import('../../../shared/environment/envdev');
+      
+      // Selon la documentation, l'upload utilise JSON (pas FormData)
+      // Le chemin_fichier est généré côté client avec le format: documents/{dossierId}/{nom_fichier}
+      const dossierId = eleve.demandeId;
+      const cheminFichier = `documents/${dossierId}/${file.name}`;
+      
+      const payload = {
+        documentable_id: dossierId,
+        documentable_type: 'App\\Models\\Dossier',
+        nom_fichier: file.name,
+        chemin_fichier: cheminFichier,
+        type_mime: file.type,
+        taille_fichier: file.size,
+        valide: false,
+        commentaires: ''
+      };
+
+      console.log('📤 Upload document (JSON):', payload);
+
+      // Envoi en JSON (Content-Type: application/json est défini par défaut dans axiosClient)
+      const response = await axiosClient.post('/documents', payload, {
+        timeout: 300000, // 5 minutes selon la documentation
+      });
+
+      if (response.data.success && response.data.data) {
+        const newDocument = {
+          id: response.data.data.id,
+          nom: response.data.data.nom_fichier || file.name,
+          nom_fichier: response.data.data.nom_fichier || file.name,
+          taille: response.data.data.taille_fichier_formate || formatFileSize(file.size),
+          taille_fichier: response.data.data.taille_fichier || file.size,
+          dateUpload: response.data.data.created_at || new Date().toISOString(),
+          type: response.data.data.type_mime || file.type,
+          url: response.data.data.chemin_fichier,
+          chemin_fichier: response.data.data.chemin_fichier,
+          isReplacement: !!replacingDocumentId
+        };
+        
+        if (replacingDocumentId) {
+          setUploadedDocuments(prev => 
+            prev.map(doc => doc.id === replacingDocumentId ? newDocument : doc)
+          );
+          setReplacingDocumentId(null);
+        } else {
+          setUploadedDocuments(prev => [...prev, newDocument]);
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur lors de l\'upload du document:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Erreur lors de l\'upload du document';
+      alert(errorMessage);
+    } finally {
+      setUploading(false);
+      if (event.target) {
+        event.target.value = '';
+      }
     }
   };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
 
   // (supprimé) Ouverture du sheet de complétion désormais non utilisée
 
@@ -378,11 +646,11 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
                 </Button>
               </Box>
 
-              {uploading && (
+              {(uploading || loadingDocuments) && (
                 <Box sx={{ mb: 2 }}>
                   <LinearProgress />
                   <Typography variant="caption" color="text.secondary" className="font-primary">
-                    Upload en cours...
+                    {loadingDocuments ? 'Chargement des documents...' : 'Upload en cours...'}
                   </Typography>
                 </Box>
               )}
@@ -661,6 +929,19 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
             console.log('🚚 Envoi à la CNEPC - payload:', payload);
             const resp = await ValidationService.envoyerAuCNEPC(payload);
             console.log('✅ Réponse CNEPC (raw):', resp);
+            
+            // Mettre à jour le statut du dossier à "transmis" via PUT /dossiers/{id}
+            try {
+              console.log('🔄 Mise à jour du statut du dossier à "transmis"...');
+              await autoEcoleService.updateDossier(eleve.demandeId, {
+                statut: 'transmis'
+              } as any);
+              console.log('✅ Statut du dossier mis à jour à "transmis"');
+            } catch (updateError: any) {
+              console.error('⚠️ Erreur lors de la mise à jour du statut du dossier:', updateError);
+              // Ne pas bloquer l'envoi si la mise à jour du statut échoue
+            }
+            
             try {
               const ps = resp?.programme_session;
               console.log('🧾 Programme session résumé:', {

@@ -2,7 +2,7 @@
 export type EpreuveStatut = 'non_saisi' | 'reussi' | 'echoue' | 'absent';
 
 export interface EpreuveAttempt {
-  result: Exclude<EpreuveStatut, 'non_saisi'>;
+  result: EpreuveStatut; // Permet 'non_saisi' pour les tentatives non encore saisies
   date: string; // ISO
   note?: string;
 }
@@ -29,7 +29,7 @@ export interface ReceptionDossier {
   candidatPrenom: string;
   autoEcoleNom: string;
   dateEnvoi: string; // ISO
-  statut: 'envoye' | 'recu' | 'en_attente';
+  statut: 'envoye' | 'recu' | 'en_attente' | 'transmis';
   dateExamen?: string; // ISO
   details?: any; // réponse complète (programme_session)
   epreuves?: EpreuvesResultat;

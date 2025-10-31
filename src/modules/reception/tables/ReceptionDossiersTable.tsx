@@ -1,7 +1,10 @@
 import React from 'react';
-import { ReceptionDossier } from '../types';
-import { Box, Button, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
+import { ReceptionDossier, EpreuveStatut } from '../types';
+import { Box, Button, Table, TableBody, TableCell, TableHead, TableRow, Typography, Chip } from '@mui/material';
 import EpreuveSheet from '../components/EpreuveSheet';
+import CandidatDetailsSheet from '../components/CandidatDetailsSheet';
+import { EyeIcon } from '@heroicons/react/24/outline';
+import { receptionService } from '../services/reception.service';
 
 interface ReceptionDossiersTableProps {
   dossiers: ReceptionDossier[];
@@ -9,6 +12,23 @@ interface ReceptionDossiersTableProps {
 }
 
 const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossiers, onReceive }) => {
+  // État pour stocker les épreuves de chaque dossier
+  const [epreuvesMap, setEpreuvesMap] = React.useState<Map<string, EpreuveStatut>>(new Map());
+
+  // Charger les épreuves depuis localStorage pour chaque dossier
+  React.useEffect(() => {
+    const newMap = new Map<string, EpreuveStatut>();
+    dossiers.forEach(dossier => {
+      const epreuves = receptionService.getEpreuvesLocal(dossier.id);
+      if (epreuves?.general) {
+        newMap.set(dossier.id, epreuves.general);
+      } else if (dossier.epreuves?.general) {
+        newMap.set(dossier.id, dossier.epreuves.general);
+      }
+    });
+    setEpreuvesMap(newMap);
+  }, [dossiers]);
+
   React.useEffect(() => {
     try {
       // Log compact de la liste
@@ -23,6 +43,7 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
           dateExamen: d.dateExamen,
           dateEnvoi: d.dateEnvoi,
           statut: d.statut,
+          epreuveGeneral: epreuvesMap.get(d.id) || 'non_saisi',
         }))
       );
       // Log de la réponse brute si disponible
@@ -35,7 +56,7 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
         }
       });
     } catch {}
-  }, [dossiers]);
+  }, [dossiers, epreuvesMap]);
   // Utiliser onReceive pour éviter l'avertissement linter si non utilisé
   React.useEffect(() => {
     try {
@@ -44,17 +65,47 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
     } catch {}
   }, [onReceive]);
   const [openEpreuve, setOpenEpreuve] = React.useState(false);
+  const [openDetails, setOpenDetails] = React.useState(false);
   const [selected, setSelected] = React.useState<ReceptionDossier | null>(null);
+  const [selectedForDetails, setSelectedForDetails] = React.useState<ReceptionDossier | null>(null);
 
   const handleOpenEpreuve = (d: ReceptionDossier) => {
     setSelected(d);
     setOpenEpreuve(true);
   };
 
+  const handleOpenDetails = (d: ReceptionDossier) => {
+    setSelectedForDetails(d);
+    setOpenDetails(true);
+  };
+
   const handleSaved = (results: any) => {
     try {
       console.log('✅ Epreuves enregistrées pour', selected?.reference, results);
+      // Mettre à jour le statut des épreuves dans le map
+      if (selected && results?.general) {
+        setEpreuvesMap(prev => {
+          const newMap = new Map(prev);
+          newMap.set(selected.id, results.general);
+          return newMap;
+        });
+      }
     } catch {}
+  };
+
+  // Fonction pour obtenir le libellé et la couleur du statut des épreuves
+  const getStatutEpreuveInfo = (statut: EpreuveStatut | undefined) => {
+    switch (statut) {
+      case 'reussi':
+        return { label: 'Validé', color: 'success' as const };
+      case 'echoue':
+        return { label: 'Échoué', color: 'error' as const };
+      case 'absent':
+        return { label: 'Absent', color: 'warning' as const };
+      case 'non_saisi':
+      default:
+        return { label: 'Non saisi', color: 'default' as const };
+    }
   };
 
   return (
@@ -108,15 +159,38 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
                 <TableCell>{dossier.autoEcoleNom}</TableCell>
                 <TableCell>{dossier.dateExamen ? new Date(dossier.dateExamen).toLocaleString() : '-'}</TableCell>
                 <TableCell>{new Date(dossier.dateEnvoi).toLocaleString()}</TableCell>
-                <TableCell>{dossier.statut}</TableCell>
+                <TableCell>
+                  {(() => {
+                    const epreuveStatut = epreuvesMap.get(dossier.id) || dossier.epreuves?.general;
+                    const statutInfo = getStatutEpreuveInfo(epreuveStatut);
+                    return (
+                      <Chip
+                        label={statutInfo.label}
+                        color={statutInfo.color}
+                        size="small"
+                        variant={epreuveStatut === 'non_saisi' ? 'outlined' : 'filled'}
+                      />
+                    );
+                  })()}
+                </TableCell>
                 <TableCell align="right">
-                  <Button
-                    variant="contained"
-                    size="small"
-                    onClick={() => handleOpenEpreuve(dossier)}
-                  >
-                    Épreuves
-                  </Button>
+                  <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<EyeIcon className="w-4 h-4" />}
+                      onClick={() => handleOpenDetails(dossier)}
+                    >
+                      Détails
+                    </Button>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={() => handleOpenEpreuve(dossier)}
+                    >
+                      Épreuves
+                    </Button>
+                  </Box>
                 </TableCell>
               </TableRow>
             );
@@ -128,6 +202,14 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
         onClose={() => setOpenEpreuve(false)}
         dossier={selected}
         onSaved={handleSaved}
+      />
+      <CandidatDetailsSheet
+        open={openDetails}
+        onClose={() => {
+          setOpenDetails(false);
+          setSelectedForDetails(null);
+        }}
+        dossier={selectedForDetails}
       />
     </Box>
   );

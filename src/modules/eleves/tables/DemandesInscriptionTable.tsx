@@ -31,23 +31,32 @@ import {
 // Heroicons imports
 import { EyeIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon, CurrencyDollarIcon, IdentificationIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { DemandeInscription, FiltresDemandes, StatistiquesDemandes } from '../types/inscription';
-import { getAutoEcoleInfo, getAutoEcoleId, getAutoEcoleDossiers } from '../../../shared/utils/autoEcoleUtils';
+// Import des utilitaires pour récupérer l'ID de l'auto-école
+import { getAutoEcoleId } from '../../../shared/utils/autoEcoleUtils';
 import { autoEcoleService } from '../../cnepc/services/auto-ecole.service';
+import ValidationService from '../services/validationService';
 
 interface DemandesInscriptionTableProps {
   onCandidatSelect?: (candidat: DemandeInscription) => void;
   refreshTrigger?: number; // Pour forcer le rafraîchissement
   onDelete?: () => void; // Callback après suppression réussie
+  autoEcoleId?: string; // ID de l'auto-école pour récupérer les dossiers
+  formationId?: string; // ID de la formation pour filtrer les dossiers (optionnel)
 }
 
-const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onCandidatSelect, refreshTrigger, onDelete }) => {
+const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ 
+  onCandidatSelect, 
+  refreshTrigger, 
+  onDelete, 
+  autoEcoleId,
+  formationId 
+}) => {
   const [demandes, setDemandes] = useState<DemandeInscription[]>([]);
   const [statistiques, setStatistiques] = useState<StatistiquesDemandes | null>(null);
   const [loading, setLoading] = useState(true);
   const [filtres, setFiltres] = useState<FiltresDemandes>({});
   const [recherche, setRecherche] = useState('');
-  const [candidatsMap, setCandidatsMap] = useState<Map<string, any>>(new Map());
-  const [formationsMap, setFormationsMap] = useState<Map<string, any>>(new Map());
+  // Suppression des maps de cache local - utilisation directe des données API
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [demandeToDelete, setDemandeToDelete] = useState<DemandeInscription | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -56,635 +65,289 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
     message: '',
     severity: 'success'
   });
-
-  useEffect(() => {
-    chargerCandidatsEtFormations();
-  }, []);
+  const [dataSource, setDataSource] = useState<'api' | null>(null);
+  const [currentAutoEcoleId, setCurrentAutoEcoleId] = useState<string | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
     chargerDemandes();
     chargerStatistiques();
-  }, [filtres, refreshTrigger, candidatsMap, formationsMap]);
+  }, [filtres, refreshTrigger, autoEcoleId, formationId, currentAutoEcoleId]);
 
-  const chargerCandidatsEtFormations = async () => {
-    try {
-      console.log('📋 Chargement des candidats et formations...');
-      
-      // Récupérer l'ID de l'auto-école connectée
-      const autoEcoleId = getAutoEcoleId();
-      
-      if (!autoEcoleId) {
-        console.warn('⚠️ Aucune auto-école trouvée');
-        return;
-      }
-
-      // Charger les candidats
-      const candidats = await autoEcoleService.getAllCandidats();
-      const candidatsMapTemp = new Map<string, any>();
-      
-      console.log('📋 Candidats bruts reçus:', candidats.length);
-      
-      // Détecter les IDs dupliqués avant de les stocker
-      const candidatsParId = new Map<string, any[]>();
-      candidats.forEach((candidat: any) => {
-        if (candidat.id) {
-          if (!candidatsParId.has(candidat.id)) {
-            candidatsParId.set(candidat.id, []);
-          }
-          candidatsParId.get(candidat.id)!.push(candidat);
-        }
-      });
-      
-      // Afficher les alertes pour les IDs dupliqués
-      candidatsParId.forEach((candidatsAvecMemeId, candidatId) => {
-        if (candidatsAvecMemeId.length > 1) {
-          const personnesIds = candidatsAvecMemeId.map(c => c.personne_id).filter(Boolean);
-          const emails = candidatsAvecMemeId.map(c => c.personne?.email).filter(Boolean);
-          const personnesIdsUniques = new Set(personnesIds);
-          const emailsUniques = new Set(emails);
-          
-          if (personnesIdsUniques.size > 1 || emailsUniques.size > 1) {
-            console.warn(`⚠️ ATTENTION: Candidat ID "${candidatId}" dupliqué avec ${candidatsAvecMemeId.length} candidats différents:`);
-            candidatsAvecMemeId.forEach((c, idx) => {
-              console.warn(`  Candidat ${idx + 1}:`);
-              console.warn(`    - Personne ID: ${c.personne_id}`);
-              console.warn(`    - Email: ${c.personne?.email || 'N/A'}`);
-              console.warn(`    - Nom complet: ${c.personne?.nom_complet || 'N/A'}`);
-            });
-            console.warn(`  → Le dernier candidat sera utilisé dans le map. Utilisez les données du dossier directement.`);
-          }
-        }
-      });
-      
-      candidats.forEach((candidat: any) => {
-        // Stocker par ID candidat (le dernier écrasera les précédents si dupliqué)
-        // C'est OK car on utilise toujours les données du dossier en priorité
-        if (candidat.id) {
-          candidatsMapTemp.set(candidat.id, candidat);
-        }
-        // Également stocker par personne_id si disponible (plus fiable pour distinguer)
-        if (candidat.personne_id) {
-          candidatsMapTemp.set(`personne_${candidat.personne_id}`, candidat);
-        }
-      });
-      
-      setCandidatsMap(candidatsMapTemp);
-      console.log('✅ Candidats chargés dans le map:', candidatsMapTemp.size);
-      console.log('📋 IDs des candidats dans le map:', Array.from(candidatsMapTemp.keys()));
-      
-      // Afficher les détails des candidats
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('👥 CANDIDATS RÉCUPÉRÉS');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      candidats.forEach((candidat: any, index: number) => {
-        console.log(`\n👤 Candidat ${index + 1}:`);
-        console.log('  • ID:', candidat.id);
-        console.log('  • Numéro candidat:', candidat.numero_candidat || 'N/A');
-        console.log('  • Nom:', candidat.personne?.nom || 'N/A');
-        console.log('  • Prénom:', candidat.personne?.prenom || 'N/A');
-        console.log('  • Nom complet:', candidat.personne?.nom_complet || 'N/A');
-        console.log('  • Email:', candidat.personne?.email || 'N/A');
-        console.log('  • Contact:', candidat.personne?.contact || 'N/A');
-        console.log('  • Adresse:', candidat.personne?.adresse || 'N/A');
-        console.log('  • Date naissance:', candidat.date_naissance || 'N/A');
-        console.log('  • Lieu naissance:', candidat.lieu_naissance || 'N/A');
-        console.log('  • Nationalité:', candidat.nationalite || 'N/A');
-        console.log('  • Genre:', candidat.genre || 'N/A');
-        console.log('  • Âge:', candidat.age || 'N/A');
-      });
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-      // Charger les formations de l'auto-école
-      const formations = await autoEcoleService.getFormationsByAutoEcole(autoEcoleId);
-      const formationsMapTemp = new Map<string, any>();
-      
-      console.log('📚 Chargement des détails des formations...');
-      
-      // Pour chaque formation, récupérer les détails complets
-      for (const formation of formations) {
+  // Fonction pour traiter les dossiers (même structure que CandidatsTable)
+  const processDossiers = async (dossiers: any[]) => {
+    console.log('📁 Dossiers trouvés:', dossiers.length);
+    console.log('📋 Premier dossier (exemple):', dossiers[0]);
+    console.log('🔍 Tous les dossiers bruts:', dossiers);
+    
+    // FORCER la récupération des vraies données depuis l'API
+    // pour éviter les données persistantes du localStorage
+    console.log('🔄 Récupération des vraies données depuis l\'API pour chaque dossier...');
+    setLoadingDetails(true);
+    
+    const dossiersComplets = await Promise.all(
+      dossiers.map(async (dossier: any) => {
         try {
-          const formationDetails = await autoEcoleService.getFormationById(formation.id);
-          formationsMapTemp.set(formation.id, formationDetails);
+          console.log(`📋 Récupération des vraies données du dossier ${dossier.id}...`);
+          const dossierComplet = await autoEcoleService.getDossierById(dossier.id);
+          console.log(`✅ Dossier ${dossier.id} avec vraies données:`, dossierComplet);
+          return dossierComplet;
         } catch (error) {
-          console.warn(`⚠️ Impossible de récupérer les détails de la formation ${formation.id}:`, error);
-          formationsMapTemp.set(formation.id, formation);
+          console.error(`❌ Erreur lors de la récupération du dossier ${dossier.id}:`, error);
+          // Retourner le dossier original en cas d'erreur
+          return dossier;
         }
-      }
-      
-      setFormationsMap(formationsMapTemp);
-      console.log('✅ Formations chargées:', formations.length);
-      
-      // Afficher les détails des formations
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('📚 FORMATIONS RÉCUPÉRÉES');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      formations.forEach((formation: any, index: number) => {
-        console.log(`\n📖 Formation ${index + 1}:`);
-        console.log('  • ID:', formation.id);
-        console.log('  • Type permis:', formation.type_permis?.libelle || 'N/A');
-        console.log('  • Code:', formation.type_permis?.code || 'N/A');
-        console.log('  • Montant:', formation.montant_formate || 'N/A');
-        console.log('  • Description:', formation.description || 'N/A');
-        console.log('  • Session:', formation.session?.libelle || 'N/A');
-        console.log('  • Statut:', formation.statut_libelle || 'N/A');
-        console.log('  • Auto-école ID:', formation.auto_ecole_id);
+      })
+    );
+    
+    console.log('📊 Dossiers avec vraies données récupérés:', dossiersComplets.length);
+    setLoadingDetails(false);
+    
+    // Convertir les dossiers en format DemandeInscription et filtrer les demandes validées
+    const demandesData: DemandeInscription[] = dossiersComplets
+      .filter((dossier: any) => {
+        // Filtrer les dossiers avec statut "valide" (cachés de la liste)
+        // Les dossiers validés sont ceux avec statut "valide" ou "validé"
+        const statut = dossier.statut?.toLowerCase() || '';
+        const isValide = statut === 'valide' || statut === 'validé';
+        if (isValide) {
+          console.log('🚫 Dossier validé filtré:', dossier.id, 'statut:', dossier.statut);
+        }
+        return !isValide;
+      })
+      .map((dossier: any) => {
+      // Mapper le statut vers le format attendu
+      const mapStatut = (statut: string): 'en_attente' | 'en_cours' | 'validee' | 'rejetee' => {
+        switch (statut) {
+          case 'en_attente': return 'en_attente';
+          case 'en_cours': return 'en_cours';
+          case 'valide': return 'validee';
+          case 'rejete': return 'rejetee';
+          default: return 'en_attente';
+        }
+      };
+
+      // Utiliser la structure de données de l'endpoint /dossiers (même que CandidatsTable)
+      const candidat = dossier.candidat;
+      const formation = dossier.formation;
+
+      // Logs de débogage pour la structure des données
+      console.log('🔍 DEBUG Candidat - Dossier ID:', dossier.id);
+      console.log('🔍 DEBUG Candidat - Structure complète:', candidat);
+      console.log('🔍 DEBUG Candidat - Personne:', candidat?.personne);
+      console.log('🔍 DEBUG Candidat - Formation:', formation);
+      console.log('🔍 DEBUG Candidat - Auto-école:', dossier.auto_ecole);
+
+      // Déterminer le nom de la formation (utiliser la structure complète de l'API)
+      const getFormationName = (formation: any) => {
+        // 1. Nom direct de la formation
+        if (formation?.nom && formation.nom.trim()) {
+          return formation.nom;
+        }
+        
+        // 2. Description de la formation
+        if (formation?.description && formation.description.trim()) {
+          return formation.description;
+        }
+        
+        // 3. Type de permis avec libellé (structure complète de l'API)
+        if (formation?.type_permis?.libelle) {
+          return `Formation ${formation.type_permis.libelle}`;
+        }
+        
+        // 4. Type de permis avec nom
+        if (formation?.type_permis?.nom) {
+          return `Formation ${formation.type_permis.nom}`;
+        }
+        
+        // 5. Session avec libellé
+        if (formation?.session?.libelle) {
+          return `Formation ${formation.session.libelle}`;
+        }
+        
+        return 'Formation';
+      };
+
+      const formationNom = getFormationName(formation);
+      const formationMontant = formation?.montant_formate || (formation?.montant ? `${formation.montant} FCFA` : 'N/A');
+
+      // Logs de débogage pour les valeurs extraites
+      console.log('🔍 DEBUG Valeurs extraites:');
+      console.log('  - Prénom:', candidat?.personne?.prenom);
+      console.log('  - Nom:', candidat?.personne?.nom);
+      console.log('  - Email:', candidat?.personne?.email);
+      console.log('  - Contact:', candidat?.personne?.contact);
+      console.log('  - Adresse:', candidat?.personne?.adresse);
+
+      return {
+        id: dossier.id,
+        numero: `DOS-${dossier.id.substring(0, 8).toUpperCase()}`,
+        candidat_id: dossier.candidat_id,
+        personne_id: candidat?.personne_id || null,
+        eleve: {
+          firstName: candidat?.personne?.prenom || '',
+          lastName: candidat?.personne?.nom || '',
+          email: candidat?.personne?.email || '',
+          phone: candidat?.personne?.contact || '',
+          address: candidat?.personne?.adresse || '',
+          birthDate: candidat?.date_naissance || '',
+          nationality: candidat?.nationalite || '',
+          lieuNaissance: candidat?.lieu_naissance || '',
+          nationaliteEtrangere: undefined
+        },
+        autoEcole: {
+          id: dossier.auto_ecole_id,
+          name: dossier.auto_ecole?.nom_auto_ecole || 'Auto-école',
+          email: dossier.auto_ecole?.email || ''
+        },
+        dateDemande: dossier.date_creation || dossier.created_at,
+        statut: mapStatut(dossier.statut),
+        documents: dossier.documents || [],
+        commentaires: dossier.commentaires || '',
+        formation: {
+          id: dossier.formation_id,
+          nom: formationNom,
+          montant: formationMontant,
+          description: formation?.description || ''
+        },
+        etape: dossier.etape ? {
+          id: dossier.etape.id,
+          libelle: dossier.etape.libelle,
+          ordre: dossier.etape.ordre,
+          statut: dossier.etape.statut_systeme
+        } : undefined
+      };
+    });
+    
+    console.log('✅ Demandes transformées:', demandesData.length);
+    console.log('📊 Demandes transformées (détail):', demandesData);
+    
+    // Appliquer les filtres
+    let demandesFiltrees = demandesData;
+    
+    console.log('🔍 Filtres appliqués:', filtres);
+    console.log('📋 Demandes avant filtrage:', demandesFiltrees.length);
+    
+    // Filtrage par formation (côté client)
+    if (formationId) {
+      console.log('🔍 Filtrage par formation ID (côté client):', formationId);
+      demandesFiltrees = demandesFiltrees.filter(d => {
+        const demande = d as any;
+        return demande.formation?.id === formationId;
       });
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    } catch (error) {
-      console.error('❌ Erreur lors du chargement des candidats et formations:', error);
+      console.log('📋 Demandes après filtrage formation:', demandesFiltrees.length);
     }
+    
+    if (filtres.statut) {
+      console.log('🔍 Filtrage par statut:', filtres.statut);
+      demandesFiltrees = demandesFiltrees.filter(d => d.statut === filtres.statut);
+      console.log('📋 Demandes après filtrage statut:', demandesFiltrees.length);
+    }
+    
+    if (filtres.recherche) {
+      const recherche = filtres.recherche.toLowerCase();
+      console.log('🔍 Filtrage par recherche:', recherche);
+      demandesFiltrees = demandesFiltrees.filter(d => {
+        const demande = d as any;
+        return (
+          demande.eleve.firstName.toLowerCase().includes(recherche) ||
+          demande.eleve.lastName.toLowerCase().includes(recherche) ||
+          demande.eleve.email.toLowerCase().includes(recherche) ||
+          demande.numero.toLowerCase().includes(recherche)
+        );
+      });
+      console.log('📋 Demandes après filtrage recherche:', demandesFiltrees.length);
+    }
+    
+    console.log('📋 Demandes finales affichées:', demandesFiltrees.length);
+    console.log('📊 Demandes finales (détail):', demandesFiltrees);
+    
+    setDemandes(demandesFiltrees);
   };
 
   const chargerDemandes = async () => {
     try {
       setLoading(true);
-      console.log('📋 Chargement des dossiers de l\'auto-école connectée...');
+      console.log('📋 Chargement des demandes d\'inscription...');
       
-      // Récupérer les informations de l'auto-école depuis le localStorage
-      const autoEcoleInfo = getAutoEcoleInfo();
-      const autoEcoleId = getAutoEcoleId();
+      // Récupérer l'ID de l'auto-école (prop ou depuis localStorage)
+      const resolvedAutoEcoleId = autoEcoleId || getAutoEcoleId();
       
-      if (!autoEcoleInfo || !autoEcoleId) {
-        console.warn('⚠️ Aucune information d\'auto-école trouvée dans le localStorage');
+      if (!resolvedAutoEcoleId) {
+        console.warn('⚠️ Aucun ID d\'auto-école trouvé (ni en prop ni dans localStorage)');
         setDemandes([]);
         setLoading(false);
         return;
       }
-
-      // Attendre que les candidats et formations soient chargés
-      if (candidatsMap.size === 0 || formationsMap.size === 0) {
-        console.log('⏳ Attente du chargement des candidats et formations...');
-        setLoading(false);
-        return;
+      
+      // Stocker l'ID résolu pour l'affichage
+      setCurrentAutoEcoleId(resolvedAutoEcoleId);
+      
+      console.log('🏫 Chargement des dossiers pour l\'auto-école ID:', resolvedAutoEcoleId);
+      if (formationId) {
+        console.log('📚 Filtrage par formation ID:', formationId);
       }
       
-      console.log('🏫 Auto-école connectée:', autoEcoleInfo.nom_auto_ecole, '(ID:', autoEcoleId, ')');
-      
-      // Récupérer les dossiers depuis les informations d'auto-école
-      const dossiersAutoEcole = getAutoEcoleDossiers();
-      
-      if (dossiersAutoEcole && dossiersAutoEcole.length > 0) {
-        console.log('📁 Dossiers trouvés dans les informations auto-école:', dossiersAutoEcole.length);
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('📋 DÉTAILS DES DOSSIERS RÉCUPÉRÉS');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      try {
+        // Utiliser la même méthode que CandidatsTable : getDossiersByAutoEcoleId
+        // Ne pas filtrer par formation côté API pour récupérer tous les dossiers
+        const filters = {
+          statut: filtres.statut as any
+          // formation_id: formationId // Commenté temporairement pour récupérer tous les dossiers
+        };
         
-        // Afficher les détails de chaque dossier
-        dossiersAutoEcole.forEach((dossier: any, index: number) => {
-          console.log(`\n📁 Dossier ${index + 1} (BRUT):`);
-          console.log('  • ID:', dossier.id);
-          console.log('  • Candidat ID:', dossier.candidat_id);
-          console.log('  • Candidat ID (depuis candidat):', dossier.candidat?.id);
-          console.log('  • Personne ID:', dossier.candidat?.personne_id);
-          console.log('  • Formation ID:', dossier.formation_id);
-          console.log('  • Statut:', dossier.statut);
-          console.log('  • Date création:', dossier.date_creation || dossier.created_at);
-          console.log('  • Commentaires:', dossier.commentaires || 'Aucun');
-          
-          if (dossier.candidat) {
-            console.log('  • Candidat (dans le dossier BRUT):');
-            console.log('    - ID complet:', JSON.stringify(dossier.candidat.id));
-            console.log('    - Personne ID:', dossier.candidat.personne_id);
-            console.log('    - Nom:', dossier.candidat.personne?.nom || 'N/A');
-            console.log('    - Prénom:', dossier.candidat.personne?.prenom || 'N/A');
-            console.log('    - Email:', dossier.candidat.personne?.email || 'N/A');
-            console.log('    - Contact:', dossier.candidat.personne?.contact || 'N/A');
-            console.log('    - Nom complet:', dossier.candidat.personne?.nom_complet || 'N/A');
-            console.log('    - Adresse:', dossier.candidat.personne?.adresse || 'N/A');
-            
-            // Comparer avec le dossier précédent pour voir s'ils sont différents
-            if (index > 0 && dossiersAutoEcole[index - 1]?.candidat) {
-              const prevDossier = dossiersAutoEcole[index - 1];
-              const sameCandidat = dossier.candidat.id === prevDossier.candidat?.id;
-              const sameEmail = dossier.candidat.personne?.email === prevDossier.candidat?.personne?.email;
-              console.log('  • Comparaison avec dossier précédent:');
-              console.log(`    - Même candidat ID: ${sameCandidat}`);
-              console.log(`    - Même email: ${sameEmail}`);
-            }
-          } else {
-            console.warn('  ⚠️ Aucun objet candidat dans le dossier');
-          }
-          
-          // Vérifier si le candidat existe dans le map
-          const candidatIdFromDossier = dossier.candidat_id || dossier.candidat?.id;
-          if (candidatIdFromDossier) {
-            const candidatInMap = candidatsMap.get(candidatIdFromDossier);
-            if (candidatInMap) {
-              console.log('  ✅ Candidat trouvé dans le map:', candidatInMap.personne?.nom_complet || 'N/A');
-            } else {
-              console.warn('  ⚠️ Candidat NON trouvé dans le map pour ID:', candidatIdFromDossier);
-            }
-          }
-          
-          if (dossier.formation) {
-            console.log('  • Formation:');
-            console.log('    - Type permis:', dossier.formation.type_permis?.libelle || 'N/A');
-            console.log('    - Montant:', dossier.formation.montant_formate || 'N/A');
-            console.log('    - Description:', dossier.formation.description || 'N/A');
-          }
-          
-          if (dossier.etape) {
-            console.log('  • Étape:');
-            console.log('    - Libellé:', dossier.etape.libelle || 'N/A');
-            console.log('    - Ordre:', dossier.etape.ordre || 'N/A');
-            console.log('    - Statut système:', dossier.etape.statut_systeme || 'N/A');
-          }
-          
-          if (dossier.documents && dossier.documents.length > 0) {
-            console.log('  • Documents:', dossier.documents.length);
-            dossier.documents.forEach((doc: any, docIndex: number) => {
-              console.log(`    ${docIndex + 1}. ${doc.nom_fichier || doc.nom || 'Document'}`);
-              console.log(`       - Type: ${doc.type_document?.libelle || 'N/A'}`);
-              console.log(`       - Validé: ${doc.valide ? 'Oui' : 'Non'}`);
-              console.log(`       - Taille: ${doc.taille_fichier_formate || 'N/A'}`);
-            });
-          } else {
-            console.log('  • Documents: Aucun');
-          }
-        });
+        console.log('🔍 Filtres envoyés à l\'API:', filters);
+        console.log('📚 Formation ID (filtrage côté client):', formationId);
         
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        const response = await autoEcoleService.getDossiersByAutoEcoleId(resolvedAutoEcoleId, filters);
         
-        // Détecter les candidats avec le même ID mais des informations différentes
-        const candidatsParId = new Map<string, Array<{dossierId: string, candidat: any}>>();
-        const candidatsParPersonneId = new Map<string, Array<{dossierId: string, candidat: any}>>();
+        console.log('📦 Dossiers récupérés depuis l\'API:', response.dossiers?.length || 0);
+        console.log('📋 Structure de la réponse:', response);
+        console.log('📊 Dossiers bruts de l\'API:', response.dossiers);
         
-        dossiersAutoEcole.forEach((dossier: any, index: number) => {
-          const candidatId = dossier.candidat_id || dossier.candidat?.id;
-          const personneId = dossier.candidat?.personne_id;
-          
-          if (candidatId && dossier.candidat) {
-            if (!candidatsParId.has(candidatId)) {
-              candidatsParId.set(candidatId, []);
-            }
-            candidatsParId.get(candidatId)!.push({
-              dossierId: dossier.id,
-              candidat: dossier.candidat
-            });
-          }
-          
-          // Vérifier si plusieurs dossiers partagent la même référence d'objet candidat
-          if (index > 0 && dossier.candidat && dossiersAutoEcole[index - 1]?.candidat) {
-            const prevCandidat = dossiersAutoEcole[index - 1].candidat;
-            if (dossier.candidat === prevCandidat) {
-              console.error(`❌ ERREUR: Dossier ${index + 1} (${dossier.id}) partage la MÊME RÉFÉRENCE d'objet candidat que le dossier ${index} (${dossiersAutoEcole[index - 1].id})`);
-              console.error(`   → C'est pourquoi les noms sont identiques !`);
-            }
-          }
-          
-          // Grouper par personne_id pour identifier les vrais candidats différents
-          if (personneId) {
-            if (!candidatsParPersonneId.has(personneId)) {
-              candidatsParPersonneId.set(personneId, []);
-            }
-            candidatsParPersonneId.get(personneId)!.push({
-              dossierId: dossier.id,
-              candidat: dossier.candidat
-            });
-          }
-        });
-
-        // Afficher les alertes pour les IDs dupliqués avec des informations différentes
-        candidatsParId.forEach((dossiers, candidatId) => {
-          if (dossiers.length > 1) {
-            const emails = dossiers.map(d => d.candidat.personne?.email).filter(Boolean);
-            const personnesIds = dossiers.map(d => d.candidat.personne_id).filter(Boolean);
-            const noms = dossiers.map(d => d.candidat.personne?.nom_complet).filter(Boolean);
-            
-            // Vérifier si les emails, personnes_ids ou noms sont différents
-            const emailsUniques = new Set(emails);
-            const personnesIdsUniques = new Set(personnesIds);
-            const nomsUniques = new Set(noms);
-            
-            console.log(`\n🔍 Analyse candidat_id "${candidatId}" utilisé par ${dossiers.length} dossiers:`);
-            console.log(`   • Personnes IDs uniques: ${personnesIdsUniques.size}`);
-            console.log(`   • Emails uniques: ${emailsUniques.size}`);
-            console.log(`   • Noms uniques: ${nomsUniques.size}`);
-            
-            if (emailsUniques.size > 1 || personnesIdsUniques.size > 1 || nomsUniques.size > 1) {
-              console.warn(`⚠️ ATTENTION: Candidat ID "${candidatId}" utilisé par ${dossiers.length} dossiers différents avec des informations différentes:`);
-              dossiers.forEach((d, idx) => {
-                console.warn(`  Dossier ${idx + 1} (${d.dossierId}):`);
-                console.warn(`    - Personne ID: ${d.candidat.personne_id}`);
-                console.warn(`    - Email: ${d.candidat.personne?.email || 'N/A'}`);
-                console.warn(`    - Nom complet: ${d.candidat.personne?.nom_complet || 'N/A'}`);
-              });
-            } else {
-              console.warn(`⚠️ ATTENTION: Candidat ID "${candidatId}" utilisé par ${dossiers.length} dossiers avec les MÊMES informations:`);
-              console.warn(`   → Cela peut signifier que les objets candidat sont partagés ou que les données sont identiques`);
-              dossiers.forEach((d, idx) => {
-                console.warn(`  Dossier ${idx + 1} (${d.dossierId}):`);
-                console.warn(`    - Personne ID: ${d.candidat.personne_id}`);
-                console.warn(`    - Email: ${d.candidat.personne?.email || 'N/A'}`);
-                console.warn(`    - Nom complet: ${d.candidat.personne?.nom_complet || 'N/A'}`);
-              });
-            }
-          }
-        });
-
-        // Convertir les dossiers en format DemandeInscription
-        const demandesData: DemandeInscription[] = dossiersAutoEcole.map((dossier: any, index: number) => {
-          // Mapper le statut vers le format attendu
-          const mapStatut = (statut: string): 'en_attente' | 'en_cours' | 'validee' | 'rejetee' => {
-            switch (statut) {
-              case 'en_attente': return 'en_attente';
-              case 'en_cours': return 'en_cours';
-              case 'valide': return 'validee';
-              case 'rejete': return 'rejetee';
-              default: return 'en_attente';
-            }
-          };
-
-          // CRÉER UNE COPIE PROFONDE du candidat pour éviter les références partagées
-          // Si plusieurs dossiers partagent le même objet candidat, ils auront tous les mêmes données
-          // On crée une copie indépendante pour chaque dossier
-          let candidatComplet: any = null;
-          let candidatPersonne: any = null;
-          
-          if (dossier.candidat) {
-            // Comparer les données AVANT la copie pour diagnostiquer le problème
-            if (index > 0 && dossiersAutoEcole[index - 1]?.candidat) {
-              const prevCandidat = dossiersAutoEcole[index - 1].candidat;
-              const sameReference = dossier.candidat === prevCandidat;
-              const samePersonneId = dossier.candidat.personne_id === prevCandidat.personne_id;
-              const sameEmail = dossier.candidat.personne?.email === prevCandidat.personne?.email;
-              const sameNom = dossier.candidat.personne?.nom === prevCandidat.personne?.nom;
-              const samePrenom = dossier.candidat.personne?.prenom === prevCandidat.personne?.prenom;
-              
-              if (sameReference) {
-                console.error(`❌ ERREUR: Dossier ${index + 1} partage la MÊME RÉFÉRENCE d'objet candidat que le dossier ${index}`);
-                console.error(`   → C'est pourquoi les noms sont identiques !`);
-              } else if (samePersonneId && sameEmail && sameNom && samePrenom) {
-                console.warn(`⚠️ Dossier ${index + 1} a les MÊMES DONNÉES candidat que le dossier ${index} (mais objets différents)`);
-                console.warn(`   → Personne ID: ${dossier.candidat.personne_id}`);
-                console.warn(`   → Email: ${dossier.candidat.personne?.email}`);
-                console.warn(`   → Nom: ${dossier.candidat.personne?.nom} ${dossier.candidat.personne?.prenom}`);
-              } else if (samePersonneId && (!sameEmail || !sameNom || !samePrenom)) {
-                console.error(`❌ ERREUR: Dossier ${index + 1} et ${index} ont le MÊME personne_id mais des DONNÉES DIFFÉRENTES:`);
-                console.error(`   → Personne ID: ${dossier.candidat.personne_id}`);
-                console.error(`   → Email dossier ${index}: ${prevCandidat.personne?.email}`);
-                console.error(`   → Email dossier ${index + 1}: ${dossier.candidat.personne?.email}`);
-                console.error(`   → Nom dossier ${index}: ${prevCandidat.personne?.nom} ${prevCandidat.personne?.prenom}`);
-                console.error(`   → Nom dossier ${index + 1}: ${dossier.candidat.personne?.nom} ${dossier.candidat.personne?.prenom}`);
-              }
-            }
-            
-            // Copie profonde de l'objet candidat et de sa personne
-            // Créer une nouvelle copie pour chaque dossier pour éviter les références partagées
-            candidatComplet = JSON.parse(JSON.stringify(dossier.candidat)); // Deep clone garanti
-            candidatPersonne = candidatComplet.personne;
-            
-            // Vérifier après la copie que c'est bien une nouvelle référence
-            if (candidatComplet === dossier.candidat) {
-              console.error(`❌ ERREUR: La copie n'a pas créé une nouvelle référence !`);
-            }
-          }
-
-          // Récupérer les informations complètes du candidat depuis le map
-          const candidatId = dossier.candidat_id || candidatComplet?.id;
-          
-          console.log(`\n🔄 Transformation dossier ${index + 1} (${dossier.id}):`);
-          console.log(`  • Candidat ID:`, candidatId);
-          console.log(`  • Candidat présent:`, !!dossier.candidat);
-          console.log(`  • Candidat copié (nouvelle référence):`, candidatComplet !== dossier.candidat);
-          
-          // Vérifier que le candidat est bien différent pour chaque dossier
-          console.log(`  • Candidat ID du dossier:`, dossier.candidat?.id);
-          console.log(`  • Personne ID du candidat:`, dossier.candidat?.personne_id);
-          console.log(`  • Email du candidat dans le dossier:`, candidatPersonne?.email);
-          console.log(`  • Nom complet du candidat:`, candidatPersonne?.nom_complet);
-          console.log(`  • Nom:`, candidatPersonne?.nom);
-          console.log(`  • Prénom:`, candidatPersonne?.prenom);
-          
-          // Si pas de candidat dans le dossier, chercher dans le map
-          // ATTENTION: Le map peut contenir des données incorrectes si plusieurs candidats
-          // partagent le même ID, donc on privilégie personne_id si disponible
-          if (!candidatComplet && candidatId) {
-            // Essayer d'abord par personne_id si disponible (plus fiable)
-            const personneIdDuDossier = dossier.candidat?.personne_id;
-            if (personneIdDuDossier) {
-              const candidatParPersonneId = candidatsMap.get(`personne_${personneIdDuDossier}`);
-              if (candidatParPersonneId) {
-                candidatComplet = candidatParPersonneId;
-                candidatPersonne = candidatComplet?.personne || null;
-                console.log(`  • Candidat trouvé dans le map par personne_id (${personneIdDuDossier})`);
-              }
-            }
-            
-            // Sinon, essayer par candidat_id (mais avec vérification)
-            if (!candidatComplet) {
-              const candidatDuMap = candidatsMap.get(candidatId);
-              if (candidatDuMap) {
-                // Vérifier si le candidat du map correspond au dossier
-                const personneIdDuMap = candidatDuMap.personne_id;
-                
-                // Si les personne_id correspondent ou si on n'a pas de personne_id dans le dossier
-                if (!personneIdDuDossier || personneIdDuDossier === personneIdDuMap) {
-                  candidatComplet = candidatDuMap;
-                  candidatPersonne = candidatComplet?.personne || null;
-                  console.log(`  • Candidat trouvé dans le map par candidat_id (personne_id: ${personneIdDuMap})`);
-                } else {
-                  console.warn(`  ⚠️ Le candidat du map a un personne_id différent (${personneIdDuMap} vs ${personneIdDuDossier}), utilisation des données du dossier uniquement`);
-                }
-              }
-            }
-          }
-          
-          if (!candidatPersonne) {
-            console.error(`  ❌ ERREUR: Aucune information de personne trouvée pour le dossier ${dossier.id}`);
-            console.error(`     - Candidat ID: ${candidatId}`);
-            console.error(`     - Candidat présent dans dossier: ${!!dossier.candidat}`);
-            console.error(`     - Candidat présent dans map: ${!!candidatsMap.get(candidatId)}`);
-          }
-
-          // Récupérer les informations complètes de la formation depuis le map
-          const formationComplet = formationsMap.get(dossier.formation_id) || dossier.formation;
-          const formationNom = formationComplet?.type_permis?.libelle || 
-                                dossier.formation?.type_permis?.libelle || 
-                                'Formation';
-          const formationMontant = formationComplet?.montant_formate || 
-                                    dossier.formation?.montant_formate || 
-                                    'N/A';
-
-          return {
-            id: dossier.id,
-            numero: `DOS-${dossier.id.substring(0, 8).toUpperCase()}`,
-            candidat_id: candidatId, // ID candidat (peut être dupliqué)
-            personne_id: candidatComplet?.personne_id || null, // ID personne (plus fiable pour distinguer)
-            eleve: {
-              // IMPORTANT: Utiliser UNIQUEMENT la copie profonde (candidatComplet/candidatPersonne)
-              // pour éviter toute référence partagée qui causerait des noms identiques
-              firstName: candidatPersonne?.prenom || '',
-              lastName: candidatPersonne?.nom || '',
-              email: candidatPersonne?.email || '',
-              phone: candidatPersonne?.contact || '',
-              address: candidatPersonne?.adresse || '',
-              birthDate: candidatComplet?.date_naissance || '',
-              nationality: candidatComplet?.nationalite || '',
-              lieuNaissance: candidatComplet?.lieu_naissance || '',
-              nationaliteEtrangere: undefined
-            },
-            autoEcole: {
-              id: autoEcoleId,
-              name: autoEcoleInfo.nom_auto_ecole,
-              email: autoEcoleInfo.email
-            },
-            dateDemande: dossier.date_creation || dossier.created_at,
-            statut: mapStatut(dossier.statut),
-            documents: dossier.documents || [],
-            commentaires: dossier.commentaires || '',
-            // Informations supplémentaires du dossier
-            formation: {
-              id: dossier.formation_id,
-              nom: formationNom,
-              montant: formationMontant,
-              description: formationComplet?.description || dossier.formation?.description || ''
-            },
-            etape: dossier.etape ? {
-              id: dossier.etape.id,
-              libelle: dossier.etape.libelle,
-              ordre: dossier.etape.ordre,
-              statut: dossier.etape.statut_systeme
-            } : undefined
-          };
-        });
-        
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('🔄 DONNÉES TRANSFORMÉES POUR L\'AFFICHAGE');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('📊 Nombre de demandes transformées:', demandesData.length);
-        
-        // Afficher les données transformées
-        demandesData.forEach((demande: DemandeInscription, index: number) => {
-          console.log(`\n📋 Demande ${index + 1}:`);
-          console.log('  • ID:', demande.id);
-          console.log('  • Numéro:', demande.numero);
-          console.log('  • Candidat ID:', (demande as any).candidat_id);
-          console.log('  • Personne ID:', (demande as any).personne_id || 'N/A');
-          console.log('  • Élève:', `${demande.eleve.firstName} ${demande.eleve.lastName}`);
-          console.log('  • Email:', demande.eleve.email);
-          console.log('  • Téléphone:', demande.eleve.phone);
-          console.log('  • Formation:', (demande as any).formation?.nom || 'N/A');
-          console.log('  • Montant:', (demande as any).formation?.montant || 'N/A');
-          console.log('  • Étape:', (demande as any).etape?.libelle || 'N/A');
-          console.log('  • Statut:', demande.statut);
-          console.log('  • Date demande:', demande.dateDemande);
-          console.log('  • Documents:', demande.documents?.length || 0);
-        });
-        
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        
-        // Appliquer les filtres
-        let demandesFiltrees = demandesData;
-        
-        console.log('🔍 Application des filtres...');
-        console.log('  • Filtre statut:', filtres.statut || 'Aucun');
-        console.log('  • Recherche:', filtres.recherche || 'Aucune');
-        
-        if (filtres.statut) {
-          const avantFiltre = demandesFiltrees.length;
-          demandesFiltrees = demandesFiltrees.filter(d => d.statut === filtres.statut);
-          console.log(`  • Filtre statut appliqué: ${avantFiltre} → ${demandesFiltrees.length}`);
+        if (response.dossiers && response.dossiers.length > 0) {
+          setDataSource('api');
+          await processDossiers(response.dossiers);
+        } else {
+          console.log('⚠️ Aucun dossier trouvé pour cette auto-école via API');
+          setDemandes([]);
         }
-        
-        if (filtres.recherche) {
-          const avantRecherche = demandesFiltrees.length;
-          const recherche = filtres.recherche.toLowerCase();
-          demandesFiltrees = demandesFiltrees.filter(d => 
-            d.eleve.firstName.toLowerCase().includes(recherche) ||
-            d.eleve.lastName.toLowerCase().includes(recherche) ||
-            d.eleve.email.toLowerCase().includes(recherche) ||
-            d.numero.toLowerCase().includes(recherche)
-          );
-          console.log(`  • Recherche appliquée: ${avantRecherche} → ${demandesFiltrees.length}`);
-        }
-        
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('✅ RÉSULTAT FINAL');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('📊 Nombre total de demandes affichées:', demandesFiltrees.length);
-        console.log('📋 Demandes finales:', demandesFiltrees.map(d => ({
-          id: d.id,
-          numero: d.numero,
-          candidat_id: (d as any).candidat_id,
-          personne_id: (d as any).personne_id || null,
-          eleve: {
-            firstName: d.eleve.firstName,
-            lastName: d.eleve.lastName,
-            nom_complet: `${d.eleve.firstName} ${d.eleve.lastName}`,
-            email: d.eleve.email,
-            phone: d.eleve.phone
-          },
-          statut: d.statut,
-          formation: (d as any).formation?.nom || 'N/A'
-        })));
-        
-        // Log détaillé pour chaque demande
-        demandesFiltrees.forEach((d, idx) => {
-          console.log(`\n📋 Demande finale ${idx + 1}:`);
-          console.log(`  • ID: ${d.id}`);
-          console.log(`  • Numéro: ${d.numero}`);
-          console.log(`  • Candidat ID: ${(d as any).candidat_id}`);
-          console.log(`  • Personne ID: ${(d as any).personne_id || 'N/A'}`);
-          console.log(`  • Élève: ${d.eleve.firstName} ${d.eleve.lastName}`);
-          console.log(`  • Email: ${d.eleve.email}`);
-          console.log(`  • Téléphone: ${d.eleve.phone}`);
-          console.log(`  • Formation: ${(d as any).formation?.nom || 'N/A'}`);
-        });
-        
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        
-        setDemandes(demandesFiltrees);
-      } else {
-        console.log('⚠️ Aucun dossier trouvé dans les informations auto-école');
+      } catch (error: any) {
+        console.error('❌ Erreur lors de la récupération des dossiers depuis l\'API:', error);
         setDemandes([]);
+        
+        // Afficher un message d'erreur spécifique
+        if (error.response?.status === 404) {
+          console.warn('⚠️ Auto-école non trouvée');
+        } else if (error.response?.status === 401) {
+          console.warn('⚠️ Non autorisé à accéder à cette auto-école');
+        }
       }
     } catch (error: any) {
       console.error('❌ Erreur lors du chargement des dossiers:', error);
       setDemandes([]);
-      
-      // Afficher un message d'erreur spécifique
-      if (error.response?.status === 404) {
-        console.warn('⚠️ Aucun dossier trouvé pour cette auto-école');
-      } else if (error.message?.includes('auto-école')) {
-        console.warn('⚠️ Problème de récupération de l\'auto-école associée');
-      }
     } finally {
       setLoading(false);
     }
   };
 
+
   const chargerStatistiques = async () => {
     try {
-      // Récupérer les dossiers depuis les informations d'auto-école
-      const dossiersAutoEcole = getAutoEcoleDossiers();
+      // Utiliser les demandes déjà chargées pour calculer les statistiques
+      const stats: StatistiquesDemandes = {
+        total: demandes.length,
+        enAttente: demandes.filter(d => d.statut === 'en_attente').length,
+        enCours: demandes.filter(d => d.statut === 'en_cours').length,
+        validees: demandes.filter(d => d.statut === 'validee').length,
+        rejetees: demandes.filter(d => d.statut === 'rejetee').length,
+        parAutoEcole: {}
+      };
       
-      if (dossiersAutoEcole && dossiersAutoEcole.length > 0) {
-        const stats: StatistiquesDemandes = {
-          total: dossiersAutoEcole.length,
-          enAttente: dossiersAutoEcole.filter((d: any) => d.statut === 'en_attente').length,
-          enCours: dossiersAutoEcole.filter((d: any) => d.statut === 'en_cours').length,
-          validees: dossiersAutoEcole.filter((d: any) => d.statut === 'valide' || d.statut === 'validee').length,
-          rejetees: dossiersAutoEcole.filter((d: any) => d.statut === 'rejete' || d.statut === 'rejetee').length,
-          parAutoEcole: {}
-        };
-        
-        setStatistiques(stats);
-        console.log('📊 Statistiques chargées depuis les dossiers auto-école:', stats);
-      } else {
-        // Statistiques par défaut si pas de données
-        setStatistiques({
-          total: 0,
-          enAttente: 0,
-          enCours: 0,
-          validees: 0,
-          rejetees: 0,
-          parAutoEcole: {}
-        });
-        console.log('📊 Aucun dossier trouvé pour les statistiques');
-      }
+      setStatistiques(stats);
+      console.log('📊 Statistiques calculées:', stats);
     } catch (error) {
-      console.error('❌ Erreur lors du chargement des statistiques:', error);
+      console.error('❌ Erreur lors du calcul des statistiques:', error);
       // Les statistiques par défaut (vides) seront utilisées
       setStatistiques({
         total: 0,
@@ -787,93 +450,10 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
   const handleVoirDetails = (demande: DemandeInscription) => {
     console.log('📋 Détails du dossier sélectionné:', demande);
     
-    // Afficher les détails dans la console pour le moment
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📁 DÉTAILS DU DOSSIER');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📋 Informations générales:');
-    console.log('  • Numéro:', demande.numero);
-    console.log('  • ID:', demande.id);
-    console.log('  • Date demande:', demande.dateDemande);
-    console.log('  • Statut:', demande.statut);
-    console.log('  • Commentaires:', demande.commentaires);
-    
-    // Récupérer les informations complètes depuis les maps
-    // Utiliser personne_id en priorité si disponible (plus fiable pour distinguer)
-    let candidatComplet = null;
-    const personneId = (demande as any).personne_id;
-    if (personneId) {
-      candidatComplet = candidatsMap.get(`personne_${personneId}`) || null;
-    }
-    // Sinon, essayer par candidat_id
-    if (!candidatComplet && (demande as any).candidat_id) {
-      candidatComplet = candidatsMap.get((demande as any).candidat_id) || null;
-    }
-    const formationComplet = formationsMap.get((demande as any).formation?.id) || (demande as any).formation;
-    
-    console.log('\n👤 Informations élève:');
-    console.log('  • Candidat ID:', (demande as any).candidat_id || 'N/A');
-    console.log('  • Personne ID:', personneId || 'N/A');
-    console.log('  • Nom complet:', demande.eleve.firstName, demande.eleve.lastName);
-    if (candidatComplet?.personne?.nom_complet) {
-      console.log('  • Nom complet (API):', candidatComplet.personne.nom_complet);
-    }
-    console.log('  • Email:', demande.eleve.email);
-    console.log('  • Téléphone:', demande.eleve.phone);
-    console.log('  • Adresse:', demande.eleve.address);
-    console.log('  • Date naissance:', demande.eleve.birthDate);
-    console.log('  • Lieu naissance:', demande.eleve.lieuNaissance);
-    console.log('  • Nationalité:', demande.eleve.nationality);
-    if (candidatComplet?.numero_candidat) {
-      console.log('  • Numéro candidat:', candidatComplet.numero_candidat);
-    }
-    
-    console.log('\n🏫 Informations auto-école:');
-    console.log('  • Nom:', demande.autoEcole.name);
-    console.log('  • ID:', demande.autoEcole.id);
-    console.log('  • Email:', demande.autoEcole.email);
-    
-    if ((demande as any).formation || formationComplet) {
-      console.log('\n📚 Informations formation:');
-      console.log('  • Nom:', (demande as any).formation?.nom || formationComplet?.type_permis?.libelle || 'N/A');
-      console.log('  • Montant:', (demande as any).formation?.montant || formationComplet?.montant_formate || 'N/A');
-      console.log('  • Description:', (demande as any).formation?.description || formationComplet?.description || 'N/A');
-      if (formationComplet?.type_permis) {
-        console.log('  • Type permis:', formationComplet.type_permis.libelle);
-        console.log('  • Code:', formationComplet.type_permis.code);
-      }
-      if (formationComplet?.session) {
-        console.log('  • Session:', formationComplet.session.libelle);
-      }
-    }
-    
-    if ((demande as any).etape) {
-      console.log('\n🔄 Informations étape:');
-      console.log('  • Libellé:', (demande as any).etape.libelle);
-      console.log('  • Ordre:', (demande as any).etape.ordre);
-      console.log('  • Statut:', (demande as any).etape.statut);
-    }
-    
-    console.log('\n📄 Documents:');
-    if (demande.documents && demande.documents.length > 0) {
-      demande.documents.forEach((doc: any, index: number) => {
-        console.log(`  ${index + 1}. ${doc.nom_fichier || doc.nom || 'Document'}`);
-        console.log(`     • Type: ${doc.type_document?.libelle || 'N/A'}`);
-        console.log(`     • Validé: ${doc.valide ? 'Oui' : 'Non'}`);
-        console.log(`     • Taille: ${doc.taille_fichier_formate || 'N/A'}`);
-        console.log(`     • Commentaires: ${doc.commentaires || 'Aucun'}`);
-      });
-    } else {
-      console.log('  Aucun document');
-    }
-    
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
     if (onCandidatSelect) {
       onCandidatSelect(demande);
     }
   };
-
 
   if (loading) {
     return (
@@ -883,24 +463,43 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
     );
   }
 
+  if (loadingDetails) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography>Récupération des vraies données depuis l'API...</Typography>
+      </Box>
+    );
+  }
+
+
   return (
     <Box sx={{ p: 3 }}>
-      {/* Informations sur l'auto-école connectée */}
-      {(() => {
-        const autoEcoleInfo = getAutoEcoleInfo();
-        return autoEcoleInfo ? (
-          <Card sx={{ mb: 3, backgroundColor: '#f8f9fa' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                🏫 {autoEcoleInfo.nom_auto_ecole}
-              </Typography>
+      {/* Informations sur la source de données */}
+      {dataSource && currentAutoEcoleId && (
+        <Card sx={{ mb: 3, backgroundColor: '#f8f9fa' }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              📊 Demandes d'inscription
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              🏫 Auto-école ID: {currentAutoEcoleId}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              🔄 Données récupérées depuis l'API
+            </Typography>
+            {loadingDetails && (
               <Typography variant="body2" color="text.secondary">
-                📧 {autoEcoleInfo.email} | 📞 {autoEcoleInfo.contact} | 📍 {autoEcoleInfo.adresse}
+                ⏳ Récupération des vraies données...
               </Typography>
-            </CardContent>
-          </Card>
-        ) : null;
-      })()}
+            )}
+            {formationId && (
+              <Typography variant="body2" color="text.secondary">
+                📚 Filtrage par formation: {formationId}
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Statistiques */}
       {statistiques && (
@@ -982,8 +581,34 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
             <MenuItem value="rejetee">Rejetée</MenuItem>
           </Select>
         </FormControl>
-
         
+        {/* Bouton de débogage */}
+        <Button
+          variant="outlined"
+          onClick={() => {
+            console.log('🔍 DEBUG - État actuel:');
+            console.log('📊 Demandes affichées:', demandes.length);
+            console.log('🔍 Filtres appliqués:', filtres);
+            console.log('📚 Formation ID:', formationId);
+            console.log('🏫 Auto-école ID:', currentAutoEcoleId);
+          }}
+          sx={{ minWidth: 120 }}
+        >
+          Debug
+        </Button>
+        
+        {/* Bouton pour forcer le rechargement des vraies données */}
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => {
+            console.log('🔄 Forçage du rechargement des vraies données...');
+            chargerDemandes();
+          }}
+          sx={{ minWidth: 150 }}
+        >
+          🔄 Recharger vraies données
+        </Button>
       </Box>
 
       {/* Tableau des demandes */}

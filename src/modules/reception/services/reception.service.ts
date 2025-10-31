@@ -3,6 +3,7 @@ import { API_ENDPOINTS } from '../../../shared/constants/api';
 import axiosClient from '../../../shared/environment/envdev';
 import { ReceptionActionResponse, ReceptionDossier, EpreuvesResultat } from '../types';
 import { autoEcoleService } from '../../cnepc/services/auto-ecole.service';
+import { getAutoEcoleId } from '../../../shared/utils/autoEcoleUtils';
 
 class ReceptionService extends BaseService {
   // Maps pour stocker les candidats et formations (même méthode que DemandesInscriptionTable)
@@ -12,68 +13,100 @@ class ReceptionService extends BaseService {
 
   async listIncoming(): Promise<ReceptionDossier[]> {
     try {
-      console.log('📋 Chargement des dossiers de réception...');
+      console.log('📋 Chargement des dossiers de réception (statut: transmis)...');
       
-      // Charger d'abord les candidats, formations et auto-écoles
+      // Récupérer l'ID de l'auto-école (même méthode que DemandesInscriptionTable.tsx)
+      const autoEcoleId = getAutoEcoleId();
+      
+      if (!autoEcoleId) {
+        console.warn('⚠️ Aucun ID d\'auto-école trouvé');
+        return [];
+      }
+      
+      console.log('🏫 Auto-école ID:', autoEcoleId);
+      
+      // Utiliser la même méthode que DemandesInscriptionTable.tsx : getDossiersByAutoEcoleId
+      // avec filtre statut: 'transmis'
+      const filters = {
+        statut: 'transmis' as any
+      };
+      
+      console.log('🔍 Filtres envoyés à l\'API:', filters);
+      
+      const response = await autoEcoleService.getDossiersByAutoEcoleId(autoEcoleId, filters);
+      
+      console.log('📦 Dossiers récupérés depuis l\'API:', response.dossiers?.length || 0);
+      console.log('📋 Structure de la réponse:', response);
+      
+      if (!response.dossiers || response.dossiers.length === 0) {
+        console.log('⚠️ Aucun dossier transmis trouvé pour cette auto-école');
+        return [];
+      }
+      
+      // Récupérer les vraies données complètes de chaque dossier (comme dans DemandesInscriptionTable.tsx)
+      console.log('🔄 Récupération des vraies données depuis l\'API pour chaque dossier...');
+      
+      const dossiersComplets = await Promise.all(
+        response.dossiers.map(async (dossier: any) => {
+          try {
+            console.log(`📋 Récupération des vraies données du dossier ${dossier.id}...`);
+            const dossierComplet = await autoEcoleService.getDossierById(dossier.id);
+            console.log(`✅ Dossier ${dossier.id} avec vraies données récupéré`);
+            return dossierComplet;
+          } catch (error) {
+            console.error(`❌ Erreur lors de la récupération du dossier ${dossier.id}:`, error);
+            // Retourner le dossier original en cas d'erreur
+            return dossier;
+          }
+        })
+      );
+      
+      console.log(`📊 ${dossiersComplets.length} dossier(s) complet(s) récupéré(s) avec statut "transmis"`);
+      
+      // Charger d'abord les candidats, formations et auto-écoles pour le mapping
       await this.chargerCandidatsEtFormations();
       
-      // Récupérer les programmes de sessions (dossiers envoyés)
-      const res = await axiosClient.get('/programme-sessions');
-      const items = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
-      
-      console.log('📦 Programmes de sessions reçus:', items.length);
-      
-      // Mapper vers ReceptionDossier en utilisant les maps, avec fallback async pour la formation
-      const mapped: ReceptionDossier[] = await Promise.all(items.map(async (ps: any, index: number) => {
-        const dossier = ps?.dossier || {};
-        const candidatId = dossier?.candidat_id;
-        const formationId = dossier?.formation_id;
-        const autoEcoleId = dossier?.auto_ecole_id;
+      // Mapper les dossiers vers ReceptionDossier
+      const mapped: ReceptionDossier[] = await Promise.all(dossiersComplets.map(async (dossier: any, index: number) => {
+        const candidat = dossier.candidat;
+        const formation = dossier.formation;
+        const autoEcoleId = dossier.auto_ecole_id;
         
         console.log(`\n🔄 Mapping dossier ${index + 1}:`);
-        console.log('  • Candidat ID:', candidatId);
-        console.log('  • Formation ID:', formationId);
+        console.log('  • Dossier ID:', dossier.id);
+        console.log('  • Candidat ID:', candidat?.id);
+        console.log('  • Formation ID:', formation?.id);
         console.log('  • Auto-école ID:', autoEcoleId);
         
         // Récupérer les informations depuis les maps
-        const candidat = this.candidatsMap.get(candidatId) || this.candidatsMap.get(`personne_${dossier?.candidat?.personne_id}`);
-        let formation = this.formationsMap.get(formationId);
-        const autoEcole = this.autoEcolesMap.get(autoEcoleId);
+        const candidatFromMap = this.candidatsMap.get(candidat?.id) || this.candidatsMap.get(`personne_${candidat?.personne_id}`);
+        let formationFromMap = this.formationsMap.get(formation?.id);
+        const autoEcoleFromMap = this.autoEcolesMap.get(autoEcoleId);
         
-        console.log('  • Candidat trouvé dans map:', !!candidat);
-        console.log('  • Formation trouvée dans map:', !!formation);
-        console.log('  • Auto-école trouvée dans map:', !!autoEcole);
+        // Utiliser les données du dossier complet en priorité, avec fallback sur les maps
+        const candidatFinal = candidatFromMap || candidat;
+        const formationFinal = formationFromMap || formation;
+        const autoEcoleFinal = autoEcoleFromMap || dossier.auto_ecole || {};
         
-        const candidatPersonne = candidat?.personne || dossier?.candidat?.personne || {};
-        // Fallback: si aucune formation trouvée dans les maps ni dans le payload, tenter un fetch direct
-        if (!formation && !dossier?.formation && formationId) {
-          try {
-            const fetched = await autoEcoleService.getFormationById(formationId);
-            formation = fetched;
-          } catch (err) {
-            console.warn('⚠️ Impossible de récupérer la formation via fallback:', formationId, err);
-          }
-        }
-        const formationDetails = formation || dossier?.formation || {};
-        const autoEcoleDetails = autoEcole || dossier?.auto_ecole || {};
+        const candidatPersonne = candidatFinal?.personne || candidat?.personne || {};
         
         const result = {
-          id: ps.id || dossier.id,
-          reference: dossier.id || ps.dossier_id || ps.reference || '',
+          id: dossier.id,
+          reference: dossier.id,
           candidatNom: candidatPersonne.nom || '',
           candidatPrenom: candidatPersonne.prenom || '',
-          autoEcoleNom: autoEcoleDetails.nom_auto_ecole || autoEcoleDetails.nom || '',
-          dateEnvoi: ps?.created_at || new Date().toISOString(),
-          statut: 'envoye',
-          dateExamen: ps?.date_examen || '',
+          autoEcoleNom: autoEcoleFinal.nom_auto_ecole || autoEcoleFinal.nom || '',
+          dateEnvoi: dossier.updated_at || dossier.created_at || new Date().toISOString(),
+          statut: 'transmis',
+          dateExamen: '', // Sera rempli si on récupère les programme-sessions
           details: {
-            ...ps,
-            candidat_complet: candidat,
-            formation_complete: formationDetails,
-            auto_ecole_complete: autoEcoleDetails
+            dossier,
+            candidat_complet: candidatFinal,
+            formation_complete: formationFinal,
+            auto_ecole_complete: autoEcoleFinal
           },
         } as ReceptionDossier;
-
+        
         // Fusionner les épreuves locales persistées (pour persistance après reload)
         try {
           const localEpreuves = this.getEpreuvesLocal(result.id);
@@ -84,7 +117,7 @@ class ReceptionService extends BaseService {
         
         console.log('  • Résultat candidat:', `${result.candidatNom} ${result.candidatPrenom}`);
         console.log('  • Résultat auto-école:', result.autoEcoleNom);
-        console.log('  • Résultat formation:', formationDetails?.type_permis?.libelle || 'N/A');
+        console.log('  • Résultat formation:', formationFinal?.type_permis?.libelle || formationFinal?.nom || 'N/A');
         
         return result;
       }));
