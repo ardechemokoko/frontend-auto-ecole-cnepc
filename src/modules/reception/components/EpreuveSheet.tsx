@@ -13,38 +13,12 @@ interface EpreuveSheetProps {
 
 const MAX_ATTEMPTS = 3;
 
-/**
- * Calcule le statut d'une épreuve en fonction de ses tentatives
- * - Réussi : si au moins une tentative est réussie (peu importe l'ordre) → épreuve validée
- * - Échoué : si 3 tentatives ont été faites et aucune n'est réussie
- * - Absent : si la dernière tentative non "non_saisi" est absente (et pas encore échoué/réussi)
- * - Non saisi : si aucune tentative ou toutes les tentatives sont "non_saisi"
- */
 function computeOverall(attempts?: EpreuveAttempt[], legacy?: EpreuveStatut): EpreuveStatut {
-  // Si un statut legacy existe et n'est pas "non_saisi", le retourner
   if (legacy && legacy !== 'non_saisi') return legacy;
-  
-  // Si pas de tentatives, retourner "non_saisi"
   if (!attempts || attempts.length === 0) return 'non_saisi';
-  
-  // Si au moins une tentative est réussie, l'épreuve est réussie (peu importe l'ordre) → épreuve validée
   if (attempts.some(a => a.result === 'reussi')) return 'reussi';
-  
-  // Filtrer les tentatives qui ne sont pas "non_saisi" pour le calcul
-  const validAttempts = attempts.filter(a => a.result !== 'non_saisi');
-  
-  // Si on a épuisé les 3 tentatives et qu'aucune n'est réussie, l'épreuve est échouée
-  if (attempts.length >= MAX_ATTEMPTS && validAttempts.length > 0 && validAttempts.every(a => a.result !== 'reussi')) {
-    return 'echoue';
-  }
-  
-  // Si on a des tentatives avec des résultats valides, retourner le résultat de la dernière tentative valide
-  if (validAttempts.length > 0) {
-    return validAttempts[validAttempts.length - 1].result;
-  }
-  
-  // Sinon, toutes les tentatives sont "non_saisi"
-  return 'non_saisi';
+  if (attempts.length >= MAX_ATTEMPTS && attempts.every(a => a.result !== 'reussi')) return 'echoue';
+  return attempts[attempts.length - 1].result;
 }
 
 /**
@@ -88,8 +62,8 @@ const EpreuveRow: React.FC<{
         <Button
           size="small"
           variant="outlined"
-          disabled={disabled || attempts.length >= MAX_ATTEMPTS || attempts.some(a => a.result === 'reussi')}
-          onClick={() => onAdd({ result: 'non_saisi' as EpreuveStatut, date: new Date().toISOString() })}
+          disabled={disabled || attempts.length >= MAX_ATTEMPTS}
+          onClick={() => onAdd({ result: 'echoue', date: new Date().toISOString() })}
         >
           Ajouter tentative
         </Button>
@@ -100,12 +74,11 @@ const EpreuveRow: React.FC<{
             <Typography variant="caption" sx={{ width: 60 }}>Tentative {idx + 1}</Typography>
             <Select
               size="small"
-              value={a.result || 'non_saisi'}
+              value={a.result}
               onChange={(e: SelectChangeEvent) => onChange(idx, { ...a, result: e.target.value as any })}
               sx={{ width: 160 }}
               disabled={disabled}
             >
-              <MenuItem value="non_saisi">Non saisi</MenuItem>
               <MenuItem value="reussi">Réussi</MenuItem>
               <MenuItem value="echoue">Échoué</MenuItem>
               <MenuItem value="absent">Absent</MenuItem>
@@ -194,24 +167,10 @@ const EpreuveSheet: React.FC<EpreuveSheetProps> = ({ open, onClose, dossier, onS
   const overallCode = computeOverall(values.codeConduiteAttempts, values.codeConduite);
   const overallVille = computeOverall(values.tourVilleAttempts, values.tourVille);
   
-  // Verrouiller une épreuve si :
-  // - Au moins une tentative a réussi (l'épreuve est validée, on ne la repasse plus)
-  // - OU si l'épreuve est échouée (3 tentatives sans réussite)
-  const shouldLockEpreuve = (attempts: EpreuveAttempt[] | undefined, status: EpreuveStatut): boolean => {
-    if (!attempts || attempts.length === 0) return false;
-    
-    // Si au moins une tentative a réussi, verrouiller immédiatement (épreuve validée)
-    if (attempts.some(a => a.result === 'reussi')) return true;
-    
-    // Si échoué (3 tentatives sans réussite), verrouiller aussi
-    if (status === 'echoue') return true;
-    
-    return false;
-  };
-  
-  const creneauxLocked = shouldLockEpreuve(values.creneauxAttempts, overallCreneaux);
-  const codeLocked = shouldLockEpreuve(values.codeConduiteAttempts, overallCode);
-  const villeLocked = shouldLockEpreuve(values.tourVilleAttempts, overallVille);
+  // Verrouiller une épreuve si elle est réussie
+  const creneauxLocked = overallCreneaux === 'reussi';
+  const codeLocked = overallCode === 'reussi';
+  const villeLocked = overallVille === 'reussi';
   
   // Calculer le résultat général (recalculé automatiquement à chaque changement)
   const overallGeneral = computeGeneral(overallCreneaux, overallCode, overallVille);

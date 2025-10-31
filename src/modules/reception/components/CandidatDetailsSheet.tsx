@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Drawer,
   Box,
@@ -10,7 +10,9 @@ import {
   Button,
   Stack,
   Tooltip,
-  LinearProgress
+  LinearProgress,
+  Snackbar,
+  Alert
 } from '@mui/material';
 // Heroicons imports
 import { 
@@ -22,7 +24,8 @@ import {
   EnvelopeIcon, 
   MapPinIcon, 
   EyeIcon,
-  ArrowDownTrayIcon 
+  ArrowDownTrayIcon,
+  CloudArrowUpIcon
 } from '@heroicons/react/24/outline';
 import { ReceptionDossier } from '../types';
 import axiosClient from '../../../shared/environment/envdev';
@@ -41,8 +44,15 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [documentsFromApi, setDocumentsFromApi] = useState<any[]>([]);
   const [dossierComplet, setDossierComplet] = useState<any>(null);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -285,7 +295,7 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
             nom: doc.nom_fichier || doc.nom,
             nom_fichier: doc.nom_fichier || doc.nom,
             chemin_fichier: doc.chemin_fichier,
-            url: doc.chemin_fichier,
+            url: doc.ficher,
             taille: doc.taille_fichier_formate || formatFileSize(doc.taille_fichier || 0),
             taille_fichier: doc.taille_fichier,
             type_mime: doc.type_mime,
@@ -449,6 +459,189 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
       console.error('❌ Erreur lors du téléchargement du document:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'Erreur lors du téléchargement du document';
       alert(`Erreur lors du téléchargement du document: ${document.nom || document.nom_fichier}\n\n${errorMessage}`);
+    }
+  };
+
+  const handleUploadNewDocument = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0 || !dossier?.reference) return;
+
+    const file = files[0];
+    setUploading(true);
+
+    try {
+      // Validation du fichier avant upload
+      const maxSize = 5 * 1024 * 1024; // 5 MB
+      if (file.size > maxSize) {
+        setSnackbar({
+          open: true,
+          message: 'Le fichier ne doit pas dépasser 5 MB',
+          severity: 'error'
+        });
+        setUploading(false);
+        return;
+      }
+
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+      if (!allowedTypes.includes(file.type)) {
+        setSnackbar({
+          open: true,
+          message: 'Format non autorisé. Utilisez PDF, JPG ou PNG',
+          severity: 'error'
+        });
+        setUploading(false);
+        return;
+      }
+
+      // Format attendu par le backend : fichier doit être un File object dans FormData
+      const cleanFileName = file.name.trim();
+      
+      // Utiliser FormData pour envoyer le fichier réel
+      const formData = new FormData();
+      formData.append('documentable_id', dossier.reference);
+      formData.append('documentable_type', 'App\\Models\\Dossier');
+      // Laravel attend un booléen, utiliser '0' pour false et '1' pour true
+      formData.append('valide', '0');
+      formData.append('commentaires', '');
+      formData.append('fichier', file, cleanFileName);
+
+      console.log('📤 Upload document (FormData):', {
+        documentable_id: dossier.reference,
+        documentable_type: 'App\\Models\\Dossier',
+        valide: false,
+        commentaires: '',
+        fichier: `[File: ${cleanFileName}, ${file.size} bytes, ${file.type}]`
+      });
+
+      // Envoi avec FormData (Content-Type sera automatiquement multipart/form-data)
+      const response = await axiosClient.post('/documents', formData, {
+        timeout: 300000, // 5 minutes selon la documentation
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (response.data.success && response.data.data) {
+        // Structure de réponse conforme à l'API documentée
+        const newDocument = {
+          id: response.data.data.id,
+          nom: response.data.data.nom_fichier || file.name,
+          nom_fichier: response.data.data.nom_fichier || file.name,
+          chemin_fichier: response.data.data.chemin_fichier,
+          url: response.data.data.chemin_fichier,
+          taille: response.data.data.taille_fichier_formate || formatFileSize(file.size),
+          taille_fichier: response.data.data.taille_fichier || file.size,
+          type_mime: response.data.data.type_mime || file.type,
+          type: response.data.data.type_mime || file.type,
+          valide: response.data.data.valide || false,
+          valide_libelle: response.data.data.valide_libelle || (response.data.data.valide ? 'Validé' : 'Non validé'),
+          dateUpload: response.data.data.created_at || new Date().toISOString(),
+          created_at: response.data.data.created_at || new Date().toISOString(),
+          commentaires: response.data.data.commentaires || ''
+        };
+
+        // Ajouter le nouveau document à la liste des documents depuis l'API
+        setDocumentsFromApi(prev => [...prev, newDocument]);
+        
+        // Recharger les documents depuis l'API pour avoir les données complètes
+        await chargerDocuments();
+        
+        setSnackbar({
+          open: true,
+          message: response.data.message || 'Document uploadé avec succès',
+          severity: 'success'
+        });
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur lors de l\'upload du document:', error);
+      
+      // Log détaillé de la réponse du serveur
+      if (error.response) {
+        console.error('📋 Réponse du serveur:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          headers: error.response.headers,
+          data: error.response.data,
+        });
+        
+        // Afficher tout le contenu de data
+        console.error('📄 Données de l\'erreur (error.response.data):', JSON.stringify(error.response.data, null, 2));
+        
+        // Si c'est un objet, afficher ses propriétés
+        if (error.response.data && typeof error.response.data === 'object') {
+          console.error('📋 Propriétés de error.response.data:', Object.keys(error.response.data));
+          if (error.response.data.errors) {
+            console.error('🔍 Erreurs de validation:', error.response.data.errors);
+          }
+          if (error.response.data.message) {
+            console.error('💬 Message:', error.response.data.message);
+          }
+        }
+      } else {
+        console.error('⚠️ Pas de réponse du serveur (erreur réseau?)');
+      }
+      
+      // Afficher le message d'erreur détaillé du serveur
+      let errorMessage = 'Erreur lors de l\'upload du document';
+      
+      if (error.response?.status === 422) {
+        // Erreur de validation - afficher les détails
+        console.error('🚫 Erreur 422 - Validation échouée');
+        
+        if (error.response.data?.errors) {
+          // Si c'est un objet d'erreurs de validation Laravel
+          const errors = Object.entries(error.response.data.errors)
+            .map(([field, messages]: [string, any]) => {
+              const fieldName = field.replace(/_/g, ' ');
+              const messagesList = Array.isArray(messages) ? messages : [messages];
+              return `${fieldName}: ${messagesList.join(', ')}`;
+            })
+            .join('\n');
+          errorMessage = `Erreurs de validation:\n${errors}`;
+        } else if (error.response.data?.message) {
+          errorMessage = error.response.data.message;
+        } else {
+          errorMessage = 'Erreur de validation. Veuillez vérifier les données du document.';
+        }
+      } else if (error.response?.data) {
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.response.data.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.response.data.errors) {
+          // Si c'est un objet d'erreurs de validation Laravel
+          const errors = Object.entries(error.response.data.errors)
+            .map(([field, messages]: [string, any]) => 
+              `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`
+            )
+            .join('; ');
+          errorMessage = `Erreurs de validation: ${errors}`;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else {
+          // Afficher le JSON de l'erreur si on ne peut pas extraire un message
+          errorMessage = JSON.stringify(error.response.data);
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setSnackbar({
+        open: true,
+        message: errorMessage.length > 300 ? errorMessage.substring(0, 300) + '...' : errorMessage,
+        severity: 'error'
+      });
+    } finally {
+      setUploading(false);
+      if (event.target) {
+        event.target.value = '';
+      }
     }
   };
 
@@ -632,18 +825,37 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
               {/* Documents */}
               <Card>
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <DocumentTextIcon className="w-5 h-5 mr-2 text-blue-600" />
-                    <Typography variant="h6" fontWeight="bold" className="font-display">
-                      Documents ({documentsFromApi.length})
-                    </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <DocumentTextIcon className="w-5 h-5 mr-2 text-blue-600" />
+                      <Typography variant="h6" fontWeight="bold" className="font-display">
+                        Documents ({documentsFromApi.length})
+                      </Typography>
+                    </Box>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<CloudArrowUpIcon className="w-4 h-4" />}
+                      onClick={handleUploadNewDocument}
+                      disabled={uploading || !dossier?.reference}
+                      className="font-primary"
+                    >
+                      {uploading ? 'Upload...' : 'Ajouter un document'}
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      style={{ display: 'none' }}
+                      onChange={handleFileSelect}
+                    />
                   </Box>
 
-                  {(loadingDocuments) && (
+                  {(loadingDocuments || uploading) && (
                     <Box sx={{ mb: 2 }}>
                       <LinearProgress />
                       <Typography variant="caption" color="text.secondary" className="font-primary">
-                        Chargement des documents...
+                        {uploading ? 'Upload en cours...' : 'Chargement des documents...'}
                       </Typography>
                     </Box>
                   )}
@@ -721,6 +933,22 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
           </Stack>
         </Box>
       </Box>
+
+      {/* Snackbar pour les notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Drawer>
   );
 };

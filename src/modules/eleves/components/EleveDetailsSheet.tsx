@@ -391,27 +391,33 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
       // Import dynamique d'axiosClient
       const { default: axiosClient } = await import('../../../shared/environment/envdev');
       
-      // Selon la documentation, l'upload utilise JSON (pas FormData)
-      // Le chemin_fichier est généré côté client avec le format: documents/{dossierId}/{nom_fichier}
+      // Format attendu par le backend : fichier doit être un File object dans FormData
+      const cleanFileName = file.name.trim();
       const dossierId = eleve.demandeId;
-      const cheminFichier = `documents/${dossierId}/${file.name}`;
       
-      const payload = {
+      // Utiliser FormData pour envoyer le fichier réel
+      const formData = new FormData();
+      formData.append('documentable_id', dossierId);
+      formData.append('documentable_type', 'App\\Models\\Dossier');
+      // Laravel attend un booléen, utiliser '0' pour false et '1' pour true
+      formData.append('valide', '0');
+      formData.append('commentaires', '');
+      formData.append('fichier', file, cleanFileName);
+
+      console.log('📤 Upload document (FormData):', {
         documentable_id: dossierId,
         documentable_type: 'App\\Models\\Dossier',
-        nom_fichier: file.name,
-        chemin_fichier: cheminFichier,
-        type_mime: file.type,
-        taille_fichier: file.size,
         valide: false,
-        commentaires: ''
-      };
+        commentaires: '',
+        fichier: `[File: ${cleanFileName}, ${file.size} bytes, ${file.type}]`
+      });
 
-      console.log('📤 Upload document (JSON):', payload);
-
-      // Envoi en JSON (Content-Type: application/json est défini par défaut dans axiosClient)
-      const response = await axiosClient.post('/documents', payload, {
+      // Envoi avec FormData (Content-Type sera automatiquement multipart/form-data)
+      const response = await axiosClient.post('/documents', formData, {
         timeout: 300000, // 5 minutes selon la documentation
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       });
 
       if (response.data.success && response.data.data) {
@@ -419,12 +425,17 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
           id: response.data.data.id,
           nom: response.data.data.nom_fichier || file.name,
           nom_fichier: response.data.data.nom_fichier || file.name,
+          chemin_fichier: response.data.data.chemin_fichier,
+          url: response.data.data.chemin_fichier,
           taille: response.data.data.taille_fichier_formate || formatFileSize(file.size),
           taille_fichier: response.data.data.taille_fichier || file.size,
-          dateUpload: response.data.data.created_at || new Date().toISOString(),
+          type_mime: response.data.data.type_mime || file.type,
           type: response.data.data.type_mime || file.type,
-          url: response.data.data.chemin_fichier,
-          chemin_fichier: response.data.data.chemin_fichier,
+          valide: response.data.data.valide || false,
+          valide_libelle: response.data.data.valide_libelle || (response.data.data.valide ? 'Validé' : 'Non validé'),
+          dateUpload: response.data.data.created_at || new Date().toISOString(),
+          created_at: response.data.data.created_at || new Date().toISOString(),
+          commentaires: response.data.data.commentaires || '',
           isReplacement: !!replacingDocumentId
         };
         
@@ -436,10 +447,67 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
         } else {
           setUploadedDocuments(prev => [...prev, newDocument]);
         }
+        
+        // Recharger les documents depuis l'API pour avoir les données complètes
+        await chargerDocuments();
       }
     } catch (error: any) {
       console.error('❌ Erreur lors de l\'upload du document:', error);
-      const errorMessage = error?.response?.data?.message || error?.message || 'Erreur lors de l\'upload du document';
+      
+      // Log détaillé de la réponse du serveur
+      if (error.response) {
+        console.error('📋 Réponse du serveur:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          headers: error.response.headers,
+          data: error.response.data,
+        });
+        
+        // Afficher tout le contenu de data
+        console.error('📄 Données de l\'erreur (error.response.data):', JSON.stringify(error.response.data, null, 2));
+        
+        // Si c'est un objet, afficher ses propriétés
+        if (error.response.data && typeof error.response.data === 'object') {
+          console.error('📋 Propriétés de error.response.data:', Object.keys(error.response.data));
+          if (error.response.data.errors) {
+            console.error('🔍 Erreurs de validation:', error.response.data.errors);
+          }
+          if (error.response.data.message) {
+            console.error('💬 Message:', error.response.data.message);
+          }
+        }
+      } else {
+        console.error('⚠️ Pas de réponse du serveur (erreur réseau?)');
+      }
+      
+      // Afficher le message d'erreur détaillé du serveur
+      let errorMessage = 'Erreur lors de l\'upload du document';
+      
+      if (error.response?.status === 422) {
+        // Erreur de validation - afficher les détails
+        console.error('🚫 Erreur 422 - Validation échouée');
+        
+        if (error.response.data?.errors) {
+          // Si c'est un objet d'erreurs de validation Laravel
+          const errors = Object.entries(error.response.data.errors)
+            .map(([field, messages]: [string, any]) => {
+              const fieldName = field.replace(/_/g, ' ');
+              const messagesList = Array.isArray(messages) ? messages : [messages];
+              return `${fieldName}: ${messagesList.join(', ')}`;
+            })
+            .join('\n');
+          errorMessage = `Erreurs de validation:\n${errors}`;
+        } else if (error.response.data?.message) {
+          errorMessage = error.response.data.message;
+        } else {
+          errorMessage = 'Erreur de validation. Veuillez vérifier les données du document.';
+        }
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       alert(errorMessage);
     } finally {
       setUploading(false);
