@@ -358,26 +358,32 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
         return;
       }
 
-      // Selon la documentation, l'upload utilise JSON (pas FormData)
-      // Le chemin_fichier est généré côté client avec le format: documents/{dossierId}/{nom_fichier}
-      const cheminFichier = `documents/${candidat.id}/${file.name}`;
+      // Format attendu par le backend : fichier doit être un File object dans FormData
+      const cleanFileName = file.name.trim();
       
-      const payload = {
+      // Utiliser FormData pour envoyer le fichier réel
+      const formData = new FormData();
+      formData.append('documentable_id', candidat.id);
+      formData.append('documentable_type', 'App\\Models\\Dossier');
+      // Laravel attend un booléen, utiliser '0' pour false et '1' pour true
+      formData.append('valide', '0');
+      formData.append('commentaires', '');
+      formData.append('fichier', file, cleanFileName);
+
+      console.log('📤 Upload document (FormData):', {
         documentable_id: candidat.id,
         documentable_type: 'App\\Models\\Dossier',
-        nom_fichier: file.name,
-        chemin_fichier: cheminFichier,
-        type_mime: file.type,
-        taille_fichier: file.size,
         valide: false,
-        commentaires: ''
-      };
+        commentaires: '',
+        fichier: `[File: ${cleanFileName}, ${file.size} bytes, ${file.type}]`
+      });
 
-      console.log('📤 Upload document (JSON):', payload);
-
-      // Envoi en JSON (Content-Type: application/json est défini par défaut dans axiosClient)
-      const response = await axiosClient.post('/documents', payload, {
+      // Envoi avec FormData (Content-Type sera automatiquement multipart/form-data)
+      const response = await axiosClient.post('/documents', formData, {
         timeout: 300000, // 5 minutes selon la documentation
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       });
 
       if (response.data.success && response.data.data) {
@@ -437,7 +443,27 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
       
       // Afficher le message d'erreur détaillé du serveur
       let errorMessage = 'Erreur lors de l\'upload du document';
-      if (error.response?.data) {
+      
+      if (error.response?.status === 422) {
+        // Erreur de validation - afficher les détails
+        console.error('🚫 Erreur 422 - Validation échouée');
+        
+        if (error.response.data?.errors) {
+          // Si c'est un objet d'erreurs de validation Laravel
+          const errors = Object.entries(error.response.data.errors)
+            .map(([field, messages]: [string, any]) => {
+              const fieldName = field.replace(/_/g, ' ');
+              const messagesList = Array.isArray(messages) ? messages : [messages];
+              return `${fieldName}: ${messagesList.join(', ')}`;
+            })
+            .join('\n');
+          errorMessage = `Erreurs de validation:\n${errors}`;
+        } else if (error.response.data?.message) {
+          errorMessage = error.response.data.message;
+        } else {
+          errorMessage = 'Erreur de validation. Veuillez vérifier les données du document.';
+        }
+      } else if (error.response?.data) {
         if (error.response.data.message) {
           errorMessage = error.response.data.message;
         } else if (error.response.data.error) {

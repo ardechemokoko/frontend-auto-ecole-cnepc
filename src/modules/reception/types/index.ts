@@ -2,7 +2,7 @@
 export type EpreuveStatut = 'non_saisi' | 'reussi' | 'echoue' | 'absent';
 
 export interface EpreuveAttempt {
-  result: EpreuveStatut; // Permet 'non_saisi' pour les tentatives non encore saisies
+  result: Exclude<EpreuveStatut, 'non_saisi'>;
   date: string; // ISO
   note?: string;
 }
