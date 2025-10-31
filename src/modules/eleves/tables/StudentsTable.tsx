@@ -37,39 +37,74 @@ const StudentsTable: React.FC = () => {
   // Charger les élèves validés au montage du composant
   useEffect(() => {
     chargerElevesValides();
+    
+    // Écouter les événements de validation de dossier pour rafraîchir automatiquement
+    const handleDossierValidated = () => {
+      console.log('🔄 Événement de validation reçu, rafraîchissement de la liste des élèves validés...');
+      chargerElevesValides();
+    };
+    
+    // Écouter aussi quand la page redevient visible (au cas où l'utilisateur navigue vers cette page)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('🔄 Page devenue visible, rafraîchissement de la liste des élèves validés...');
+        chargerElevesValides();
+      }
+    };
+    
+    window.addEventListener('dossierValidated', handleDossierValidated);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Nettoyer les écouteurs lors du démontage
+    return () => {
+      window.removeEventListener('dossierValidated', handleDossierValidated);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const chargerElevesValides = async () => {
     try {
       setLoading(true);
-      let eleves = await ValidationService.getElevesValides();
-      // Fallback localStorage direct si nécessaire
-      if (!eleves || eleves.length === 0) {
-        try {
-          const raw = localStorage.getItem('eleves_valides_storage');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-              eleves = parsed;
-            }
-          }
-        } catch {}
-      }
+      console.log('🔄 Chargement des élèves validés...');
+      const eleves = await ValidationService.getElevesValides();
+      console.log('📊 Élèves validés récupérés:', eleves.length);
+      console.log('📋 Liste des élèves:', eleves);
       const stats = await ValidationService.getStatistiquesElevesValides();
+      console.log('📊 Statistiques:', stats);
       setElevesValides(eleves);
       setStatistiques(stats);
-    } catch (error) {
-      console.error('Erreur lors du chargement des élèves validés:', error);
+    } catch (error: any) {
+      console.error('❌ Erreur lors du chargement des élèves validés:', error);
+      console.error('📋 Détails de l\'erreur:', {
+        message: error?.message,
+        stack: error?.stack
+      });
+      setElevesValides([]);
+      setStatistiques(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredStudents = elevesValides.filter(eleve =>
-    eleve.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    eleve.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    eleve.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredStudents = elevesValides.filter(eleve => {
+    const firstName = eleve.firstName?.toLowerCase() || '';
+    const lastName = eleve.lastName?.toLowerCase() || '';
+    const email = eleve.email?.toLowerCase() || '';
+    const search = searchTerm.toLowerCase();
+    
+    return firstName.includes(search) || 
+           lastName.includes(search) || 
+           email.includes(search);
+  });
+
+  // Log pour débogage
+  useEffect(() => {
+    console.log('🔍 État de StudentsTable:');
+    console.log('  - Élèves validés:', elevesValides.length);
+    console.log('  - Élèves filtrés:', filteredStudents.length);
+    console.log('  - Terme de recherche:', searchTerm);
+    console.log('  - Données:', elevesValides);
+  }, [elevesValides, filteredStudents, searchTerm]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -203,12 +238,27 @@ const StudentsTable: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredStudents.length === 0 ? (
+            {loading ? (
               <TableRow>
                 <TableCell colSpan={8} align="center">
                   <Typography variant="body2" color="text.secondary">
-                    Aucun élève validé trouvé
+                    Chargement...
                   </Typography>
+                </TableCell>
+              </TableRow>
+            ) : filteredStudents.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} align="center">
+                  <Typography variant="body2" color="text.secondary">
+                    {elevesValides.length === 0 
+                      ? 'Aucun élève validé trouvé. Les dossiers avec statut "valide" apparaîtront ici.' 
+                      : `Aucun élève ne correspond à "${searchTerm}"`}
+                  </Typography>
+                  {elevesValides.length === 0 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                      Vérifiez la console pour voir les détails de la récupération des données.
+                    </Typography>
+                  )}
                 </TableCell>
               </TableRow>
             ) : (

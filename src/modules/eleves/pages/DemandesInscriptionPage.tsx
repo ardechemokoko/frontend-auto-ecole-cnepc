@@ -37,10 +37,12 @@ const DemandesInscriptionPage: React.FC = () => {
     setSelectedCandidat(null);
   };
 
-  const handleValidationSuccess = () => {
-    console.log('Demande validée avec succès - l\'élève a été transféré vers StudentsTable');
-    // Rafraîchir la liste des demandes pour supprimer la demande validée
+  const handleValidationSuccess = (eleveValide: any) => {
+    console.log('✅ Demande validée avec succès - l\'élève a été transféré vers StudentsTable:', eleveValide);
+    // Rafraîchir la liste des demandes pour cacher la demande validée
     setRefreshTrigger(prev => prev + 1);
+    // Note: StudentsTable se rafraîchira automatiquement quand on y navigue
+    // car il appelle getElevesValides() qui récupère depuis le stockage local
   };
 
   const handleDeleteSuccess = () => {

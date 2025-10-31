@@ -1,4 +1,7 @@
 import { DemandeInscription } from '../types/inscription';
+import axiosClient from '../../../shared/environment/envdev';
+import { autoEcoleService } from '../../cnepc/services/auto-ecole.service';
+import { getAutoEcoleId } from '../../../shared/utils/autoEcoleUtils';
 
 // Interface pour un élève validé
 export interface EleveValide {
@@ -25,21 +28,6 @@ export interface EleveValide {
 
 // Service de validation des demandes
 export class ValidationService {
-  private static elevesValides: EleveValide[] = [];
-  private static demandesValidees: string[] = []; // IDs des demandes validées
-  private static readonly STORAGE_KEY = 'eleves_valides_storage';
-
-  private static loadFromStorage() {
-    try {
-      const raw = localStorage.getItem(this.STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          this.elevesValides = parsed;
-        }
-      }
-    } catch {}
-  }
 
   // Envoyer un dossier au CNEPC (programmation de session)
   static async envoyerAuCNEPC(payload: { dossier_id: string; date_examen: string }): Promise<any> {
@@ -86,147 +74,302 @@ export class ValidationService {
     }
   }
 
-  private static saveToStorage() {
+  // Valider une demande via l'API en mettant à jour le statut du dossier
+  static async validerDemande(demande: DemandeInscription): Promise<EleveValide> {
     try {
-      // Sanitize non-serializable fields (e.g., File) before saving
-      const serializable = this.elevesValides.map(e => ({
-        ...e,
-        originalDocuments: (e.originalDocuments || []).map((d: any) => {
-          const { file, ...rest } = d || {};
-          return rest; // drop File reference
-        })
-      }));
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(serializable));
-    } catch {}
+      // Appeler l'API pour mettre à jour le statut du dossier vers "valide"
+      const response = await axiosClient.put(`/dossiers/${demande.id}`, {
+        statut: 'valide'
+      });
+
+      if (response.data.success && response.data.data) {
+        const dossier = response.data.data;
+        
+        // Mapper le dossier mis à jour vers EleveValide
+        const candidat = dossier.candidat;
+        const personne = candidat?.personne || {};
+        
+    const nouvelEleve: EleveValide = {
+          id: `eleve-${dossier.id}`,
+          firstName: personne.prenom || demande.eleve.firstName,
+          lastName: personne.nom || demande.eleve.lastName,
+          email: personne.email || demande.eleve.email,
+          phone: personne.contact || demande.eleve.phone,
+          address: personne.adresse || demande.eleve.address,
+          birthDate: candidat?.date_naissance || demande.eleve.birthDate,
+          lieuNaissance: candidat?.lieu_naissance || demande.eleve.lieuNaissance,
+          nationality: candidat?.nationalite || demande.eleve.nationality,
+      nationaliteEtrangere: demande.eleve.nationaliteEtrangere,
+      status: 'validated',
+          documentsCount: dossier.documents?.length || demande.documents?.length || 0,
+      validatedAt: new Date().toISOString(),
+          demandeId: dossier.id,
+          originalDocuments: dossier.documents || demande.documents || [],
+          autoEcole: dossier.auto_ecole ? {
+            id: dossier.auto_ecole.id,
+            name: dossier.auto_ecole.nom_auto_ecole || demande.autoEcole.name
+          } : demande.autoEcole
+        };
+
+        console.log('✅ Demande validée via API et transférée vers les élèves validés:', nouvelEleve);
+        return nouvelEleve;
+      }
+
+      throw new Error('Erreur lors de la validation de la demande');
+    } catch (error: any) {
+      console.error('❌ Erreur lors de la validation de la demande:', error);
+      throw new Error(error?.response?.data?.message || error?.message || 'Erreur lors de la validation de la demande');
+    }
   }
 
-  private static getUploadedDocsForDemande(demandeId: string): any[] {
+  // Récupérer tous les élèves validés (dossiers avec statut "valide" depuis l'API)
+  // Utilise la même méthode que DemandesInscriptionTable.tsx
+  static async getElevesValides(): Promise<EleveValide[]> {
     try {
-      const raw = localStorage.getItem(`candidat_docs_${demandeId}`);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
+      console.log('🔄 Chargement des élèves validés via autoEcoleService...');
+      
+      // Récupérer l'ID de l'auto-école (même méthode que DemandesInscriptionTable.tsx)
+      const autoEcoleId = getAutoEcoleId();
+      
+      if (!autoEcoleId) {
+        console.warn('⚠️ Aucun ID d\'auto-école trouvé');
+        return [];
+      }
+      
+      console.log('🏫 Auto-école ID:', autoEcoleId);
+      
+      // Utiliser la même méthode que DemandesInscriptionTable.tsx : getDossiersByAutoEcoleId
+      // avec filtre statut: 'valide'
+      const filters = {
+        statut: 'valide' as any
+      };
+      
+      console.log('🔍 Filtres envoyés à l\'API:', filters);
+      
+      const response = await autoEcoleService.getDossiersByAutoEcoleId(autoEcoleId, filters);
+      
+      console.log('📦 Dossiers récupérés depuis l\'API:', response.dossiers?.length || 0);
+      console.log('📋 Structure de la réponse:', response);
+      
+      if (!response.dossiers || response.dossiers.length === 0) {
+        console.log('⚠️ Aucun dossier validé trouvé pour cette auto-école');
+        return [];
+      }
+      
+      // Récupérer les vraies données complètes de chaque dossier (comme dans DemandesInscriptionTable.tsx)
+      console.log('🔄 Récupération des vraies données depuis l\'API pour chaque dossier...');
+      
+      const dossiersComplets = await Promise.all(
+        response.dossiers.map(async (dossier: any) => {
+          try {
+            console.log(`📋 Récupération des vraies données du dossier ${dossier.id}...`);
+            const dossierComplet = await autoEcoleService.getDossierById(dossier.id);
+            console.log(`✅ Dossier ${dossier.id} avec vraies données récupéré`);
+            return dossierComplet;
+          } catch (error) {
+            console.error(`❌ Erreur lors de la récupération du dossier ${dossier.id}:`, error);
+            // Retourner le dossier original en cas d'erreur
+            return dossier;
+          }
+        })
+      );
+      
+      console.log(`📊 ${dossiersComplets.length} dossier(s) complet(s) récupéré(s) avec statut "valide"`);
+      
+      // Mapper les dossiers vers EleveValide (même structure que DemandesInscriptionTable.tsx)
+      const elevesValides = dossiersComplets.map((dossier: any, index: number) => {
+        const candidat = dossier.candidat;
+        const personne = candidat?.personne || {};
+        
+        const eleveValide = {
+          id: `eleve-${dossier.id}`,
+          firstName: personne.prenom || '',
+          lastName: personne.nom || '',
+          email: personne.email || '',
+          phone: personne.contact || '',
+          address: personne.adresse || '',
+          birthDate: candidat?.date_naissance || null,
+          lieuNaissance: candidat?.lieu_naissance || null,
+          nationality: candidat?.nationalite || '',
+          nationaliteEtrangere: candidat?.nationalite_etrangere || undefined,
+          status: 'validated' as const,
+          documentsCount: dossier.documents?.length || 0,
+          validatedAt: dossier.updated_at || dossier.created_at || new Date().toISOString(),
+          demandeId: dossier.id,
+          originalDocuments: dossier.documents || [],
+          autoEcole: dossier.auto_ecole ? {
+            id: dossier.auto_ecole.id || dossier.auto_ecole_id || '',
+            name: dossier.auto_ecole.nom_auto_ecole || ''
+          } : { id: dossier.auto_ecole_id || '', name: '' }
+        };
+        
+        console.log(`✅ Élève ${index + 1} mappé:`, eleveValide);
+        
+        return eleveValide;
+      });
+
+      console.log(`✅ ${elevesValides.length} élève(s) validé(s) retourné(s)`);
+      return elevesValides;
+    } catch (error: any) {
+      console.error('❌ Erreur lors de la récupération des élèves validés:', error);
+      console.error('📋 Détails de l\'erreur:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status
+      });
+      throw new Error(error?.response?.data?.message || error?.message || 'Erreur lors de la récupération des élèves validés');
+    }
+  }
+
+  // Récupérer un élève validé par ID (via l'API)
+  static async getEleveValideById(id: string): Promise<EleveValide | null> {
+    try {
+      // Extraire l'ID du dossier depuis l'ID de l'élève (format: eleve-{dossierId})
+      const dossierId = id.replace('eleve-', '');
+      const response = await axiosClient.get(`/dossiers/${dossierId}`);
+      
+      if (response.data.success && response.data.data) {
+        const dossier = response.data.data;
+        const candidat = dossier.candidat;
+        const personne = candidat?.personne || {};
+        
+        return {
+          id: `eleve-${dossier.id}`,
+          firstName: personne.prenom || '',
+          lastName: personne.nom || '',
+          email: personne.email || '',
+          phone: personne.contact || '',
+          address: personne.adresse || '',
+          birthDate: candidat?.date_naissance,
+          lieuNaissance: candidat?.lieu_naissance,
+          nationality: candidat?.nationalite || '',
+          nationaliteEtrangere: undefined,
+          status: 'validated',
+          documentsCount: dossier.documents?.length || 0,
+          validatedAt: dossier.updated_at || dossier.created_at || new Date().toISOString(),
+          demandeId: dossier.id,
+          originalDocuments: dossier.documents || [],
+          autoEcole: dossier.auto_ecole ? {
+            id: dossier.auto_ecole.id,
+            name: dossier.auto_ecole.nom_auto_ecole || ''
+          } : { id: '', name: '' }
+        };
+      }
+      
+      return null;
+    } catch (error: any) {
+      console.error('Erreur lors de la récupération de l\'élève:', error);
+      if (error?.response?.status === 404) {
+        return null;
+      }
+      throw new Error(error?.response?.data?.message || error?.message || 'Erreur lors de la récupération de l\'élève');
+    }
+  }
+
+  // Supprimer un élève validé (en changeant le statut du dossier)
+  static async supprimerEleveValide(id: string): Promise<boolean> {
+    try {
+      // Extraire l'ID du dossier depuis l'ID de l'élève
+      const dossierId = id.replace('eleve-', '');
+      // Remettre le statut à "en_attente" ou supprimer le dossier
+      await axiosClient.put(`/dossiers/${dossierId}`, {
+        statut: 'en_attente'
+      });
+      console.log('✅ Élève supprimé (statut remis à en_attente):', id);
+      return true;
+    } catch (error: any) {
+      console.error('Erreur lors de la suppression de l\'élève:', error);
+      throw new Error(error?.response?.data?.message || error?.message || 'Erreur lors de la suppression de l\'élève');
+    }
+  }
+
+  // Mettre à jour un élève validé (via l'API)
+  static async mettreAJourEleveValide(id: string, updates: Partial<EleveValide>): Promise<EleveValide | null> {
+    try {
+      // Extraire l'ID du dossier depuis l'ID de l'élève
+      const dossierId = id.replace('eleve-', '');
+      // Mettre à jour le dossier
+      const response = await axiosClient.put(`/dossiers/${dossierId}`, updates);
+      
+      if (response.data.success && response.data.data) {
+        const dossier = response.data.data;
+        const candidat = dossier.candidat;
+        const personne = candidat?.personne || {};
+        
+        return {
+          id: `eleve-${dossier.id}`,
+          firstName: personne.prenom || '',
+          lastName: personne.nom || '',
+          email: personne.email || '',
+          phone: personne.contact || '',
+          address: personne.adresse || '',
+          birthDate: candidat?.date_naissance,
+          lieuNaissance: candidat?.lieu_naissance,
+          nationality: candidat?.nationalite || '',
+          nationaliteEtrangere: undefined,
+          status: 'validated',
+          documentsCount: dossier.documents?.length || 0,
+          validatedAt: dossier.updated_at || dossier.created_at || new Date().toISOString(),
+          demandeId: dossier.id,
+          originalDocuments: dossier.documents || [],
+          autoEcole: dossier.auto_ecole ? {
+            id: dossier.auto_ecole.id,
+            name: dossier.auto_ecole.nom_auto_ecole || ''
+          } : { id: '', name: '' }
+        };
+      }
+      
+      return null;
+    } catch (error: any) {
+      console.error('Erreur lors de la mise à jour de l\'élève:', error);
+      throw new Error(error?.response?.data?.message || error?.message || 'Erreur lors de la mise à jour de l\'élève');
+    }
+  }
+
+  // Récupérer les IDs des demandes validées (depuis l'API)
+  static async getDemandesValidees(): Promise<string[]> {
+    try {
+      const response = await axiosClient.get('/dossiers', {
+        params: {
+          statut: 'valide'
+        }
+      });
+      
+      if (response.data.success && response.data.dossiers) {
+        const dossiers = Array.isArray(response.data.dossiers) 
+          ? response.data.dossiers 
+          : [response.data.dossiers];
+        return dossiers.map((d: any) => d.id);
+      }
+      
+      return [];
+    } catch (error: any) {
+      console.error('Erreur lors de la récupération des demandes validées:', error);
       return [];
     }
   }
 
-  // Valider une demande et la transférer vers les élèves validés
-  static async validerDemande(demande: DemandeInscription): Promise<EleveValide> {
-    // Charger état persistant
-    this.loadFromStorage();
-
-    // Récupérer les documents uploadés côté candidat (persistés)
-    const uploadedDocs = this.getUploadedDocsForDemande(demande.id);
-    const mergedDocuments = [...(demande.documents || []), ...uploadedDocs];
-    // Créer un nouvel élève validé à partir de la demande
-    const nouvelEleve: EleveValide = {
-      id: `eleve-${Date.now()}`,
-      firstName: demande.eleve.firstName,
-      lastName: demande.eleve.lastName,
-      email: demande.eleve.email,
-      phone: demande.eleve.phone,
-      address: demande.eleve.address,
-      birthDate: demande.eleve.birthDate,
-      lieuNaissance: demande.eleve.lieuNaissance,
-      nationality: demande.eleve.nationality,
-      nationaliteEtrangere: demande.eleve.nationaliteEtrangere,
-      status: 'validated',
-      documentsCount: mergedDocuments.length,
-      validatedAt: new Date().toISOString(),
-      demandeId: demande.id,
-      originalDocuments: mergedDocuments, // Transmettre tous les documents (origine + uploadés)
-      autoEcole: demande.autoEcole
-    };
-
-    // Ajouter à la liste des élèves validés
-    this.elevesValides.push(nouvelEleve);
-    this.saveToStorage();
-
-    // Marquer la demande comme validée
-    this.demandesValidees.push(demande.id);
-
-    // Mettre à jour le dossier dans auto_ecole_info (localStorage) pour refléter l'envoi
-    try {
-      const autoRaw = localStorage.getItem('auto_ecole_info');
-      if (autoRaw) {
-        const autoData = JSON.parse(autoRaw);
-        if (autoData && Array.isArray(autoData.dossiers)) {
-          autoData.dossiers = autoData.dossiers.map((d: any) => {
-            if (d.id === demande.id) {
-              return {
-                ...d,
-                statut: 'eleve_inscrit',
-                documents: mergedDocuments,
-                date_modification: new Date().toISOString(),
-              };
-            }
-            return d;
-          });
-          localStorage.setItem('auto_ecole_info', JSON.stringify(autoData));
-        }
-      }
-    } catch {}
-
-    // Simuler une mise à jour de la demande (marquer comme validée)
-    console.log('Demande validée et transférée:', nouvelEleve);
-
-    return nouvelEleve;
+  // Vérifier si une demande a été validée (via l'API)
+  static isDemandeValideeLocal(demandeId: string): boolean {
+    // Cette méthode est toujours utilisée localement pour éviter les appels API répétés
+    // On peut la garder mais elle ne sera pas exacte à 100%
+    // Pour une vérification exacte, il faudrait appeler l'API
+    return false; // Retourner false par défaut, le filtrage se fera via l'API
   }
 
-  // Récupérer tous les élèves validés
-  static async getElevesValides(): Promise<EleveValide[]> {
-    this.loadFromStorage();
-    return [...this.elevesValides];
-  }
-
-  // Récupérer un élève validé par ID
-  static async getEleveValideById(id: string): Promise<EleveValide | null> {
-    return this.elevesValides.find(eleve => eleve.id === id) || null;
-  }
-
-  // Supprimer un élève validé
-  static async supprimerEleveValide(id: string): Promise<boolean> {
-    const index = this.elevesValides.findIndex(eleve => eleve.id === id);
-    if (index !== -1) {
-      this.elevesValides.splice(index, 1);
-      this.saveToStorage();
-      return true;
-    }
-    return false;
-  }
-
-  // Mettre à jour un élève validé
-  static async mettreAJourEleveValide(id: string, updates: Partial<EleveValide>): Promise<EleveValide | null> {
-    const index = this.elevesValides.findIndex(eleve => eleve.id === id);
-    if (index !== -1) {
-      this.elevesValides[index] = { ...this.elevesValides[index], ...updates };
-      this.saveToStorage();
-      return this.elevesValides[index];
-    }
-    return null;
-  }
-
-  // Vérifier si une demande a été validée
-  static async isDemandeValidee(demandeId: string): Promise<boolean> {
-    return this.demandesValidees.includes(demandeId);
-  }
-
-  // Récupérer les IDs des demandes validées
-  static async getDemandesValidees(): Promise<string[]> {
-    return [...this.demandesValidees];
-  }
-
-  // Obtenir les statistiques des élèves validés
+  // Obtenir les statistiques des élèves validés (depuis l'API)
   static async getStatistiquesElevesValides(): Promise<{
     total: number;
     valides: number;
     documentsComplets: number;
     documentsIncomplets: number;
   }> {
-    const total = this.elevesValides.length;
-    const valides = this.elevesValides.filter(eleve => eleve.status === 'validated').length;
-    const documentsComplets = this.elevesValides.filter(eleve => eleve.documentsCount >= 4).length;
+    try {
+      // Calculer depuis la liste des élèves validés
+      const eleves = await this.getElevesValides();
+      const total = eleves.length;
+      const valides = eleves.filter(eleve => eleve.status === 'validated').length;
+      const documentsComplets = eleves.filter(eleve => eleve.documentsCount >= 4).length;
     const documentsIncomplets = total - documentsComplets;
 
     return {
@@ -235,6 +378,15 @@ export class ValidationService {
       documentsComplets,
       documentsIncomplets
     };
+    } catch (error: any) {
+      console.error('Erreur lors de la récupération des statistiques:', error);
+      return {
+        total: 0,
+        valides: 0,
+        documentsComplets: 0,
+        documentsIncomplets: 0
+      };
+    }
   }
 }
 

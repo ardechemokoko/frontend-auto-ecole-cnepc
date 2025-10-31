@@ -694,6 +694,37 @@ export class AutoEcoleService {
       throw error;
     }
   }
+
+  /**
+   * Récupère tous les dossiers de l'auto-école connectée
+   */
+  async getMesDossiers(): Promise<any[]> {
+    try {
+      console.log('📋 Récupération des dossiers de l\'auto-école connectée...');
+      const response = await axiosClient.get('/auto-ecoles/mes-dossiers');
+      
+      console.log('✅ Réponse /auto-ecoles/mes-dossiers:', response.data);
+      
+      if (response.data?.success && Array.isArray(response.data.data)) {
+        return response.data.data;
+      } else if (Array.isArray(response.data)) {
+        return response.data;
+      } else {
+        console.warn('⚠️ Format de réponse inattendu:', response.data);
+        return [];
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur lors de la récupération des dossiers:', error);
+      console.error('🔴 Status HTTP:', error.response?.status);
+      console.error('🔴 Message:', error.message);
+      
+      if (error.response?.data) {
+        console.error('📋 Réponse du backend:', JSON.stringify(error.response.data, null, 2));
+      }
+      
+      throw error;
+    }
+  }
 }
 
 // Instance singleton du service

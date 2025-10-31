@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Button, Divider, Drawer, IconButton, MenuItem, Select, SelectChangeEvent, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, Divider, Drawer, IconButton, MenuItem, Select, SelectChangeEvent, Stack, TextField, Typography, Chip } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { ReceptionDossier, EpreuvesResultat, EpreuveAttempt, EpreuveStatut } from '../types';
 import { receptionService } from '../services/reception.service';
@@ -13,27 +13,63 @@ interface EpreuveSheetProps {
 
 const MAX_ATTEMPTS = 3;
 
+/**
+ * Calcule le statut d'une épreuve en fonction de ses tentatives
+ * - Réussi : si au moins une tentative est réussie (peu importe l'ordre) → épreuve validée
+ * - Échoué : si 3 tentatives ont été faites et aucune n'est réussie
+ * - Absent : si la dernière tentative non "non_saisi" est absente (et pas encore échoué/réussi)
+ * - Non saisi : si aucune tentative ou toutes les tentatives sont "non_saisi"
+ */
 function computeOverall(attempts?: EpreuveAttempt[], legacy?: EpreuveStatut): EpreuveStatut {
+  // Si un statut legacy existe et n'est pas "non_saisi", le retourner
   if (legacy && legacy !== 'non_saisi') return legacy;
+  
+  // Si pas de tentatives, retourner "non_saisi"
   if (!attempts || attempts.length === 0) return 'non_saisi';
+  
+  // Si au moins une tentative est réussie, l'épreuve est réussie (peu importe l'ordre) → épreuve validée
   if (attempts.some(a => a.result === 'reussi')) return 'reussi';
-  if (attempts.length >= MAX_ATTEMPTS && attempts.every(a => a.result !== 'reussi')) return 'echoue';
-  return attempts[attempts.length - 1].result;
+  
+  // Filtrer les tentatives qui ne sont pas "non_saisi" pour le calcul
+  const validAttempts = attempts.filter(a => a.result !== 'non_saisi');
+  
+  // Si on a épuisé les 3 tentatives et qu'aucune n'est réussie, l'épreuve est échouée
+  if (attempts.length >= MAX_ATTEMPTS && validAttempts.length > 0 && validAttempts.every(a => a.result !== 'reussi')) {
+    return 'echoue';
+  }
+  
+  // Si on a des tentatives avec des résultats valides, retourner le résultat de la dernière tentative valide
+  if (validAttempts.length > 0) {
+    return validAttempts[validAttempts.length - 1].result;
+  }
+  
+  // Sinon, toutes les tentatives sont "non_saisi"
+  return 'non_saisi';
 }
 
-// Résultat général en fonction des trois épreuves
+/**
+ * Calcule le résultat global en fonction des trois épreuves
+ * - Validé (reussi) : toutes les épreuves sont réussies
+ * - Échoué (echoue) : au moins une épreuve est échouée
+ * - Absent : au moins une épreuve est absente et aucune n'est échouée
+ * - Non saisi : en cours de saisie ou aucune donnée suffisante
+ */
 function computeGeneral(
   creneaux: EpreuveStatut,
   codeConduite: EpreuveStatut,
   tourVille: EpreuveStatut
 ): EpreuveStatut {
   const statuses: EpreuveStatut[] = [creneaux, codeConduite, tourVille];
+  
   // Réussi uniquement si toutes les épreuves sont réussies
   if (statuses.every(s => s === 'reussi')) return 'reussi';
+  
   // Échoué si au moins une épreuve est échouée
   if (statuses.some(s => s === 'echoue')) return 'echoue';
+  
   // Absent si on a au moins un absent et aucune échoue et pas toutes réussies
   if (statuses.some(s => s === 'absent')) return 'absent';
+  
   // Sinon non saisi (en cours / aucune donnée suffisante)
   return 'non_saisi';
 }
@@ -52,8 +88,8 @@ const EpreuveRow: React.FC<{
         <Button
           size="small"
           variant="outlined"
-          disabled={disabled || attempts.length >= MAX_ATTEMPTS}
-          onClick={() => onAdd({ result: 'echoue', date: new Date().toISOString() })}
+          disabled={disabled || attempts.length >= MAX_ATTEMPTS || attempts.some(a => a.result === 'reussi')}
+          onClick={() => onAdd({ result: 'non_saisi' as EpreuveStatut, date: new Date().toISOString() })}
         >
           Ajouter tentative
         </Button>
@@ -64,11 +100,12 @@ const EpreuveRow: React.FC<{
             <Typography variant="caption" sx={{ width: 60 }}>Tentative {idx + 1}</Typography>
             <Select
               size="small"
-              value={a.result}
+              value={a.result || 'non_saisi'}
               onChange={(e: SelectChangeEvent) => onChange(idx, { ...a, result: e.target.value as any })}
               sx={{ width: 160 }}
               disabled={disabled}
             >
+              <MenuItem value="non_saisi">Non saisi</MenuItem>
               <MenuItem value="reussi">Réussi</MenuItem>
               <MenuItem value="echoue">Échoué</MenuItem>
               <MenuItem value="absent">Absent</MenuItem>
@@ -152,13 +189,49 @@ const EpreuveSheet: React.FC<EpreuveSheetProps> = ({ open, onClose, dossier, onS
     }
   };
 
+  // Calculer les statuts individuels de chaque épreuve (recalculé à chaque rendu)
   const overallCreneaux = computeOverall(values.creneauxAttempts, values.creneaux);
   const overallCode = computeOverall(values.codeConduiteAttempts, values.codeConduite);
   const overallVille = computeOverall(values.tourVilleAttempts, values.tourVille);
-  const creneauxLocked = overallCreneaux === 'reussi';
-  const codeLocked = overallCode === 'reussi';
-  const villeLocked = overallVille === 'reussi';
+  
+  // Verrouiller une épreuve si :
+  // - Au moins une tentative a réussi (l'épreuve est validée, on ne la repasse plus)
+  // - OU si l'épreuve est échouée (3 tentatives sans réussite)
+  const shouldLockEpreuve = (attempts: EpreuveAttempt[] | undefined, status: EpreuveStatut): boolean => {
+    if (!attempts || attempts.length === 0) return false;
+    
+    // Si au moins une tentative a réussi, verrouiller immédiatement (épreuve validée)
+    if (attempts.some(a => a.result === 'reussi')) return true;
+    
+    // Si échoué (3 tentatives sans réussite), verrouiller aussi
+    if (status === 'echoue') return true;
+    
+    return false;
+  };
+  
+  const creneauxLocked = shouldLockEpreuve(values.creneauxAttempts, overallCreneaux);
+  const codeLocked = shouldLockEpreuve(values.codeConduiteAttempts, overallCode);
+  const villeLocked = shouldLockEpreuve(values.tourVilleAttempts, overallVille);
+  
+  // Calculer le résultat général (recalculé automatiquement à chaque changement)
   const overallGeneral = computeGeneral(overallCreneaux, overallCode, overallVille);
+
+  // Fonction pour obtenir le libellé et la couleur du statut global
+  const getStatutGlobalInfo = (statut: EpreuveStatut) => {
+    switch (statut) {
+      case 'reussi':
+        return { label: 'Validé', color: 'success' as const };
+      case 'echoue':
+        return { label: 'Échoué', color: 'error' as const };
+      case 'absent':
+        return { label: 'Absent', color: 'warning' as const };
+      case 'non_saisi':
+      default:
+        return { label: 'Non saisi', color: 'default' as const };
+    }
+  };
+
+  const statutGlobalInfo = getStatutGlobalInfo(overallGeneral);
 
   return (
     <Drawer
@@ -188,8 +261,31 @@ const EpreuveSheet: React.FC<EpreuveSheetProps> = ({ open, onClose, dossier, onS
       <Divider />
       <Box sx={{ p: 2, display: 'grid', gap: 3 }}>
         <Box>
-          <Typography variant="subtitle1">Résultat général</Typography>
-          <Typography variant="body1" color="text.primary">{overallGeneral}</Typography>
+          <Typography variant="subtitle1" gutterBottom>Résultat global</Typography>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Chip
+              label={statutGlobalInfo.label}
+              color={statutGlobalInfo.color}
+              size="medium"
+              variant={overallGeneral === 'non_saisi' ? 'outlined' : 'filled'}
+            />
+            <Typography variant="body2" color="text.secondary">
+              ({overallGeneral})
+            </Typography>
+          </Stack>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            {overallGeneral === 'reussi' && '✅ Toutes les épreuves sont validées'}
+            {overallGeneral === 'echoue' && '❌ Au moins une épreuve est échouée'}
+            {overallGeneral === 'absent' && '⚠️ Au moins un candidat est absent'}
+            {overallGeneral === 'non_saisi' && '📝 En attente de saisie des résultats'}
+          </Typography>
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              <strong>Créneaux:</strong> {overallCreneaux} | 
+              <strong> Code:</strong> {overallCode} | 
+              <strong> Tour de ville:</strong> {overallVille}
+            </Typography>
+          </Box>
         </Box>
         <Divider />
         <EpreuveRow
