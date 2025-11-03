@@ -269,7 +269,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       logout();
       navigate(ROUTES.LOGIN);
     } catch (e) {
-
+      console.log(e);
     }
   };
 
@@ -306,29 +306,28 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
           sx={{
             backgroundColor: '#2A5A9A',
             color: 'white',
-            p: 2.5,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            p: 2,
+            textAlign: 'center',
           }}
         >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
           <Avatar
-            sx={{
-              bgcolor: 'white',
-              width: 40,
-              height: 40,
-            }}
-          >
-            <img
-              src="/src/assets/img/mtt.png"
-              alt="DGTT Gabon"
-              style={{ width: 32, height: 32, objectFit: 'contain' }}
-            />
-          </Avatar>
+                sx={{
+                  bgcolor: 'green',
+                  width: 70,
+                  height: 70,
+                  fontWeight: '2rem',
+                  fontSize: '2.5rem',
+                }}
+              >
+                {user?.name?.charAt(0) || 'U'}
+              </Avatar>
+          </Box>
+          
           {open && (
             <Box sx={{ ml: 1, minWidth: 0, transition: 'all 0.3s ease-in-out' }}>
               <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'white' }}>
-                DGTT Gabon
+                 {user?.name || 'Utilisateur'}
               </Typography>
               <Typography variant="caption" sx={{ color: 'white', opacity: 0.8 }}>
                 Espace Administration
@@ -336,6 +335,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
             </Box>
           )}
         </Box>
+      
 
         {/* Navigation */}
         <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
@@ -800,36 +800,6 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
 
         {/* User Info & Actions */}
         <Box sx={{ mt: 'auto' }}>
-          {/* User Info */}
-          <Box
-            sx={{
-              backgroundColor: '#1A4A8A',
-              color: 'white',
-              p: 2,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Avatar
-                sx={{
-                  bgcolor: 'green',
-                  width: 32,
-                  height: 32,
-                }}
-              >
-                {user?.name?.charAt(0) || 'U'}
-              </Avatar>
-              {open && (
-                <Box sx={{ minWidth: 0, flex: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'white' }}>
-                    {user?.name || 'Utilisateur'}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                   {user?.role}
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </Box>
 
           {/* Logout Button */}
           <Box
