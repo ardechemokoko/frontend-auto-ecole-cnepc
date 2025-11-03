@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Button, TextField, Typography, Box, Alert, CircularProgress } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, CircularProgress, Link, TextField, Typography } from '@mui/material';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../../../shared/constants';
 import { useAppStore } from '../../../store';
-import { authService } from '../services/authService';
 import { tokenService } from '../services';
+import { authService } from '../services/authService';
+
 import { User, MeResponse } from '../types';
 import { AutoEcoleDetailResponse } from '../../cnepc/types/auto-ecole';
-import { ROUTES } from '../../../shared/constants';
+
 
 interface LoginFormData {
   email: string;
@@ -194,23 +196,34 @@ const LoginForm: React.FC = () => {
         }
       }
 
-      login(user, token);
-      setMessage({ type: 'success', text: 'Connexion réussie !' });
-      tokenService.setAuthData(token, user);
+      // login(user, token);
+      // setMessage({ type: 'success', text: 'Connexion réussie !' });
+      // tokenService.setAuthData(token, user);
+   
+      if (user.role !== 'candidat') {
+        login(user, token);
+        setMessage({ type: 'success', text: 'Connexion réussie !' });
+        tokenService.setAuthData(token, user);
 
+        console.log('✅ Token sauvegardé dans localStorage avec la clé "access_token"');
       console.log('✅ Token sauvegardé dans localStorage avec la clé "access_token"');
       console.log('✅ Rôle utilisateur vérifié:', user.role);
       if (autoEcoleInfo) {
         console.log('✅ Informations auto-école sauvegardées');
       }
 
-      // Redirection vers le dashboard après connexion réussie
-      setTimeout(() => {
-        navigate(ROUTES.DASHBOARD);
-      }, 1000);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
-      setMessage({ type: 'error', text: errorMessage });
+        // Redirection vers le dashboard après connexion réussie
+        setTimeout(() => {
+          navigate(ROUTES.DASHBOARD);
+        }, 1000);
+      }else{
+        setMessage({ type: 'error', text: 'Accès refusé. Vous n\'êtes pas autorisé à accéder à cette application.' });
+        tokenService.clearAll()
+        //authService.logoutBackEnd();
+      }
+
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message || 'Erreur de connexion' });
     } finally {
       setLoading(false);
     }
