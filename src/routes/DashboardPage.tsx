@@ -56,7 +56,7 @@ const [user, setUser]= useState();
                       whiteSpace: 'nowrap'
                     }}
                   >
-                    Vue d'ensemble
+                    Vue d'ensembles
                   </Typography>
                   <Typography 
                     variant="body2" 

@@ -18,246 +18,336 @@ import {
   MenuItem,
   Grid,
   Card,
-  CardContent
+  CardContent,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
+  Alert,
+  Snackbar
 } from '@mui/material';
 // Heroicons imports
-import { EyeIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon, CurrencyDollarIcon, IdentificationIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { DemandeInscription, FiltresDemandes, StatistiquesDemandes } from '../types/inscription';
-import { getAutoEcoleInfo, getAutoEcoleId, getAutoEcoleDossiers } from '../../../shared/utils/autoEcoleUtils';
-import { candidatsService, CandidatApiItem } from '../services/candidats.service';
-import { formationsService, FormationApiItem } from '../services/formations.service';
+// Import des utilitaires pour récupérer l'ID de l'auto-école
+import { getAutoEcoleId } from '../../../shared/utils/autoEcoleUtils';
+import { autoEcoleService } from '../../cnepc/services/auto-ecole.service';
+import ValidationService from '../services/validationService';
 
 interface DemandesInscriptionTableProps {
   onCandidatSelect?: (candidat: DemandeInscription) => void;
   refreshTrigger?: number; // Pour forcer le rafraîchissement
+  onDelete?: () => void; // Callback après suppression réussie
+  autoEcoleId?: string; // ID de l'auto-école pour récupérer les dossiers
+  formationId?: string; // ID de la formation pour filtrer les dossiers (optionnel)
 }
 
-const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onCandidatSelect, refreshTrigger }) => {
+const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ 
+  onCandidatSelect, 
+  refreshTrigger, 
+  onDelete, 
+  autoEcoleId,
+  formationId 
+}) => {
   const [demandes, setDemandes] = useState<DemandeInscription[]>([]);
   const [statistiques, setStatistiques] = useState<StatistiquesDemandes | null>(null);
   const [loading, setLoading] = useState(true);
   const [filtres, setFiltres] = useState<FiltresDemandes>({});
   const [recherche, setRecherche] = useState('');
-  const [candidats, setCandidats] = useState<CandidatApiItem[]>([]);
-  const [formations, setFormations] = useState<FormationApiItem[]>([]);
-  const [candidatsLoading, setCandidatsLoading] = useState(false);
-  const [formationsLoading, setFormationsLoading] = useState(false);
+  // Suppression des maps de cache local - utilisation directe des données API
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [demandeToDelete, setDemandeToDelete] = useState<DemandeInscription | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+  const [dataSource, setDataSource] = useState<'api' | null>(null);
+  const [currentAutoEcoleId, setCurrentAutoEcoleId] = useState<string | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
-    chargerCandidats();
-    chargerFormations();
     chargerDemandes();
     chargerStatistiques();
-  }, [filtres, refreshTrigger]);
+  }, [filtres, refreshTrigger, autoEcoleId, formationId, currentAutoEcoleId]);
 
-  const chargerCandidats = async () => {
-    try {
-      setCandidatsLoading(true);
-      console.log('👥 Chargement des candidats...');
-      
-      // Récupérer le token depuis le localStorage
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        console.warn('⚠️ Aucun token trouvé pour récupérer les candidats');
-        return;
-      }
-      
-      const response = await candidatsService.getAllCandidats(token);
-      setCandidats(response.data);
-      console.log('✅ Candidats chargés:', response.data.length);
-    } catch (error: any) {
-      console.error('❌ Erreur lors du chargement des candidats:', error);
-      setCandidats([]);
-    } finally {
-      setCandidatsLoading(false);
-    }
-  };
+  // Fonction pour traiter les dossiers (même structure que CandidatsTable)
+  const processDossiers = async (dossiers: any[]) => {
+    console.log('📁 Dossiers trouvés:', dossiers.length);
+    console.log('📋 Premier dossier (exemple):', dossiers[0]);
+    console.log('🔍 Tous les dossiers bruts:', dossiers);
+    
+    // FORCER la récupération des vraies données depuis l'API
+    // pour éviter les données persistantes du localStorage
+    console.log('🔄 Récupération des vraies données depuis l\'API pour chaque dossier...');
+    setLoadingDetails(true);
+    
+    const dossiersComplets = await Promise.all(
+      dossiers.map(async (dossier: any) => {
+        try {
+          console.log(`📋 Récupération des vraies données du dossier ${dossier.id}...`);
+          const dossierComplet = await autoEcoleService.getDossierById(dossier.id);
+          console.log(`✅ Dossier ${dossier.id} avec vraies données:`, dossierComplet);
+          return dossierComplet;
+        } catch (error) {
+          console.error(`❌ Erreur lors de la récupération du dossier ${dossier.id}:`, error);
+          // Retourner le dossier original en cas d'erreur
+          return dossier;
+        }
+      })
+    );
+    
+    console.log('📊 Dossiers avec vraies données récupérés:', dossiersComplets.length);
+    setLoadingDetails(false);
+    
+    // Convertir les dossiers en format DemandeInscription et filtrer les demandes validées
+    const demandesData: DemandeInscription[] = dossiersComplets
+      .filter((dossier: any) => {
+        // Filtrer les dossiers avec statut "valide" (cachés de la liste)
+        // Les dossiers validés sont ceux avec statut "valide" ou "validé"
+        const statut = dossier.statut?.toLowerCase() || '';
+        const isValide = statut === 'valide' || statut === 'validé';
+        if (isValide) {
+          console.log('🚫 Dossier validé filtré:', dossier.id, 'statut:', dossier.statut);
+        }
+        return !isValide;
+      })
+      .map((dossier: any) => {
+      // Mapper le statut vers le format attendu
+      const mapStatut = (statut: string): 'en_attente' | 'en_cours' | 'validee' | 'rejetee' => {
+        switch (statut) {
+          case 'en_attente': return 'en_attente';
+          case 'en_cours': return 'en_cours';
+          case 'valide': return 'validee';
+          case 'rejete': return 'rejetee';
+          default: return 'en_attente';
+        }
+      };
 
-  const chargerFormations = async () => {
-    try {
-      setFormationsLoading(true);
-      console.log('📚 Chargement des formations...');
-      
-      // Récupérer le token depuis le localStorage
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        console.warn('⚠️ Aucun token trouvé pour récupérer les formations');
-        return;
-      }
-      
-      // Récupérer l'ID de l'auto-école connectée
-      const autoEcoleId = getAutoEcoleId();
-      if (!autoEcoleId) {
-        console.warn('⚠️ Aucune auto-école trouvée pour récupérer les formations');
-        return;
-      }
-      
-      const formationsData = await formationsService.getFormationsByAutoEcole(autoEcoleId, token);
-      setFormations(formationsData);
-      console.log('✅ Formations chargées:', formationsData.length);
-    } catch (error: any) {
-      console.error('❌ Erreur lors du chargement des formations:', error);
-      setFormations([]);
-    } finally {
-      setFormationsLoading(false);
+      // Utiliser la structure de données de l'endpoint /dossiers (même que CandidatsTable)
+      const candidat = dossier.candidat;
+      const formation = dossier.formation;
+
+      // Logs de débogage pour la structure des données
+      console.log('🔍 DEBUG Candidat - Dossier ID:', dossier.id);
+      console.log('🔍 DEBUG Candidat - Structure complète:', candidat);
+      console.log('🔍 DEBUG Candidat - Personne:', candidat?.personne);
+      console.log('🔍 DEBUG Candidat - Formation:', formation);
+      console.log('🔍 DEBUG Candidat - Auto-école:', dossier.auto_ecole);
+
+      // Déterminer le nom de la formation (utiliser la structure complète de l'API)
+      const getFormationName = (formation: any) => {
+        // 1. Nom direct de la formation
+        if (formation?.nom && formation.nom.trim()) {
+          return formation.nom;
+        }
+        
+        // 2. Description de la formation
+        if (formation?.description && formation.description.trim()) {
+          return formation.description;
+        }
+        
+        // 3. Type de permis avec libellé (structure complète de l'API)
+        if (formation?.type_permis?.libelle) {
+          return `Formation ${formation.type_permis.libelle}`;
+        }
+        
+        // 4. Type de permis avec nom
+        if (formation?.type_permis?.nom) {
+          return `Formation ${formation.type_permis.nom}`;
+        }
+        
+        // 5. Session avec libellé
+        if (formation?.session?.libelle) {
+          return `Formation ${formation.session.libelle}`;
+        }
+        
+        return 'Formation';
+      };
+
+      const formationNom = getFormationName(formation);
+      const formationMontant = formation?.montant_formate || (formation?.montant ? `${formation.montant} FCFA` : 'N/A');
+
+      // Logs de débogage pour les valeurs extraites
+      console.log('🔍 DEBUG Valeurs extraites:');
+      console.log('  - Prénom:', candidat?.personne?.prenom);
+      console.log('  - Nom:', candidat?.personne?.nom);
+      console.log('  - Email:', candidat?.personne?.email);
+      console.log('  - Contact:', candidat?.personne?.contact);
+      console.log('  - Adresse:', candidat?.personne?.adresse);
+
+      return {
+        id: dossier.id,
+        numero: `DOS-${dossier.id.substring(0, 8).toUpperCase()}`,
+        candidat_id: dossier.candidat_id,
+        personne_id: candidat?.personne_id || null,
+        eleve: {
+          firstName: candidat?.personne?.prenom || '',
+          lastName: candidat?.personne?.nom || '',
+          email: candidat?.personne?.email || '',
+          phone: candidat?.personne?.contact || '',
+          address: candidat?.personne?.adresse || '',
+          birthDate: candidat?.date_naissance || '',
+          nationality: candidat?.nationalite || '',
+          lieuNaissance: candidat?.lieu_naissance || '',
+          nationaliteEtrangere: undefined
+        },
+        autoEcole: {
+          id: dossier.auto_ecole_id,
+          name: dossier.auto_ecole?.nom_auto_ecole || 'Auto-école',
+          email: dossier.auto_ecole?.email || ''
+        },
+        dateDemande: dossier.date_creation || dossier.created_at,
+        statut: mapStatut(dossier.statut),
+        documents: dossier.documents || [],
+        commentaires: dossier.commentaires || '',
+        formation: {
+          id: dossier.formation_id,
+          nom: formationNom,
+          montant: formationMontant,
+          description: formation?.description || ''
+        },
+        etape: dossier.etape ? {
+          id: dossier.etape.id,
+          libelle: dossier.etape.libelle,
+          ordre: dossier.etape.ordre,
+          statut: dossier.etape.statut_systeme
+        } : undefined
+      };
+    });
+    
+    console.log('✅ Demandes transformées:', demandesData.length);
+    console.log('📊 Demandes transformées (détail):', demandesData);
+    
+    // Appliquer les filtres
+    let demandesFiltrees = demandesData;
+    
+    console.log('🔍 Filtres appliqués:', filtres);
+    console.log('📋 Demandes avant filtrage:', demandesFiltrees.length);
+    
+    // Filtrage par formation (côté client)
+    if (formationId) {
+      console.log('🔍 Filtrage par formation ID (côté client):', formationId);
+      demandesFiltrees = demandesFiltrees.filter(d => {
+        const demande = d as any;
+        return demande.formation?.id === formationId;
+      });
+      console.log('📋 Demandes après filtrage formation:', demandesFiltrees.length);
     }
+    
+    if (filtres.statut) {
+      console.log('🔍 Filtrage par statut:', filtres.statut);
+      demandesFiltrees = demandesFiltrees.filter(d => d.statut === filtres.statut);
+      console.log('📋 Demandes après filtrage statut:', demandesFiltrees.length);
+    }
+    
+    if (filtres.recherche) {
+      const recherche = filtres.recherche.toLowerCase();
+      console.log('🔍 Filtrage par recherche:', recherche);
+      demandesFiltrees = demandesFiltrees.filter(d => {
+        const demande = d as any;
+        return (
+          demande.eleve.firstName.toLowerCase().includes(recherche) ||
+          demande.eleve.lastName.toLowerCase().includes(recherche) ||
+          demande.eleve.email.toLowerCase().includes(recherche) ||
+          demande.numero.toLowerCase().includes(recherche)
+        );
+      });
+      console.log('📋 Demandes après filtrage recherche:', demandesFiltrees.length);
+    }
+    
+    console.log('📋 Demandes finales affichées:', demandesFiltrees.length);
+    console.log('📊 Demandes finales (détail):', demandesFiltrees);
+    
+    setDemandes(demandesFiltrees);
   };
 
   const chargerDemandes = async () => {
     try {
       setLoading(true);
-      console.log('📋 Chargement des dossiers de l\'auto-école connectée...');
+      console.log('📋 Chargement des demandes d\'inscription...');
       
-      // Récupérer les informations de l'auto-école depuis le localStorage
-      const autoEcoleInfo = getAutoEcoleInfo();
-      const autoEcoleId = getAutoEcoleId();
+      // Récupérer l'ID de l'auto-école (prop ou depuis localStorage)
+      const resolvedAutoEcoleId = autoEcoleId || getAutoEcoleId();
       
-      if (!autoEcoleInfo || !autoEcoleId) {
-        console.warn('⚠️ Aucune information d\'auto-école trouvée dans le localStorage');
+      if (!resolvedAutoEcoleId) {
+        console.warn('⚠️ Aucun ID d\'auto-école trouvé (ni en prop ni dans localStorage)');
         setDemandes([]);
+        setLoading(false);
         return;
       }
       
-      console.log('🏫 Auto-école connectée:', autoEcoleInfo.nom_auto_ecole, '(ID:', autoEcoleId, ')');
+      // Stocker l'ID résolu pour l'affichage
+      setCurrentAutoEcoleId(resolvedAutoEcoleId);
       
-      // Récupérer les dossiers depuis les informations d'auto-école
-      const dossiersAutoEcole = getAutoEcoleDossiers();
+      console.log('🏫 Chargement des dossiers pour l\'auto-école ID:', resolvedAutoEcoleId);
+      if (formationId) {
+        console.log('📚 Filtrage par formation ID:', formationId);
+      }
       
-      if (dossiersAutoEcole && dossiersAutoEcole.length > 0) {
-        console.log('📁 Dossiers trouvés dans les informations auto-école:', dossiersAutoEcole.length);
+      try {
+        // Utiliser la même méthode que CandidatsTable : getDossiersByAutoEcoleId
+        // Ne pas filtrer par formation côté API pour récupérer tous les dossiers
+        const filters = {
+          statut: filtres.statut as any
+          // formation_id: formationId // Commenté temporairement pour récupérer tous les dossiers
+        };
         
-        // Convertir les dossiers en format DemandeInscription
-        const demandesData: DemandeInscription[] = dossiersAutoEcole.map((dossier: any) => {
-          // Mapper le statut vers le format attendu
-          const mapStatut = (statut: string): 'en_attente' | 'en_cours' | 'validee' | 'rejetee' => {
-            switch (statut) {
-              case 'en_attente': return 'en_attente';
-              case 'en_cours': return 'en_cours';
-              case 'valide': return 'validee';
-              case 'rejete': return 'rejetee';
-              default: return 'en_attente';
-            }
-          };
-
-          // Trouver le candidat correspondant
-          const candidat = candidats.find(c => c.id === dossier.candidat_id);
-          
-          // Trouver la formation correspondante
-          const formation = formations.find(f => f.id === dossier.formation_id);
-
-          return {
-            id: dossier.id,
-            numero: `DOS-${dossier.id.substring(0, 8).toUpperCase()}`,
-            eleve: {
-              firstName: candidat?.personne?.prenom || dossier.candidat?.personne?.prenom || '',
-              lastName: candidat?.personne?.nom || dossier.candidat?.personne?.nom || '',
-              email: candidat?.personne?.email || dossier.candidat?.personne?.email || '',
-              phone: candidat?.personne?.contact || dossier.candidat?.personne?.contact || '',
-              address: candidat?.personne?.adresse || dossier.candidat?.personne?.adresse || '',
-              birthDate: candidat?.date_naissance || dossier.candidat?.date_naissance || '',
-              nationality: candidat?.nationalite || dossier.candidat?.nationalite || '',
-              lieuNaissance: candidat?.lieu_naissance || dossier.candidat?.lieu_naissance || '',
-              nationaliteEtrangere: undefined
-            },
-            autoEcole: {
-              id: autoEcoleId,
-              name: autoEcoleInfo.nom_auto_ecole,
-              email: autoEcoleInfo.email
-            },
-            dateDemande: dossier.date_creation || dossier.created_at,
-            statut: mapStatut(dossier.statut),
-            documents: dossier.documents || [],
-            commentaires: dossier.commentaires || '',
-            // Informations supplémentaires du dossier avec les vrais noms
-            formation: formation ? {
-              id: formation.id,
-              nom: formation.type_permis?.libelle || 'Formation',
-              montant: formation.montant_formate || 'N/A',
-              description: formation.description || ''
-            } : (dossier.formation ? {
-              id: dossier.formation.id,
-              nom: dossier.formation.type_permis?.libelle || 'Formation',
-              montant: dossier.formation.montant_formate || 'N/A',
-              description: dossier.formation.description || ''
-            } : undefined),
-            etape: dossier.etape ? {
-              id: dossier.etape.id,
-              libelle: dossier.etape.libelle,
-              ordre: dossier.etape.ordre,
-              statut: dossier.etape.statut_systeme
-            } : undefined
-          };
-        });
+        console.log('🔍 Filtres envoyés à l\'API:', filters);
+        console.log('📚 Formation ID (filtrage côté client):', formationId);
         
-        // Appliquer les filtres
-        let demandesFiltrees = demandesData;
+        const response = await autoEcoleService.getDossiersByAutoEcoleId(resolvedAutoEcoleId, filters);
         
-        if (filtres.statut) {
-          demandesFiltrees = demandesFiltrees.filter(d => d.statut === filtres.statut);
+        console.log('📦 Dossiers récupérés depuis l\'API:', response.dossiers?.length || 0);
+        console.log('📋 Structure de la réponse:', response);
+        console.log('📊 Dossiers bruts de l\'API:', response.dossiers);
+        
+        if (response.dossiers && response.dossiers.length > 0) {
+          setDataSource('api');
+          await processDossiers(response.dossiers);
+        } else {
+          console.log('⚠️ Aucun dossier trouvé pour cette auto-école via API');
+          setDemandes([]);
         }
-        
-        if (filtres.recherche) {
-          const recherche = filtres.recherche.toLowerCase();
-          demandesFiltrees = demandesFiltrees.filter(d => 
-            d.eleve.firstName.toLowerCase().includes(recherche) ||
-            d.eleve.lastName.toLowerCase().includes(recherche) ||
-            d.eleve.email.toLowerCase().includes(recherche) ||
-            d.numero.toLowerCase().includes(recherche)
-          );
-        }
-        
-        setDemandes(demandesFiltrees);
-        console.log('✅ Dossiers chargés:', demandesFiltrees.length, 'sur', demandesData.length, 'total');
-      } else {
-        console.log('⚠️ Aucun dossier trouvé dans les informations auto-école');
+      } catch (error: any) {
+        console.error('❌ Erreur lors de la récupération des dossiers depuis l\'API:', error);
         setDemandes([]);
+        
+        // Afficher un message d'erreur spécifique
+        if (error.response?.status === 404) {
+          console.warn('⚠️ Auto-école non trouvée');
+        } else if (error.response?.status === 401) {
+          console.warn('⚠️ Non autorisé à accéder à cette auto-école');
+        }
       }
     } catch (error: any) {
       console.error('❌ Erreur lors du chargement des dossiers:', error);
       setDemandes([]);
-      
-      // Afficher un message d'erreur spécifique
-      if (error.response?.status === 404) {
-        console.warn('⚠️ Aucun dossier trouvé pour cette auto-école');
-      } else if (error.message?.includes('auto-école')) {
-        console.warn('⚠️ Problème de récupération de l\'auto-école associée');
-      }
     } finally {
       setLoading(false);
     }
   };
 
+
   const chargerStatistiques = async () => {
     try {
-      // Récupérer les dossiers depuis les informations d'auto-école
-      const dossiersAutoEcole = getAutoEcoleDossiers();
+      // Utiliser les demandes déjà chargées pour calculer les statistiques
+      const stats: StatistiquesDemandes = {
+        total: demandes.length,
+        enAttente: demandes.filter(d => d.statut === 'en_attente').length,
+        enCours: demandes.filter(d => d.statut === 'en_cours').length,
+        validees: demandes.filter(d => d.statut === 'validee').length,
+        rejetees: demandes.filter(d => d.statut === 'rejetee').length,
+        parAutoEcole: {}
+      };
       
-      if (dossiersAutoEcole && dossiersAutoEcole.length > 0) {
-        const stats: StatistiquesDemandes = {
-          total: dossiersAutoEcole.length,
-          enAttente: dossiersAutoEcole.filter((d: any) => d.statut === 'en_attente').length,
-          enCours: dossiersAutoEcole.filter((d: any) => d.statut === 'en_cours').length,
-          validees: dossiersAutoEcole.filter((d: any) => d.statut === 'valide' || d.statut === 'validee').length,
-          rejetees: dossiersAutoEcole.filter((d: any) => d.statut === 'rejete' || d.statut === 'rejetee').length,
-          parAutoEcole: {}
-        };
-        
-        setStatistiques(stats);
-        console.log('📊 Statistiques chargées depuis les dossiers auto-école:', stats);
-      } else {
-        // Statistiques par défaut si pas de données
-        setStatistiques({
-          total: 0,
-          enAttente: 0,
-          enCours: 0,
-          validees: 0,
-          rejetees: 0,
-          parAutoEcole: {}
-        });
-        console.log('📊 Aucun dossier trouvé pour les statistiques');
-      }
+      setStatistiques(stats);
+      console.log('📊 Statistiques calculées:', stats);
     } catch (error) {
-      console.error('❌ Erreur lors du chargement des statistiques:', error);
+      console.error('❌ Erreur lors du calcul des statistiques:', error);
       // Les statistiques par défaut (vides) seront utilisées
       setStatistiques({
         total: 0,
@@ -279,12 +369,65 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
     setFiltres(prev => ({ ...prev, statut: statut || undefined }));
   };
 
+  const handleDeleteClick = (demande: DemandeInscription) => {
+    setDemandeToDelete(demande);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!demandeToDelete) return;
+
+    setDeleteLoading(true);
+    try {
+      await autoEcoleService.deleteDossier(demandeToDelete.id);
+      
+      // Afficher un message de succès
+      setSnackbar({
+        open: true,
+        message: `La demande d'inscription de ${demandeToDelete.eleve.firstName} ${demandeToDelete.eleve.lastName} a été supprimée avec succès`,
+        severity: 'success'
+      });
+
+      // Fermer le dialogue
+      setDeleteDialogOpen(false);
+      setDemandeToDelete(null);
+
+      // Rafraîchir la liste
+      await chargerDemandes();
+      await chargerStatistiques();
+
+      // Appeler le callback si fourni
+      if (onDelete) {
+        onDelete();
+      }
+    } catch (error: any) {
+      console.error('Erreur lors de la suppression:', error);
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || 'Erreur lors de la suppression de la demande',
+        severity: 'error'
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setDemandeToDelete(null);
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
   const getStatutColor = (statut: string) => {
     switch (statut) {
       case 'en_attente': return 'warning';
       case 'en_cours': return 'info';
       case 'valide':
       case 'validee': return 'success';
+      case 'eleve_inscrit': return 'success';
       case 'rejete':
       case 'rejetee': return 'error';
       default: return 'default';
@@ -297,6 +440,7 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
       case 'en_cours': return 'En cours';
       case 'valide':
       case 'validee': return 'Validé';
+      case 'eleve_inscrit': return 'Élève inscrit';
       case 'rejete':
       case 'rejetee': return 'Rejeté';
       default: return statut;
@@ -306,99 +450,56 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
   const handleVoirDetails = (demande: DemandeInscription) => {
     console.log('📋 Détails du dossier sélectionné:', demande);
     
-    // Afficher les détails dans la console pour le moment
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📁 DÉTAILS DU DOSSIER');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📋 Informations générales:');
-    console.log('  • Numéro:', demande.numero);
-    console.log('  • ID:', demande.id);
-    console.log('  • Date demande:', demande.dateDemande);
-    console.log('  • Statut:', demande.statut);
-    console.log('  • Commentaires:', demande.commentaires);
-    
-    console.log('\n👤 Informations élève:');
-    console.log('  • Nom complet:', demande.eleve.firstName, demande.eleve.lastName);
-    console.log('  • Email:', demande.eleve.email);
-    console.log('  • Téléphone:', demande.eleve.phone);
-    console.log('  • Adresse:', demande.eleve.address);
-    console.log('  • Date naissance:', demande.eleve.birthDate);
-    console.log('  • Lieu naissance:', demande.eleve.lieuNaissance);
-    console.log('  • Nationalité:', demande.eleve.nationality);
-    
-    console.log('\n🏫 Informations auto-école:');
-    console.log('  • Nom:', demande.autoEcole.name);
-    console.log('  • ID:', demande.autoEcole.id);
-    console.log('  • Email:', demande.autoEcole.email);
-    
-    if ((demande as any).formation) {
-      console.log('\n📚 Informations formation:');
-      console.log('  • Nom:', (demande as any).formation.nom);
-      console.log('  • Montant:', (demande as any).formation.montant);
-      console.log('  • Description:', (demande as any).formation.description);
-    }
-    
-    if ((demande as any).etape) {
-      console.log('\n🔄 Informations étape:');
-      console.log('  • Libellé:', (demande as any).etape.libelle);
-      console.log('  • Ordre:', (demande as any).etape.ordre);
-      console.log('  • Statut:', (demande as any).etape.statut);
-    }
-    
-    console.log('\n📄 Documents:');
-    if (demande.documents && demande.documents.length > 0) {
-      demande.documents.forEach((doc: any, index: number) => {
-        console.log(`  ${index + 1}. ${doc.nom_fichier || doc.nom || 'Document'}`);
-        console.log(`     • Type: ${doc.type_document?.libelle || 'N/A'}`);
-        console.log(`     • Validé: ${doc.valide ? 'Oui' : 'Non'}`);
-        console.log(`     • Taille: ${doc.taille_fichier_formate || 'N/A'}`);
-        console.log(`     • Commentaires: ${doc.commentaires || 'Aucun'}`);
-      });
-    } else {
-      console.log('  Aucun document');
-    }
-    
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
     if (onCandidatSelect) {
       onCandidatSelect(demande);
     }
   };
 
-
-  if (loading || candidatsLoading || formationsLoading) {
+  if (loading) {
     return (
       <Box sx={{ p: 3 }}>
-        <Typography>
-          {loading && 'Chargement des demandes d\'inscription...'}
-          {candidatsLoading && 'Chargement des candidats...'}
-          {formationsLoading && 'Chargement des formations...'}
-        </Typography>
+        <Typography>Chargement des demandes d'inscription...</Typography>
       </Box>
     );
   }
 
+  if (loadingDetails) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography>Récupération des vraies données depuis l'API...</Typography>
+      </Box>
+    );
+  }
+
+
   return (
     <Box sx={{ p: 3 }}>
-      {/* Informations sur l'auto-école connectée */}
-      {(() => {
-        const autoEcoleInfo = getAutoEcoleInfo();
-        return autoEcoleInfo ? (
-          <Card sx={{ mb: 3, backgroundColor: '#f8f9fa' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                🏫 {autoEcoleInfo.nom_auto_ecole}
-              </Typography>
+      {/* Informations sur la source de données */}
+      {dataSource && currentAutoEcoleId && (
+        <Card sx={{ mb: 3, backgroundColor: '#f8f9fa' }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              📊 Demandes d'inscription
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              🏫 Auto-école ID: {currentAutoEcoleId}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              🔄 Données récupérées depuis l'API
+            </Typography>
+            {loadingDetails && (
               <Typography variant="body2" color="text.secondary">
-                📧 {autoEcoleInfo.email} | 📞 {autoEcoleInfo.contact} | 📍 {autoEcoleInfo.adresse}
+                ⏳ Récupération des vraies données...
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                👥 Candidats chargés: {candidats.length} | 📚 Formations chargées: {formations.length}
+            )}
+            {formationId && (
+              <Typography variant="body2" color="text.secondary">
+                📚 Filtrage par formation: {formationId}
               </Typography>
-            </CardContent>
-          </Card>
-        ) : null;
-      })()}
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Statistiques */}
       {statistiques && (
@@ -480,8 +581,34 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
             <MenuItem value="rejetee">Rejetée</MenuItem>
           </Select>
         </FormControl>
-
         
+        {/* Bouton de débogage */}
+        <Button
+          variant="outlined"
+          onClick={() => {
+            console.log('🔍 DEBUG - État actuel:');
+            console.log('📊 Demandes affichées:', demandes.length);
+            console.log('🔍 Filtres appliqués:', filtres);
+            console.log('📚 Formation ID:', formationId);
+            console.log('🏫 Auto-école ID:', currentAutoEcoleId);
+          }}
+          sx={{ minWidth: 120 }}
+        >
+          Debug
+        </Button>
+        
+        {/* Bouton pour forcer le rechargement des vraies données */}
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => {
+            console.log('🔄 Forçage du rechargement des vraies données...');
+            chargerDemandes();
+          }}
+          sx={{ minWidth: 150 }}
+        >
+          🔄 Recharger vraies données
+        </Button>
       </Box>
 
       {/* Tableau des demandes */}
@@ -490,7 +617,7 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
           <TableHead>
             <TableRow>
               <TableCell>Numéro</TableCell>
-              <TableCell>Élève</TableCell>
+              <TableCell>Nom & Prenom</TableCell>
               <TableCell>Formation</TableCell>
               <TableCell>Étape</TableCell>
               <TableCell>Date demande</TableCell>
@@ -518,26 +645,45 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
                     <Typography variant="caption" color="text.secondary" display="block">
                       {demande.eleve.phone}
                     </Typography>
+                    <Typography variant="caption" color="text.secondary" display="flex" alignItems="center" gap={0.5}>
+                      <IdentificationIcon className="w-4 h-4" /> {demande.numero}
+                    </Typography>
                   </Box>
                 </TableCell>
                 <TableCell>
                   <Box>
-                    <Typography variant="body2" fontWeight="bold">
+                    <Typography variant="body2" fontWeight="bold" color="primary">
                       {(demande as any).formation?.nom || 'Formation'}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {(demande as any).formation?.montant || 'N/A'}
+                    <Typography variant="caption" color="text.secondary" display="flex" alignItems="center" gap={0.5}>
+                      <CurrencyDollarIcon className="w-4 h-4" /> {(demande as any).formation?.montant || 'N/A'}
                     </Typography>
+                    {(demande as any).formation?.description && (
+                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                        📝 {(demande as any).formation.description.substring(0, 30)}...
+                      </Typography>
+                    )}
                   </Box>
                 </TableCell>
                 <TableCell>
                   <Box>
+                    { (demande as any).etape?.libelle ? (
+                      <>
                     <Typography variant="body2">
-                      {(demande as any).etape?.libelle || 'N/A'}
+                          {(demande as any).etape?.libelle}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Ordre: {(demande as any).etape?.ordre || 'N/A'}
+                          Ordre: {(demande as any).etape?.ordre || '-'}
                     </Typography>
+                      </>
+                    ) : (
+                      <Chip 
+                        icon={<ExclamationTriangleIcon className="w-4 h-4" />} 
+                        label="Étape: Demande d'inscription" 
+                        color="warning" 
+                        size="small"
+                      />
+                    )}
                   </Box>
                 </TableCell>
                 <TableCell>
@@ -575,7 +721,12 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
                   <IconButton size="small" color="secondary">
                     <PencilIcon className="w-4 h-4" />
                   </IconButton>
-                  <IconButton size="small" color="error">
+                  <IconButton 
+                    size="small" 
+                    color="error"
+                    onClick={() => handleDeleteClick(demande)}
+                    title="Supprimer la demande"
+                  >
                     <TrashIcon className="w-4 h-4" />
                   </IconButton>
                 </TableCell>
@@ -584,6 +735,59 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({ onC
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Dialogue de confirmation de suppression */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleDeleteCancel}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+      >
+        <DialogTitle id="delete-dialog-title">
+          Confirmer la suppression
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="delete-dialog-description">
+            Êtes-vous sûr de vouloir supprimer la demande d'inscription de{' '}
+            <strong>
+              {demandeToDelete?.eleve.firstName} {demandeToDelete?.eleve.lastName}
+            </strong>
+            {' '}?
+            <br />
+            <br />
+            Cette action est irréversible et supprimera définitivement la demande et tous ses documents associés.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} disabled={deleteLoading}>
+            Annuler
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm} 
+            color="error" 
+            variant="contained"
+            disabled={deleteLoading}
+          >
+            {deleteLoading ? 'Suppression...' : 'Supprimer'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar pour les messages de succès/erreur */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
 
     </Box>
   );

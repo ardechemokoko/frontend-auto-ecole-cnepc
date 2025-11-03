@@ -31,6 +31,11 @@ export const API_ENDPOINTS = {
     STATUS: '/cnepc/status',
     HISTORY: '/cnepc/history',
   },
+  RECEPTION: {
+    INCOMING: '/reception/dossiers',
+    DETAILS: (id: string) => `/reception/dossiers/${id}`,
+    RECEIVE: (id: string) => `/reception/dossiers/${id}/receive`,
+  },
   // Gestion des utilisateurs (Admin)
   USERS: {
     LIST: '/admin/operators',

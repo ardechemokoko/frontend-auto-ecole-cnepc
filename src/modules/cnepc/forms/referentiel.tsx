@@ -120,6 +120,7 @@ const PageReferenciel: React.FC = () => {
         description: formData.description,
         statut: true,
       })
+      console.log(res);
       if (res) {
         // showFormulaire()
         getReferentiel();

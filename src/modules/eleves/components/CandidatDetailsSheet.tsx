@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Drawer,
   Box,
@@ -11,7 +11,9 @@ import {
   Button,
   Stack,
   Tooltip,
-  LinearProgress
+  LinearProgress,
+  Alert,
+  Snackbar
 } from '@mui/material';
 // Heroicons imports
 import { 
@@ -23,18 +25,18 @@ import {
   EnvelopeIcon, 
   MapPinIcon, 
   EyeIcon,
-  CloudArrowUpIcon, 
-  TrashIcon, 
-  ArrowDownTrayIcon 
+  ArrowDownTrayIcon,
+  CloudArrowUpIcon
 } from '@heroicons/react/24/outline';
 import { DemandeInscription } from '../types/inscription';
 import ValidationService from '../services/validationService';
+import axiosClient from '../../../shared/environment/envdev';
 
 interface CandidatDetailsSheetProps {
   open: boolean;
   onClose: () => void;
   candidat: DemandeInscription | null;
-  onValidationSuccess?: () => void; // Callback pour notifier la validation
+  onValidationSuccess?: (eleveValide: any) => void; // Callback avec l'élève validé
 }
 
 const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
@@ -43,11 +45,106 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
   candidat,
   onValidationSuccess
 }) => {
-  const [uploading, setUploading] = useState(false);
-  const [uploadedDocuments, setUploadedDocuments] = useState<any[]>([]);
-  const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
-  const [replacingDocumentId, setReplacingDocumentId] = useState<string | null>(null);
   const [validating, setValidating] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [documentsFromApi, setDocumentsFromApi] = useState<any[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Charger les documents depuis l'API quand le sheet s'ouvre
+  useEffect(() => {
+    if (open && candidat && candidat.id) {
+      chargerDocuments();
+    }
+  }, [open, candidat]);
+
+  // Fonction pour obtenir tous les documents (depuis API + originaux)
+  const getAllDocuments = () => {
+    // Priorité : documents depuis l'API > documents originaux
+    const apiDocs = documentsFromApi || [];
+    const originalDocs = candidat?.documents || [];
+    
+    // Fusionner tous les documents en évitant les doublons (par ID)
+    const allDocsMap = new Map();
+    
+    // D'abord les documents depuis l'API (les plus à jour)
+    apiDocs.forEach((doc: any) => {
+      if (doc.id) {
+        allDocsMap.set(doc.id, doc);
+      }
+    });
+    
+    // Ensuite les documents originaux (si pas déjà présents)
+    originalDocs.forEach((doc: any) => {
+      if (doc.id && !allDocsMap.has(doc.id)) {
+        allDocsMap.set(doc.id, doc);
+      }
+    });
+    
+    return Array.from(allDocsMap.values());
+  };
+
+  // Fonction pour charger les documents depuis l'API
+  const chargerDocuments = async () => {
+    if (!candidat?.id) return;
+
+    try {
+      setLoadingDocuments(true);
+      // Utiliser l'endpoint GET /documents?dossier_id={dossierId}
+      const response = await axiosClient.get('/documents', {
+        params: {
+          dossier_id: candidat.id
+        }
+      });
+
+      if (response.data.success && response.data.data) {
+        const documents = Array.isArray(response.data.data) 
+          ? response.data.data 
+          : [response.data.data];
+        
+        // Mapper les documents pour correspondre au format attendu
+        const mappedDocuments = documents.map((doc: any) => ({
+          id: doc.id,
+          nom: doc.nom_fichier || doc.nom,
+          nom_fichier: doc.nom_fichier || doc.nom,
+          chemin_fichier: doc.chemin_fichier,
+          url: doc.chemin_fichier,
+          taille: doc.taille_fichier_formate || formatFileSize(doc.taille_fichier || 0),
+          taille_fichier: doc.taille_fichier,
+          taille_fichier_formate: doc.taille_fichier_formate,
+          type_mime: doc.type_mime,
+          type: doc.type_mime,
+          valide: doc.valide,
+          valide_libelle: doc.valide_libelle || (doc.valide ? 'Validé' : 'Non validé'),
+          dateUpload: doc.created_at || doc.date_upload,
+          created_at: doc.created_at,
+          commentaires: doc.commentaires
+        }));
+
+        setDocumentsFromApi(mappedDocuments);
+        console.log('✅ Documents chargés depuis l\'API:', mappedDocuments.length);
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur lors du chargement des documents:', error);
+      // Ne pas bloquer l'affichage si le chargement échoue
+      setDocumentsFromApi([]);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   if (!candidat) return null;
 
@@ -70,152 +167,397 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
   };
 
 
-  // Fonction pour obtenir tous les documents (existants + uploadés)
-  const getAllDocuments = () => {
-    const existingDocs = candidat.documents.filter(doc => 
-      !uploadedDocuments.some(uploaded => uploaded.id === doc.id)
-    );
-    const allDocs = [...existingDocs, ...uploadedDocuments];
-    console.log('Documents existants:', existingDocs);
-    console.log('Documents uploadés:', uploadedDocuments);
-    console.log('Tous les documents:', allDocs);
-    return allDocs;
-  };
+  const handleViewDocument = async (document: any) => {
+    try {
+      if (!document.id) {
+        alert(`Impossible d'ouvrir le document: ${document.nom || document.nom_fichier}\n\nLe document n'a pas d'ID valide.`);
+        return;
+      }
 
-  const handleViewDocument = (document: any) => {
-    // Si le document a un fichier (document uploadé), créer une URL temporaire
-    if (document.file) {
-      const url = URL.createObjectURL(document.file);
-      window.open(url, '_blank');
-      // Nettoyer l'URL après un délai pour libérer la mémoire
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } else if (document.url && !document.url.startsWith('#')) {
-      // Si le document a une URL valide
-      window.open(document.url, '_blank');
-    } else {
-      // Pour les documents existants sans fichier ni URL valide
-      console.log('Document sans fichier ou URL valide:', document.nom);
-      alert(`Impossible d'ouvrir le document: ${document.nom}\n\nCe document nécessite une connexion au serveur pour être visualisé.`);
-    }
-  };
-
-  const handleDownloadDocument = (document: any) => {
-    // Si le document a un fichier (document uploadé), on peut le télécharger directement
-    if (document.file) {
-      const url = URL.createObjectURL(document.file);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = document.nom;
-      a.click();
-      URL.revokeObjectURL(url);
-    } else {
-      // Pour les documents existants, simulation du téléchargement
-      console.log('Téléchargement du document existant:', document.nom);
-      // En réalité, ici vous devriez faire un appel API pour télécharger le document
-      alert(`Téléchargement du document: ${document.nom}\n\nEn production, ceci ferait un appel API pour récupérer le fichier depuis le serveur.`);
-    }
-  };
-
-  const handleReplaceDocument = (document: any) => {
-    // Marquer le document à remplacer et ouvrir le sélecteur
-    setReplacingDocumentId(document.id);
-    if (fileInputRef) {
-      fileInputRef.click();
-    }
-  };
-
-  const handleDeleteDocument = (document: any) => {
-    // Simulation de la suppression
-    console.log('Suppression du document:', document.nom);
-    // Ici vous pouvez implémenter la logique de suppression
-  };
-
-  const handleUploadNewDocument = () => {
-    if (fileInputRef) {
-      fileInputRef.click();
-    }
-  };
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      setUploading(true);
-      
-      // Traitement de chaque fichier
-      Array.from(files).forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const newDocument = {
-            id: replacingDocumentId || (Date.now() + Math.random()),
-            nom: file.name,
-            taille: formatFileSize(file.size),
-            dateUpload: new Date().toISOString(),
-            type: file.type,
-            url: e.target?.result as string,
-            file: file,
-            isReplacement: !!replacingDocumentId
-          };
-          
-          if (replacingDocumentId) {
-            // Remplacer le document existant
-            setUploadedDocuments(prev => 
-              prev.map(doc => doc.id === replacingDocumentId ? newDocument : doc)
-            );
-            setReplacingDocumentId(null);
-          } else {
-            // Ajouter un nouveau document
-            setUploadedDocuments(prev => {
-              console.log('Ajout du document:', newDocument);
-              console.log('Documents actuels:', prev);
-              return [...prev, newDocument];
-            });
-          }
-        };
-        reader.readAsDataURL(file);
+      console.log('📄 Ouverture du document PDF:', {
+        nom: document.nom || document.nom_fichier,
+        id: document.id,
+        chemin_fichier: document.chemin_fichier,
+        type_mime: document.type_mime
       });
+
+      // Essayer différentes méthodes pour récupérer le fichier PDF
+      const endpoints = [
+        // Méthode 1: Endpoint direct avec Accept header pour forcer le binaire
+        { url: `/documents/${document.id}`, headers: { 'Accept': 'application/pdf,application/octet-stream,*/*' } },
+        // Méthode 2: Endpoint de téléchargement
+        { url: `/documents/${document.id}/download`, headers: {} },
+        // Méthode 3: Endpoint file
+        { url: `/documents/${document.id}/file`, headers: {} },
+        // Méthode 4: Via chemin_fichier
+        ...(document.chemin_fichier ? [{ url: `/storage/${document.chemin_fichier}`, headers: {} }] : []),
+        // Méthode 5: Via files endpoint
+        ...(document.chemin_fichier ? [{ url: `/files/${document.chemin_fichier}`, headers: {} }] : [])
+      ];
+
+      let lastError: any = null;
       
-      setTimeout(() => {
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`🔄 Tentative avec: ${endpoint.url}`);
+          
+          // Télécharger le document avec axios pour inclure le token d'authentification
+          const response = await axiosClient.get(endpoint.url, {
+            responseType: 'blob', // Important : récupérer le fichier en tant que blob
+            headers: endpoint.headers
+          });
+
+          // Vérifier que la réponse est bien un blob (pas du JSON)
+          // Si le Content-Type est application/json, c'est que c'est les métadonnées, pas le fichier
+          const contentType = response.headers['content-type'] || '';
+          if (contentType.includes('application/json')) {
+            console.log('⚠️ Réponse JSON reçue au lieu du fichier, essai de la méthode suivante');
+            continue; // Essayer la méthode suivante
+          }
+
+          if (response.data instanceof Blob && response.data.size > 0) {
+            // Créer une URL blob à partir de la réponse
+            const blob = new Blob([response.data], {
+              type: response.headers['content-type'] || document.type_mime || 'application/pdf'
+            });
+            const url = URL.createObjectURL(blob);
+            
+            // Ouvrir le document dans un nouvel onglet (le navigateur ouvrira le PDF avec son viewer intégré)
+            window.open(url, '_blank');
+            
+            // Nettoyer l'URL après un délai plus long pour permettre l'ouverture
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+            
+            console.log('✅ Document ouvert avec succès');
+            return; // Succès, sortir de la fonction
+          }
+        } catch (error: any) {
+          console.log(`❌ Erreur avec ${endpoint.url}:`, error?.response?.status || error?.message);
+          lastError = error;
+          continue; // Essayer la méthode suivante
+        }
+      }
+
+      // Si toutes les méthodes ont échoué
+      throw lastError || new Error('Toutes les méthodes de récupération du fichier ont échoué');
+    } catch (error: any) {
+      console.error('❌ Erreur lors de l\'ouverture du document:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Erreur lors de l\'ouverture du document';
+      alert(`Erreur lors de l'ouverture du document: ${document.nom || document.nom_fichier}\n\n${errorMessage}\n\nVérifiez que le fichier existe sur le serveur.`);
+    }
+  };
+
+  const handleDownloadDocument = async (document: any) => {
+    try {
+      // Pour télécharger un document depuis le serveur, utiliser le chemin_fichier ou l'endpoint de téléchargement
+      if (document.id) {
+        console.log('📥 Téléchargement du document via API avec authentification:', {
+          nom: document.nom || document.nom_fichier,
+          id: document.id,
+          chemin_fichier: document.chemin_fichier
+        });
+
+        // Essayer d'abord avec le chemin_fichier via /storage/{chemin_fichier}
+        // Sinon utiliser l'endpoint /documents/{id}/download
+        let documentUrl = '';
+        
+        if (document.chemin_fichier) {
+          documentUrl = `/storage/${document.chemin_fichier}`;
+        } else {
+          documentUrl = `/documents/${document.id}/download`;
+        }
+
+        try {
+          // Télécharger le document avec axios pour inclure le token d'authentification
+          const response = await axiosClient.get(documentUrl, {
+            responseType: 'blob', // Important : récupérer le fichier en tant que blob
+          });
+
+          // Créer une URL blob à partir de la réponse
+          const blob = new Blob([response.data], {
+            type: response.headers['content-type'] || document.type_mime || 'application/pdf'
+          });
+          const url = URL.createObjectURL(blob);
+          
+          // Créer un lien de téléchargement
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = document.nom || document.nom_fichier || 'document';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          
+          // Nettoyer l'URL après un délai
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch (error: any) {
+          // Si l'erreur est 404, essayer l'autre méthode
+          if (error?.response?.status === 404 && document.chemin_fichier) {
+            const altUrl = `/documents/${document.id}/download`;
+            const altResponse = await axiosClient.get(altUrl, {
+              responseType: 'blob',
+            });
+            const blob = new Blob([altResponse.data], {
+              type: altResponse.headers['content-type'] || document.type_mime || 'application/pdf'
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = document.nom || document.nom_fichier || 'document';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          } else {
+            throw error;
+          }
+        }
+      } else {
+        alert(`Impossible de télécharger le document: ${document.nom || document.nom_fichier}\n\nLe document n'a pas d'ID valide.`);
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur lors du téléchargement du document:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Erreur lors du téléchargement du document';
+      alert(`Erreur lors du téléchargement du document: ${document.nom || document.nom_fichier}\n\n${errorMessage}`);
+    }
+  };
+
+  const handleUploadClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0 || !candidat) return;
+
+    const file = files[0];
+    setUploading(true);
+
+    try {
+      // Validation du fichier avant upload
+      const maxSize = 5 * 1024 * 1024; // 5 MB
+      if (file.size > maxSize) {
+        setSnackbar({
+          open: true,
+          message: 'Le fichier ne doit pas dépasser 5 MB',
+          severity: 'error'
+        });
         setUploading(false);
-      }, 1000);
-    }
-    
-    // Reset du file input
-    if (event.target) {
-      event.target.value = '';
+        return;
+      }
+
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+      if (!allowedTypes.includes(file.type)) {
+        setSnackbar({
+          open: true,
+          message: 'Format non autorisé. Utilisez PDF, JPG ou PNG',
+          severity: 'error'
+        });
+        setUploading(false);
+        return;
+      }
+
+      // Format attendu par le backend : fichier doit être un File object dans FormData
+      const cleanFileName = file.name.trim();
+      
+      // Utiliser FormData pour envoyer le fichier réel
+      const formData = new FormData();
+      formData.append('documentable_id', candidat.id);
+      formData.append('documentable_type', 'App\\Models\\Dossier');
+      // Laravel attend un booléen, utiliser '0' pour false et '1' pour true
+      formData.append('valide', '0');
+      formData.append('commentaires', '');
+      formData.append('fichier', file, cleanFileName);
+
+      console.log('📤 Upload document (FormData):', {
+        documentable_id: candidat.id,
+        documentable_type: 'App\\Models\\Dossier',
+        valide: false,
+        commentaires: '',
+        fichier: `[File: ${cleanFileName}, ${file.size} bytes, ${file.type}]`
+      });
+
+      // Envoi avec FormData (Content-Type sera automatiquement multipart/form-data)
+      const response = await axiosClient.post('/documents', formData, {
+        timeout: 300000, // 5 minutes selon la documentation
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (response.data.success && response.data.data) {
+        // Structure de réponse conforme à l'API documentée
+        const newDocument = {
+          id: response.data.data.id,
+          nom: response.data.data.nom_fichier,
+          nom_fichier: response.data.data.nom_fichier,
+          chemin_fichier: response.data.data.chemin_fichier,
+          taille: response.data.data.taille_fichier_formate,
+          taille_fichier: response.data.data.taille_fichier,
+          type_mime: response.data.data.type_mime,
+          valide: response.data.data.valide,
+          valide_libelle: response.data.data.valide_libelle || (response.data.data.valide ? 'Validé' : 'Non validé'),
+          dateUpload: response.data.data.created_at,
+          url: response.data.data.chemin_fichier,
+          commentaires: response.data.data.commentaires,
+        };
+
+        // Ajouter le nouveau document à la liste des documents depuis l'API
+        setDocumentsFromApi(prev => [...prev, newDocument]);
+        
+        setSnackbar({
+          open: true,
+          message: response.data.message || 'Document uploadé avec succès',
+          severity: 'success'
+        });
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur lors de l\'upload du document:', error);
+      
+      // Log détaillé de la réponse du serveur
+      if (error.response) {
+        console.error('📋 Réponse du serveur:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          headers: error.response.headers,
+          data: error.response.data,
+        });
+        
+        // Afficher tout le contenu de data
+        console.error('📄 Données de l\'erreur (error.response.data):', JSON.stringify(error.response.data, null, 2));
+        
+        // Si c'est un objet, afficher ses propriétés
+        if (error.response.data && typeof error.response.data === 'object') {
+          console.error('📋 Propriétés de error.response.data:', Object.keys(error.response.data));
+          if (error.response.data.errors) {
+            console.error('🔍 Erreurs de validation:', error.response.data.errors);
+          }
+          if (error.response.data.message) {
+            console.error('💬 Message:', error.response.data.message);
+          }
+        }
+      } else {
+        console.error('⚠️ Pas de réponse du serveur (erreur réseau?)');
+      }
+      
+      // Afficher le message d'erreur détaillé du serveur
+      let errorMessage = 'Erreur lors de l\'upload du document';
+      
+      if (error.response?.status === 422) {
+        // Erreur de validation - afficher les détails
+        console.error('🚫 Erreur 422 - Validation échouée');
+        
+        if (error.response.data?.errors) {
+          // Si c'est un objet d'erreurs de validation Laravel
+          const errors = Object.entries(error.response.data.errors)
+            .map(([field, messages]: [string, any]) => {
+              const fieldName = field.replace(/_/g, ' ');
+              const messagesList = Array.isArray(messages) ? messages : [messages];
+              return `${fieldName}: ${messagesList.join(', ')}`;
+            })
+            .join('\n');
+          errorMessage = `Erreurs de validation:\n${errors}`;
+        } else if (error.response.data?.message) {
+          errorMessage = error.response.data.message;
+        } else {
+          errorMessage = 'Erreur de validation. Veuillez vérifier les données du document.';
+        }
+      } else if (error.response?.data) {
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.response.data.error) {
+          // Vérifier si l'erreur indique un problème de chemin_fichier
+          const errorText = error.response.data.error;
+          if (errorText.includes('chemin_fichier') && errorText.includes('null value')) {
+            errorMessage = 'Le serveur n\'a pas pu traiter le fichier. Le backend ne génère pas le chemin du fichier. Veuillez contacter l\'administrateur.';
+          } else {
+            errorMessage = errorText;
+          }
+        } else if (error.response.data.errors) {
+          // Si c'est un objet d'erreurs de validation Laravel
+          const errors = Object.entries(error.response.data.errors)
+            .map(([field, messages]: [string, any]) => 
+              `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`
+            )
+            .join('; ');
+          errorMessage = `Erreurs de validation: ${errors}`;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else {
+          // Afficher le JSON de l'erreur si on ne peut pas extraire un message
+          errorMessage = JSON.stringify(error.response.data);
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Message spécial pour les erreurs 500 liées aux fichiers
+      if (error.response?.status === 500) {
+        console.error('❌ Erreur serveur 500: Le backend ne traite probablement pas les métadonnées du document correctement.');
+        console.error('💡 Suggestion: Vérifier que le backend reçoit bien les données JSON et génère le chemin_fichier.');
+      }
+      
+      setSnackbar({
+        open: true,
+        message: errorMessage.length > 200 ? errorMessage.substring(0, 200) + '...' : errorMessage,
+        severity: 'error'
+      });
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (event.target) {
+        event.target.value = '';
+      }
     }
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  const handleCloseSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
   };
 
 
-  // Fonction pour valider la demande et la transférer
+  // Fonction pour valider la demande localement (sans appel API)
   const handleValidation = async () => {
     if (!candidat) return;
 
     try {
       setValidating(true);
       
-      // Valider la demande et la transférer vers les élèves validés
+      // Valider la demande localement et la transférer vers les élèves validés
       const eleveValide = await ValidationService.validerDemande(candidat);
       
-      console.log('Demande validée avec succès:', eleveValide);
+      console.log('✅ Demande validée localement avec succès:', eleveValide);
       
-      // Notifier le parent de la validation réussie
+      // Notifier le parent de la validation réussie avec l'élève validé
       if (onValidationSuccess) {
-        onValidationSuccess();
+        onValidationSuccess(eleveValide);
       }
       
-      // Fermer le sheet
-      onClose();
+      // Afficher un message de succès
+      setSnackbar({
+        open: true,
+        message: 'Demande validée avec succès. L\'élève a été transféré vers la liste des élèves validés.',
+        severity: 'success'
+      });
+      
+      // Déclencher un événement personnalisé pour rafraîchir StudentsTable
+      window.dispatchEvent(new CustomEvent('dossierValidated', { 
+        detail: { eleveValide } 
+      }));
+      
+      // Fermer le sheet après un court délai pour voir le message
+      setTimeout(() => {
+        onClose();
+      }, 1500);
       
     } catch (error) {
-      console.error('Erreur lors de la validation:', error);
+      console.error('❌ Erreur lors de la validation:', error);
+      setSnackbar({
+        open: true,
+        message: error instanceof Error ? error.message : 'Erreur lors de la validation de la demande',
+        severity: 'error'
+      });
     } finally {
       setValidating(false);
     }
@@ -402,8 +744,8 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
                   variant="contained"
                   size="small"
                   startIcon={<CloudArrowUpIcon className="w-4 h-4" />}
-                  onClick={handleUploadNewDocument}
-                  disabled={uploading}
+                  onClick={handleUploadClick}
+                  disabled={uploading || !candidat}
                   sx={{ 
                     backgroundColor: 'primary.main',
                     '&:hover': {
@@ -411,40 +753,34 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
                     }
                   }}
                 >
-                  Ajouter un document
+                  {uploading ? 'Upload...' : 'Ajouter un document'}
                 </Button>
               </Box>
 
-              {uploading && (
+              {(uploading || loadingDocuments) && (
                 <Box sx={{ mb: 2 }}>
                   <LinearProgress />
-                  <Typography variant="caption" color="text.secondary">
-                    Upload en cours...
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    {loadingDocuments ? 'Chargement des documents...' : 'Upload en cours...'}
                   </Typography>
                 </Box>
               )}
 
- 
-              
               {/* Input file caché */}
               <input
                 type="file"
-                ref={setFileInputRef}
+                ref={fileInputRef}
                 onChange={handleFileSelect}
-                multiple
                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt"
                 style={{ display: 'none' }}
               />
 
-              {/* Documents existants + uploadés */}
+              {/* Documents existants */}
               {getAllDocuments().length > 0 ? (
                 <Stack spacing={2}>
-                  {/* Documents existants (non remplacés) */}
-                  {candidat.documents
-                    .filter(doc => !uploadedDocuments.some(uploaded => uploaded.id === doc.id))
-                    .map((doc) => (
+                  {getAllDocuments().map((doc) => (
                     <Box
-                      key={doc.id}
+                      key={doc.id || doc.nom}
                       sx={{
                         p: 2,
                         border: '1px solid',
@@ -455,89 +791,29 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
                     >
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                         <Box sx={{ flex: 1 }}>
-                          <Typography variant="body1" fontWeight="medium" gutterBottom>
-                            {doc.nom.length > 6 ? `${doc.nom.substring(0, 12)}...` : doc.nom}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Taille: {doc.taille}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Uploadé le {new Date(doc.dateUpload).toLocaleDateString('fr-FR')}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: 0.5, ml: 2 }}>
-                          <Tooltip title="Voir le document">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleViewDocument(doc)}
-                              color="primary"
-                            >
-                              <EyeIcon className="w-4 h-4" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Télécharger">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDownloadDocument(doc)}
-                              color="secondary"
-                            >
-                              <ArrowDownTrayIcon className="w-4 h-4" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Remplacer">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleReplaceDocument(doc)}
-                              color="warning"
-                            >
-                              <CloudArrowUpIcon className="w-4 h-4" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Supprimer">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDeleteDocument(doc)}
-                              color="error"
-                            >
-                              <TrashIcon className="w-4 h-4" />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </Box>
-                    </Box>
-                  ))}
-
-                  {/* Documents uploadés/remplacés */}
-                  {uploadedDocuments.map((doc) => (
-                    <Box
-                      key={doc.id}
-                      sx={{
-                        p: 2,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        borderRadius: 1,
-                        backgroundColor: 'background.paper'
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="body1" fontWeight="medium" gutterBottom>
-                            {doc.nom.length > 6 ? `${doc.nom.substring(0, 6)}...` : doc.nom}
-                            {doc.isReplacement && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            <Typography variant="body1" fontWeight="medium">
+                              {doc.nom_fichier || doc.nom || 'Document sans nom'}
+                            </Typography>
+                            {doc.valide && (
                               <Chip 
-                                label="Remplacé" 
+                                label={doc.valide_libelle || 'Validé'} 
                                 size="small" 
-                                color="warning" 
-                                sx={{ ml: 1, fontSize: '0.7rem' }}
+                                color="success"
+                                sx={{ fontSize: '0.7rem', height: 20 }}
                               />
                             )}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Taille: {doc.taille}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {doc.isReplacement ? 'Remplacé' : 'Uploadé'} le {new Date(doc.dateUpload).toLocaleDateString('fr-FR')}
-                          </Typography>
+                          </Box>
+                          {(doc.taille || doc.taille_fichier_formate) && (
+                            <Typography variant="body2" color="text.secondary">
+                              Taille: {doc.taille_fichier_formate || doc.taille}
+                            </Typography>
+                          )}
+                          {(doc.dateUpload || doc.created_at) && (
+                            <Typography variant="caption" color="text.secondary">
+                              Uploadé le {new Date(doc.dateUpload || doc.created_at).toLocaleDateString('fr-FR')}
+                            </Typography>
+                          )}
                         </Box>
                         <Box sx={{ display: 'flex', gap: 0.5, ml: 2 }}>
                           <Tooltip title="Voir le document">
@@ -556,27 +832,6 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
                               color="secondary"
                             >
                               <ArrowDownTrayIcon className="w-4 h-4" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Remplacer">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleReplaceDocument(doc)}
-                              color="warning"
-                            >
-                              <CloudArrowUpIcon className="w-4 h-4" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Supprimer">
-                            <IconButton
-                              size="small"
-                              onClick={() => {
-                                setUploadedDocuments(prev => prev.filter(d => d.id !== doc.id));
-                                handleDeleteDocument(doc);
-                              }}
-                              color="error"
-                            >
-                              <TrashIcon className="w-4 h-4" />
                             </IconButton>
                           </Tooltip>
                         </Box>
@@ -588,17 +843,17 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
                 <Box sx={{ textAlign: 'center', py: 4 }}>
                   <DocumentTextIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                   <Typography variant="h6" color="text.secondary" gutterBottom>
-                    Aucun document uploadé
+                    Aucun document disponible
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    Cliquez sur le bouton ci-dessous pour ajouter des documents
+                    Cliquez sur le bouton ci-dessus pour ajouter un document
                   </Typography>
                   <Button
                     variant="contained"
                     size="large"
                     startIcon={<CloudArrowUpIcon className="w-5 h-5" />}
-                    onClick={handleUploadNewDocument}
-                    disabled={uploading}
+                    onClick={handleUploadClick}
+                    disabled={uploading || !candidat}
                     sx={{ 
                       backgroundColor: 'primary.main',
                       px: 4,
@@ -640,6 +895,21 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
         </Box>
       </Box>
 
+      {/* Snackbar pour les messages */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Drawer>
   );
 };
