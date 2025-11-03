@@ -83,32 +83,45 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // Restaurer l'état d'authentification au chargement de l'app
   useEffect(() => {
     const restoreAuth = async () => {
-      const token = tokenService.getToken();
-      const userData = localStorage.getItem('user_data');
+      // Essayer d'abord avec access_token (utilisé par l'API)
+      let token = tokenService.getTokenApi();
+      let userData = tokenService.getUser();
       
-      // Pour les mocks, on vérifie simplement la présence du token et des données utilisateur
+      // Si pas trouvé, essayer avec auth_token (fallback)
+      if (!token) {
+        token = tokenService.getToken();
+        userData = localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data')!) : null;
+      }
+      
+      console.log('🔄 Restauration de l\'authentification...');
+      console.log('  • Token trouvé:', !!token);
+      console.log('  • User data trouvé:', !!userData);
+      console.log('  • Token clé utilisée:', token ? (localStorage.getItem('access_token') ? 'access_token' : 'auth_token') : 'aucune');
+      
       if (token && userData) {
         try {
-          const user = JSON.parse(userData);
           // Vérifier si c'est un token mock (commence par "mock-jwt-token")
           if (token.startsWith('mock-jwt-token')) {
-            dispatch({ type: 'RESTORE_AUTH', payload: { user, token } });
+            console.log('✅ Token mock détecté, restauration de l\'auth');
+            dispatch({ type: 'RESTORE_AUTH', payload: { user: userData, token } });
           } else if (tokenService.isTokenValid()) {
-            // Pour les vrais tokens JWT
-            dispatch({ type: 'RESTORE_AUTH', payload: { user, token } });
+            console.log('✅ Token JWT valide, restauration de l\'auth');
+            dispatch({ type: 'RESTORE_AUTH', payload: { user: userData, token } });
           } else {
+            console.log('❌ Token invalide, nettoyage');
             // Token invalide, nettoyer
             tokenService.clearAll();
             localStorage.removeItem('user_data');
             dispatch({ type: 'SET_LOADING', payload: false });
           }
         } catch (error) {
-          console.error('Erreur lors de la restauration de l\'authentification:', error);
+          console.error('❌ Erreur lors de la restauration de l\'authentification:', error);
           tokenService.clearAll();
           localStorage.removeItem('user_data');
           dispatch({ type: 'SET_LOADING', payload: false });
         }
       } else {
+        console.log('❌ Pas de token ou de données utilisateur, nettoyage');
         // Pas de token ou de données utilisateur, nettoyer
         tokenService.clearAll();
         localStorage.removeItem('user_data');
@@ -120,9 +133,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   }, []);
 
   const login = (user: User, token: string) => {
-    // Sauvegarder dans localStorage
-    tokenService.setToken(token);
-    localStorage.setItem('user_data', JSON.stringify(user));
+    // Sauvegarder dans localStorage avec les deux clés pour compatibilité
+    tokenService.setToken(token); // auth_token
+    tokenService.setAuthData(token, user); // access_token + user
+    localStorage.setItem('user_data', JSON.stringify(user)); // user_data (fallback)
     dispatch({ type: 'LOGIN', payload: { user, token } });
   };
 
@@ -130,6 +144,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     // Nettoyer le localStorage
     tokenService.clearAll();
     localStorage.removeItem('user_data');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('auto_ecole_info');
     dispatch({ type: 'LOGOUT' });
   };
 

@@ -56,6 +56,10 @@ class TokenService {
   clearAll(): void {
     this.removeToken();
     this.removeRefreshToken();
+    localStorage.removeItem(this.TOKEN_KEYApi);
+    localStorage.removeItem(this.USER_KEY);
+    localStorage.removeItem('user_data');
+    localStorage.removeItem('auto_ecole_info');
   }
 
    // ✅ Récupération des infos utilisateur

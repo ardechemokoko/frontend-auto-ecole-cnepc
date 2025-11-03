@@ -20,7 +20,9 @@ import {
   Assignment, 
   TrendingUp,
   AutoAwesome,
-  PersonAdd
+  PersonAdd,
+  Quiz,
+  Schedule
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../shared/constants';
@@ -53,7 +55,7 @@ const CNEPCPage: React.FC = () => {
         {/* Menu des modules CNEPC */}
         <Grid container spacing={3}>
           {/* Module Gestion des Auto-Écoles */}
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={4}>
             <Card 
               sx={{ 
                 height: '100%', 
@@ -116,8 +118,72 @@ const CNEPCPage: React.FC = () => {
             </Card>
           </Grid>
 
+          {/* Module Candidats aux Examens */}
+          <Grid item xs={12} md={4}>
+            <Card 
+              sx={{ 
+                height: '100%', 
+                display: 'flex', 
+                flexDirection: 'column',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: 4
+                }
+              }}
+            >
+              <CardContent sx={{ flexGrow: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Avatar sx={{ bgcolor: 'success.main', mr: 2 }}>
+                    <Quiz />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h5" component="h2" gutterBottom>
+                      Candidats aux Examens
+                    </Typography>
+                    <Chip 
+                      label="Nouveau Module" 
+                      color="success" 
+                      size="small"
+                      sx={{ mb: 1 }}
+                    />
+                  </Box>
+                </Box>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  Gérez les candidats aux examens, organisez les sessions d'examen 
+                  et planifiez les créneaux pour les 3 épreuves du permis de conduire.
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <Chip icon={<People />} label="Candidats" size="small" />
+                  <Chip icon={<Schedule />} label="Sessions" size="small" />
+                  <Chip icon={<Quiz />} label="Épreuves" size="small" />
+                </Box>
+              </CardContent>
+              <CardActions sx={{ p: 2, pt: 0 }}>
+                <Button
+                  variant="contained"
+                  fullWidth
+                  startIcon={<Quiz />}
+                  onClick={() => navigate(ROUTES.CANDIDATS_EXAMEN)}
+                  sx={{ py: 1.5, mb: 1 }}
+                >
+                  Accéder au Module
+                </Button>
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  startIcon={<Schedule />}
+                  onClick={() => navigate(ROUTES.CANDIDATS_EXAMEN_SESSIONS)}
+                  sx={{ py: 1.5 }}
+                >
+                  Sessions d'Examen
+                </Button>
+              </CardActions>
+            </Card>
+          </Grid>
+
           {/* Module Envoi au CNEPC */}
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={4}>
             <Card 
               sx={{ 
                 height: '100%', 
@@ -201,33 +267,33 @@ const CNEPCPage: React.FC = () => {
                         0
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Candidats
+                        Candidats Inscrits
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid item xs={12} sm={3}>
                     <Box sx={{ textAlign: 'center', p: 2 }}>
                       <Avatar sx={{ bgcolor: 'warning.main', mx: 'auto', mb: 1 }}>
-                        <Assignment />
+                        <Schedule />
                       </Avatar>
                       <Typography variant="h4" color="warning.main">
                         0
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Dossiers
+                        Sessions d'Examen
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid item xs={12} sm={3}>
                     <Box sx={{ textAlign: 'center', p: 2 }}>
                       <Avatar sx={{ bgcolor: 'success.main', mx: 'auto', mb: 1 }}>
-                        <TrendingUp />
+                        <Quiz />
                       </Avatar>
                       <Typography variant="h4" color="success.main">
                         0
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Validés
+                        Examens Réussis
                       </Typography>
                     </Box>
                   </Grid>
