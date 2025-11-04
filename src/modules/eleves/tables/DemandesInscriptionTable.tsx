@@ -334,20 +334,63 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
 
   const chargerStatistiques = async () => {
     try {
-      // Utiliser les demandes déjà chargées pour calculer les statistiques
+      // Charger les statistiques réelles des demandes d'inscription depuis l'API
+      const resolvedAutoEcoleId = autoEcoleId || getAutoEcoleId();
+      
+      if (!resolvedAutoEcoleId) {
+        console.warn('⚠️ Aucun ID d\'auto-école trouvé pour charger les statistiques');
+        setStatistiques({
+          total: 0,
+          enAttente: 0,
+          enCours: 0,
+          validees: 0,
+          rejetees: 0,
+          parAutoEcole: {}
+        });
+        return;
+      }
+
+      // Récupérer tous les dossiers sans filtre pour calculer les statistiques réelles
+      const response = await autoEcoleService.getDossiersByAutoEcoleId(resolvedAutoEcoleId);
+      const dossiers = response.dossiers || [];
+
+      // Filtrer uniquement les demandes d'inscription (exclure les dossiers validés/transmis)
+      // Les demandes d'inscription sont les dossiers qui ne sont pas encore validés/transmis au CNEPC
+      const demandesInscription = dossiers.filter((d: any) => {
+        const statut = d.statut?.toLowerCase();
+        // Exclure les statuts qui indiquent que le dossier est déjà traité/transmis
+        return statut !== 'valide' && 
+               statut !== 'validated' && 
+               statut !== 'transmis' && 
+               statut !== 'transmitted';
+      });
+
+      // Calculer les statistiques à partir des demandes d'inscription uniquement
       const stats: StatistiquesDemandes = {
-        total: demandes.length,
-        enAttente: demandes.filter(d => d.statut === 'en_attente').length,
-        enCours: demandes.filter(d => d.statut === 'en_cours').length,
-        validees: demandes.filter(d => d.statut === 'validee').length,
-        rejetees: demandes.filter(d => d.statut === 'rejetee').length,
+        total: demandesInscription.length,
+        enAttente: demandesInscription.filter((d: any) => {
+          const statut = d.statut?.toLowerCase();
+          return statut === 'en_attente' || statut === 'pending';
+        }).length,
+        enCours: demandesInscription.filter((d: any) => {
+          const statut = d.statut?.toLowerCase();
+          return statut === 'en_cours' || statut === 'in_progress';
+        }).length,
+        validees: demandesInscription.filter((d: any) => {
+          const statut = d.statut?.toLowerCase();
+          return statut === 'validee' || statut === 'validated';
+        }).length,
+        rejetees: demandesInscription.filter((d: any) => {
+          const statut = d.statut?.toLowerCase();
+          return statut === 'rejetee' || statut === 'rejected' || statut === 'rejete';
+        }).length,
         parAutoEcole: {}
       };
       
       setStatistiques(stats);
-      console.log('📊 Statistiques calculées:', stats);
+      console.log('📊 Statistiques des demandes d\'inscription chargées depuis l\'API:', stats);
     } catch (error) {
-      console.error('❌ Erreur lors du calcul des statistiques:', error);
+      console.error('❌ Erreur lors du chargement des statistiques:', error);
       // Les statistiques par défaut (vides) seront utilisées
       setStatistiques({
         total: 0,
