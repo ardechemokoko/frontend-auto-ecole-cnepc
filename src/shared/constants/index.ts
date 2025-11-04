@@ -7,6 +7,7 @@ export const ROUTES = {
   CNEPC: '/cnepc',
   RECEPTION: '/reception',
   AUTO_ECOLES: '/auto-ecoles',
+  CANDIDAT_DETAILS: '/candidat/:id',
   SETTINGS: '/settings',
   USER_MANAGEMENT: '/user-management',
   UPDATE: '/updateinfo',
