@@ -154,6 +154,13 @@ const LoginForm: React.FC = () => {
 
       // Vérifier si le token est bien un JWT
       const token = authResponse.data.access_token;
+      const refreshToken = authResponse.data.refresh_token;
+      
+      // Sauvegarder le refresh_token si présent
+      if (refreshToken) {
+        tokenService.setRefreshToken(refreshToken);
+        console.log('✅ Refresh token sauvegardé');
+      }
       
       // Vérifier le rôle utilisateur via l'endpoint /auth/me
       console.log('🔍 Vérification du rôle utilisateur...');

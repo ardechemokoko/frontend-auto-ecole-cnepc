@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Table, 
   TableBody, 
@@ -20,19 +21,17 @@ import {
 import { 
   MagnifyingGlassIcon, 
   EyeIcon, 
-  PencilIcon, 
   TrashIcon 
 } from '@heroicons/react/24/outline';
 import ValidationService, { EleveValide } from '../services/validationService';
-import EleveDetailsSheet from '../components/EleveDetailsSheet';
+import { ROUTES } from '../../../shared/constants';
 
 const StudentsTable: React.FC = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [elevesValides, setElevesValides] = useState<EleveValide[]>([]);
   const [loading, setLoading] = useState(true);
   const [statistiques, setStatistiques] = useState<any>(null);
-  const [selectedEleve, setSelectedEleve] = useState<EleveValide | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
 
   // Charger les élèves validés au montage du composant
   useEffect(() => {
@@ -122,19 +121,10 @@ const StudentsTable: React.FC = () => {
 
   const handleViewStudent = (studentId: string) => {
     const eleve = elevesValides.find(e => e.id === studentId);
-    if (eleve) {
-      setSelectedEleve(eleve);
-      setSheetOpen(true);
+    if (eleve && eleve.demandeId) {
+      // Naviguer vers la page de détails en utilisant le demandeId (qui correspond au dossier)
+      navigate(ROUTES.ELEVE_INSCRIT_DETAILS.replace(':id', eleve.demandeId));
     }
-  };
-
-  const handleCloseSheet = () => {
-    setSheetOpen(false);
-    setSelectedEleve(null);
-  };
-
-  const handleEditStudent = (studentId: string) => {
-    console.log('Modifier élève:', studentId);
   };
 
   const handleDeleteStudent = async (studentId: string) => {
@@ -296,13 +286,6 @@ const StudentsTable: React.FC = () => {
                       </IconButton>
                       <IconButton
                         size="small"
-                        onClick={() => handleEditStudent(eleve.id)}
-                        title="Modifier"
-                      >
-                        <PencilIcon className="w-5 h-5 text-gray-600" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
                         onClick={() => handleDeleteStudent(eleve.id)}
                         title="Supprimer"
                       >
@@ -316,13 +299,6 @@ const StudentsTable: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
-
-      {/* Right Sheet pour les détails */}
-      <EleveDetailsSheet
-        open={sheetOpen}
-        onClose={handleCloseSheet}
-        eleve={selectedEleve}
-      />
     </Box>
   );
 };

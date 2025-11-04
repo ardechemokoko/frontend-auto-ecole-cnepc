@@ -474,33 +474,6 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
 
   return (
     <Box sx={{ p: 3 }}>
-      {/* Informations sur la source de données */}
-      {dataSource && currentAutoEcoleId && (
-        <Card sx={{ mb: 3, backgroundColor: '#f8f9fa' }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              📊 Demandes d'inscription
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              🏫 Auto-école ID: {currentAutoEcoleId}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              🔄 Données récupérées depuis l'API
-            </Typography>
-            {loadingDetails && (
-              <Typography variant="body2" color="text.secondary">
-                ⏳ Récupération des vraies données...
-              </Typography>
-            )}
-            {formationId && (
-              <Typography variant="body2" color="text.secondary">
-                📚 Filtrage par formation: {formationId}
-              </Typography>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
       {/* Statistiques */}
       {statistiques && (
         <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -581,34 +554,6 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
             <MenuItem value="rejetee">Rejetée</MenuItem>
           </Select>
         </FormControl>
-        
-        {/* Bouton de débogage */}
-        <Button
-          variant="outlined"
-          onClick={() => {
-            console.log('🔍 DEBUG - État actuel:');
-            console.log('📊 Demandes affichées:', demandes.length);
-            console.log('🔍 Filtres appliqués:', filtres);
-            console.log('📚 Formation ID:', formationId);
-            console.log('🏫 Auto-école ID:', currentAutoEcoleId);
-          }}
-          sx={{ minWidth: 120 }}
-        >
-          Debug
-        </Button>
-        
-        {/* Bouton pour forcer le rechargement des vraies données */}
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => {
-            console.log('🔄 Forçage du rechargement des vraies données...');
-            chargerDemandes();
-          }}
-          sx={{ minWidth: 150 }}
-        >
-          🔄 Recharger vraies données
-        </Button>
       </Box>
 
       {/* Tableau des demandes */}

@@ -17,19 +17,19 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import {
-  Home as HomeIcon,
-  Refresh as Ref,
-  People as UserGroupIcon,
-  CheckCircle as CheckCircleIcon,
-  Send as PaperAirplaneIcon,
-  ChevronLeft as ChevronLeftIcon,
-  ChevronRight as ChevronRightIcon,
-  Logout as ArrowRightOnRectangleIcon,
-  ExpandMore as ChevronDownIcon,
-  Settings as SettingsIcon,
-  Person as PersonIcon,
-  Password,
-} from '@mui/icons-material';
+  HomeIcon,
+  ArrowPathIcon,
+  UserGroupIcon,
+  CheckCircleIcon,
+  PaperAirplaneIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ArrowRightOnRectangleIcon,
+  ChevronDownIcon,
+  Cog6ToothIcon,
+  EnvelopeIcon,
+  UserPlusIcon,
+} from '@heroicons/react/24/outline';
 import { ROUTES } from '../constants';
 import tokenService from '../../modules/auth/services/tokenService';
 import { authService } from '../../modules/auth/services/authService';
@@ -67,7 +67,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
     // },
      {
       title: 'Referentiel',
-      icon: Ref,
+      icon: ArrowPathIcon,
       path: ROUTES.REF,
       description: 'reference de l\' auto-école'
     },
@@ -88,17 +88,14 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
         {
           path: `${ROUTES.ELEVES}/demandes`,
           title: 'Demandes d\'inscription',
-          description: 'Voir les demandes d\'inscription'
+          description: 'Voir les demandes d\'inscription',
+          icon: EnvelopeIcon
         },
         {
           path: `${ROUTES.ELEVES}/inscrits`,
           title: 'Candidats inscrits',
-          description: 'Voir les candidats inscrits'
-        },
-        {
-          path: `${ROUTES.ELEVES}/nouvelle`,
-          title: 'Nouvelle inscription',
-          description: 'Créer une nouvelle inscription'
+          description: 'Voir les candidats inscrits',
+          icon: UserPlusIcon
         }
       ]
     },
@@ -127,7 +124,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
     // },
     {
       title: 'Referentiel',
-      icon: Ref,
+      icon: ArrowPathIcon,
       path: ROUTES.REF,
       description: 'reference de l\' auto-école'
     },
@@ -148,17 +145,14 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
         {
           path: `${ROUTES.ELEVES}/demandes`,
           title: 'Demandes d\'inscription',
-          description: 'Voir les demandes d\'inscription'
+          description: 'Voir les demandes d\'inscription',
+          icon: EnvelopeIcon
         },
         {
           path: `${ROUTES.ELEVES}/inscrits`,
           title: 'Candidats inscrits',
-          description: 'Voir les candidats inscrits'
-        },
-        {
-          path: `${ROUTES.ELEVES}/nouvelle`,
-          title: 'Nouvelle inscription',
-          description: 'Créer une nouvelle inscription'
+          description: 'Voir les candidats inscrits',
+          icon: UserPlusIcon
         }
       ]
     },
@@ -195,7 +189,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
     },
     {
       title: 'Paramètres',
-      icon: SettingsIcon,
+      icon: Cog6ToothIcon,
       path: ROUTES.SETTINGS,
       description: 'Configuration et gestion du système',
       key: 'settings',
@@ -231,9 +225,9 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
 
   // Préparer la liste des menus selon le rôle
   const baseMenuItems = user?.role === "responsable_auto_ecole" ? allMenuItemsAutoEcole : allMenuItems;
-  // Pour l'administrateur: n'afficher que le menu CNEPC (sans sous-menu)
+  // Pour l'administrateur: n'afficher que le menu CNEPC et Workflow
   const roleAdjustedMenuItems = user?.role === 'admin'
-    ? allMenuItems.filter(item => item.title === 'CNEPC')
+    ? allMenuItems.filter(item => item.title === 'CNEPC' || item.title === 'Workflow')
     : baseMenuItems;
 
   // Filtrer les menus selon les permissions de l'utilisateur
@@ -290,14 +284,16 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
         variant="permanent"
         sx={{
           display: { xs: 'none', sm: 'block' },
-          width: open ? 240 : 64,
+          width: open ? 256 : 64,
           flexShrink: 0,
           '& .MuiDrawer-paper': {
-            width: open ? 240 : 64,
+            width: open ? 256 : 64,
             boxSizing: 'border-box',
-            transition: 'width 0.3s ease-in-out',
+            transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             overflowX: 'hidden',
             backgroundColor: '#3A75C4',
+            borderRight: 'none',
+            boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1)',
           },
         }}
       >
@@ -306,18 +302,24 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
           sx={{
             backgroundColor: '#2A5A9A',
             color: 'white',
-            p: 2,
-            textAlign: 'center',
+            p: open ? 3 : 2,
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            mb: open ? 2.5 : 0,
+          }}>
           <Avatar
                 sx={{
-                  bgcolor: 'green',
-                  width: 70,
-                  height: 70,
-                  fontWeight: '2rem',
-                  fontSize: '2.5rem',
+                  backgroundColor: '#10b981',
+                  width: open ? 56 : 40,
+                  height: open ? 56 : 40,
+                  fontSize: open ? '1.75rem' : '1.25rem',
+                  fontWeight: 600,
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
               >
                 {user?.name?.charAt(0) || 'U'}
@@ -325,11 +327,29 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
           </Box>
           
           {open && (
-            <Box sx={{ ml: 1, minWidth: 0, transition: 'all 0.3s ease-in-out' }}>
-              <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'white' }}>
+            <Box sx={{ 
+              mt: 1.5,
+              textAlign: 'center',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  fontWeight: 600, 
+                  color: 'white',
+                  fontSize: '0.9375rem',
+                  mb: 0.5,
+                }}
+              >
                  {user?.name || 'Utilisateur'}
               </Typography>
-              <Typography variant="caption" sx={{ color: 'white', opacity: 0.8 }}>
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  color: 'rgba(255, 255, 255, 0.65)',
+                  fontSize: '0.8125rem',
+                }}
+              >
                 Espace Administration
               </Typography>
             </Box>
@@ -338,8 +358,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       
 
         {/* Navigation */}
-        <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-          <List sx={{ px: 1, py: 2 }}>
+        <Box sx={{ flexGrow: 1, overflow: 'auto', py: 1 }}>
+          <List sx={{ px: open ? 1.5 : 1, py: 0 }}>
             {user?.role !== "responsable_auto_ecole" ? menuItems.map((item) => {
               const IconComponent = item.icon;
               const isCandidatsItem = item.title === 'Gestion des Candidats';
@@ -364,27 +384,35 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                         }
                       }}
                       sx={{
-                        mx: 1,
+                        mx: 0,
+                        px: open ? 1.5 : 1,
+                        py: 0.875,
                         borderRadius: 2,
                         mb: 0.5,
-                        backgroundColor: isActive(item.path) ? 'rgba(255, 255, 255, 0.3)' : 'transparent',
-                        borderLeft: isActive(item.path) ? '4px solid white' : 'none',
-                        color: 'white',
+                        justifyContent: open ? 'flex-start' : 'center',
+                        backgroundColor: isActive(item.path) 
+                          ? 'rgba(255, 255, 255, 0.15)'
+                          : 'transparent',
+                        color: isActive(item.path) ? 'white' : 'rgba(255, 255, 255, 0.85)',
+                        minHeight: 44,
                         '&:hover': {
-                          backgroundColor: isActive(item.path) ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.2)',
+                          backgroundColor: isActive(item.path) 
+                            ? 'rgba(255, 255, 255, 0.2)'
+                            : 'rgba(255, 255, 255, 0.08)',
                         },
-                        transition: 'all 0.2s ease-in-out',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
                       title={open ? item.description : item.title}
                     >
                       <ListItemIcon
                         sx={{
-                          minWidth: open ? 40 : 'auto',
+                          minWidth: open ? 40 : 0,
                           justifyContent: 'center',
-                          color: 'white',
+                          color: 'inherit',
+                          mr: open ? 1.5 : 0,
                         }}
                       >
-                        <IconComponent />
+                        <IconComponent className="w-6 h-6" style={{ color: 'inherit' }} />
                       </ListItemIcon>
                       {open && (
                         <>
@@ -392,15 +420,18 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                             primary={item.title}
                             primaryTypographyProps={{
                               variant: 'body2',
-                              fontWeight: isActive(item.path) ? 'medium' : 'normal',
-                              color: 'white',
+                              fontWeight: isActive(item.path) ? 600 : 500,
+                              color: 'inherit',
+                              fontSize: '0.875rem',
                             }}
                           />
                           {(isCandidatsItem || isSettingsItem || isCnepcItem || isWorkflowItem) && item.hasSubmenu && (
                             <ChevronDownIcon
-                              sx={{
+                              className="w-5 h-5"
+                              style={{
                                 transform: (isCandidatsItem ? candidatsOpen : (isSettingsItem ? settingsOpen : (isCnepcItem ? cnepcOpen : workflowOpen))) ? 'rotate(180deg)' : 'rotate(0deg)',
-                                transition: 'transform 0.2s ease-in-out',
+                                transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                color: 'rgba(255, 255, 255, 0.7)',
                               }}
                             />
                           )}
@@ -415,29 +446,46 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                       <List component="div" disablePadding>
                         {item.submenu?.map((subItem) => {
                           const subActive = isActive(subItem.path);
+                          const SubIconComponent = (subItem as any).icon;
                           return (
                             <ListItem key={subItem.path} disablePadding>
                               <ListItemButton
                                 onClick={() => handleNavigation(subItem.path)}
                                 sx={{
-                                  ml: 4,
-                                  mr: 1,
+                                  ml: 4.5,
+                                  mr: 1.5,
+                                  px: 1.5,
+                                  py: 0.75,
                                   borderRadius: 2,
                                   mb: 0.5,
-                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  backgroundColor: subActive 
+                                    ? 'rgba(255, 255, 255, 0.12)'
+                                    : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.7)',
+                                  minHeight: 40,
                                   '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
                                     color: 'white',
                                   },
-                                  transition: 'all 0.2s ease-in-out',
+                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                 }}
                               >
+                                {SubIconComponent && (
+                                  <ListItemIcon
+                                    sx={{
+                                      minWidth: 36,
+                                      color: 'inherit',
+                                    }}
+                                  >
+                                    <SubIconComponent className="w-5 h-5" style={{ color: 'inherit' }} />
+                                  </ListItemIcon>
+                                )}
                                 <ListItemText
                                   primary={subItem.title}
                                   primaryTypographyProps={{
                                     variant: 'body2',
-                                    fontSize: '0.875rem',
+                                    fontSize: '0.8125rem',
+                                    fontWeight: subActive ? 500 : 400,
                                   }}
                                 />
                               </ListItemButton>
@@ -459,24 +507,30 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                               <ListItemButton
                                 onClick={() => handleNavigation(subItem.path)}
                                 sx={{
-                                  ml: 4,
-                                  mr: 1,
+                                  ml: 4.5,
+                                  mr: 1.5,
+                                  px: 1.5,
+                                  py: 0.75,
                                   borderRadius: 2,
                                   mb: 0.5,
-                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  backgroundColor: subActive 
+                                    ? 'rgba(255, 255, 255, 0.12)'
+                                    : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.7)',
+                                  minHeight: 40,
                                   '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
                                     color: 'white',
                                   },
-                                  transition: 'all 0.2s ease-in-out',
+                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                 }}
                               >
                                 <ListItemText
                                   primary={subItem.title}
                                   primaryTypographyProps={{
                                     variant: 'body2',
-                                    fontSize: '0.875rem',
+                                    fontSize: '0.8125rem',
+                                    fontWeight: subActive ? 500 : 400,
                                   }}
                                 />
                               </ListItemButton>
@@ -498,24 +552,30 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                               <ListItemButton
                                 onClick={() => handleNavigation(subItem.path)}
                                 sx={{
-                                  ml: 4,
-                                  mr: 1,
+                                  ml: 4.5,
+                                  mr: 1.5,
+                                  px: 1.5,
+                                  py: 0.75,
                                   borderRadius: 2,
                                   mb: 0.5,
-                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  backgroundColor: subActive 
+                                    ? 'rgba(255, 255, 255, 0.12)'
+                                    : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.7)',
+                                  minHeight: 40,
                                   '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
                                     color: 'white',
                                   },
-                                  transition: 'all 0.2s ease-in-out',
+                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                 }}
                               >
                                 <ListItemText
                                   primary={subItem.title}
                                   primaryTypographyProps={{
                                     variant: 'body2',
-                                    fontSize: '0.875rem',
+                                    fontSize: '0.8125rem',
+                                    fontWeight: subActive ? 500 : 400,
                                   }}
                                 />
                               </ListItemButton>
@@ -537,24 +597,30 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                               <ListItemButton
                                 onClick={() => handleNavigation(subItem.path)}
                                 sx={{
-                                  ml: 4,
-                                  mr: 1,
+                                  ml: 4.5,
+                                  mr: 1.5,
+                                  px: 1.5,
+                                  py: 0.75,
                                   borderRadius: 2,
                                   mb: 0.5,
-                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  backgroundColor: subActive 
+                                    ? 'rgba(255, 255, 255, 0.12)'
+                                    : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.7)',
+                                  minHeight: 40,
                                   '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
                                     color: 'white',
                                   },
-                                  transition: 'all 0.2s ease-in-out',
+                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                 }}
                               >
                                 <ListItemText
                                   primary={subItem.title}
                                   primaryTypographyProps={{
                                     variant: 'body2',
-                                    fontSize: '0.875rem',
+                                    fontSize: '0.8125rem',
+                                    fontWeight: subActive ? 500 : 400,
                                   }}
                                 />
                               </ListItemButton>
@@ -591,27 +657,35 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                         }
                       }}
                       sx={{
-                        mx: 1,
+                        mx: 0,
+                        px: open ? 1.5 : 1,
+                        py: 0.875,
                         borderRadius: 2,
                         mb: 0.5,
-                        backgroundColor: isActive(item.path) ? 'rgba(255, 255, 255, 0.3)' : 'transparent',
-                        borderLeft: isActive(item.path) ? '4px solid white' : 'none',
-                        color: 'white',
+                        justifyContent: open ? 'flex-start' : 'center',
+                        backgroundColor: isActive(item.path) 
+                          ? 'rgba(255, 255, 255, 0.15)'
+                          : 'transparent',
+                        color: isActive(item.path) ? 'white' : 'rgba(255, 255, 255, 0.85)',
+                        minHeight: 44,
                         '&:hover': {
-                          backgroundColor: isActive(item.path) ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.2)',
+                          backgroundColor: isActive(item.path) 
+                            ? 'rgba(255, 255, 255, 0.2)'
+                            : 'rgba(255, 255, 255, 0.08)',
                         },
-                        transition: 'all 0.2s ease-in-out',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
                       title={open ? item.description : item.title}
                     >
                       <ListItemIcon
                         sx={{
-                          minWidth: open ? 40 : 'auto',
+                          minWidth: open ? 40 : 0,
                           justifyContent: 'center',
-                          color: 'white',
+                          color: 'inherit',
+                          mr: open ? 1.5 : 0,
                         }}
                       >
-                        <IconComponent />
+                        <IconComponent className="w-6 h-6" style={{ color: 'inherit' }} />
                       </ListItemIcon>
                       {open && (
                         <>
@@ -619,15 +693,18 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                             primary={item.title}
                             primaryTypographyProps={{
                               variant: 'body2',
-                              fontWeight: isActive(item.path) ? 'medium' : 'normal',
-                              color: 'white',
+                              fontWeight: isActive(item.path) ? 600 : 500,
+                              color: 'inherit',
+                              fontSize: '0.875rem',
                             }}
                           />
                           {(isCandidatsItem || isSettingsItem || isCnepcItem || isWorkflowItem) && item.hasSubmenu && (
                             <ChevronDownIcon
-                              sx={{
+                              className="w-5 h-5"
+                              style={{
                                 transform: (isCandidatsItem ? candidatsOpen : (isSettingsItem ? settingsOpen : (isCnepcItem ? cnepcOpen : workflowOpen))) ? 'rotate(180deg)' : 'rotate(0deg)',
-                                transition: 'transform 0.2s ease-in-out',
+                                transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                color: 'rgba(255, 255, 255, 0.7)',
                               }}
                             />
                           )}
@@ -642,29 +719,46 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                       <List component="div" disablePadding>
                         {item.submenu?.map((subItem) => {
                           const subActive = isActive(subItem.path);
+                          const SubIconComponent = (subItem as any).icon;
                           return (
                             <ListItem key={subItem.path} disablePadding>
                               <ListItemButton
                                 onClick={() => handleNavigation(subItem.path)}
                                 sx={{
-                                  ml: 4,
-                                  mr: 1,
+                                  ml: 4.5,
+                                  mr: 1.5,
+                                  px: 1.5,
+                                  py: 0.75,
                                   borderRadius: 2,
                                   mb: 0.5,
-                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  backgroundColor: subActive 
+                                    ? 'rgba(255, 255, 255, 0.12)'
+                                    : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.7)',
+                                  minHeight: 40,
                                   '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
                                     color: 'white',
                                   },
-                                  transition: 'all 0.2s ease-in-out',
+                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                 }}
                               >
+                                {SubIconComponent && (
+                                  <ListItemIcon
+                                    sx={{
+                                      minWidth: 36,
+                                      color: 'inherit',
+                                    }}
+                                  >
+                                    <SubIconComponent className="w-5 h-5" style={{ color: 'inherit' }} />
+                                  </ListItemIcon>
+                                )}
                                 <ListItemText
                                   primary={subItem.title}
                                   primaryTypographyProps={{
                                     variant: 'body2',
-                                    fontSize: '0.875rem',
+                                    fontSize: '0.8125rem',
+                                    fontWeight: subActive ? 500 : 400,
                                   }}
                                 />
                               </ListItemButton>
@@ -686,24 +780,30 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                               <ListItemButton
                                 onClick={() => handleNavigation(subItem.path)}
                                 sx={{
-                                  ml: 4,
-                                  mr: 1,
+                                  ml: 4.5,
+                                  mr: 1.5,
+                                  px: 1.5,
+                                  py: 0.75,
                                   borderRadius: 2,
                                   mb: 0.5,
-                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  backgroundColor: subActive 
+                                    ? 'rgba(255, 255, 255, 0.12)'
+                                    : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.7)',
+                                  minHeight: 40,
                                   '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
                                     color: 'white',
                                   },
-                                  transition: 'all 0.2s ease-in-out',
+                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                 }}
                               >
                                 <ListItemText
                                   primary={subItem.title}
                                   primaryTypographyProps={{
                                     variant: 'body2',
-                                    fontSize: '0.875rem',
+                                    fontSize: '0.8125rem',
+                                    fontWeight: subActive ? 500 : 400,
                                   }}
                                 />
                               </ListItemButton>
@@ -725,24 +825,30 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                               <ListItemButton
                                 onClick={() => handleNavigation(subItem.path)}
                                 sx={{
-                                  ml: 4,
-                                  mr: 1,
+                                  ml: 4.5,
+                                  mr: 1.5,
+                                  px: 1.5,
+                                  py: 0.75,
                                   borderRadius: 2,
                                   mb: 0.5,
-                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  backgroundColor: subActive 
+                                    ? 'rgba(255, 255, 255, 0.12)'
+                                    : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.7)',
+                                  minHeight: 40,
                                   '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
                                     color: 'white',
                                   },
-                                  transition: 'all 0.2s ease-in-out',
+                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                 }}
                               >
                                 <ListItemText
                                   primary={subItem.title}
                                   primaryTypographyProps={{
                                     variant: 'body2',
-                                    fontSize: '0.875rem',
+                                    fontSize: '0.8125rem',
+                                    fontWeight: subActive ? 500 : 400,
                                   }}
                                 />
                               </ListItemButton>
@@ -764,24 +870,30 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                               <ListItemButton
                                 onClick={() => handleNavigation(subItem.path)}
                                 sx={{
-                                  ml: 4,
-                                  mr: 1,
+                                  ml: 4.5,
+                                  mr: 1.5,
+                                  px: 1.5,
+                                  py: 0.75,
                                   borderRadius: 2,
                                   mb: 0.5,
-                                  backgroundColor: subActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                                  backgroundColor: subActive 
+                                    ? 'rgba(255, 255, 255, 0.12)'
+                                    : 'transparent',
+                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.7)',
+                                  minHeight: 40,
                                   '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
                                     color: 'white',
                                   },
-                                  transition: 'all 0.2s ease-in-out',
+                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                 }}
                               >
                                 <ListItemText
                                   primary={subItem.title}
                                   primaryTypographyProps={{
                                     variant: 'body2',
-                                    fontSize: '0.875rem',
+                                    fontSize: '0.8125rem',
+                                    fontWeight: subActive ? 500 : 400,
                                   }}
                                 />
                               </ListItemButton>
@@ -804,39 +916,61 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
           {/* Logout Button */}
           <Box
             sx={{
-              backgroundColor: '#0A3A7A',
+              backgroundColor: '#2A5A9A',
               color: 'white',
-              p: 2,
+              p: open ? 2 : 1.5,
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
             }}
           >
             <ListItemButton
               onClick={handleLogout}
               sx={{
+                mx: 0,
+                px: open ? 1.5 : 1,
+                py: 0.875,
                 borderRadius: 2,
-                color: 'white',
+                color: 'rgba(255, 255, 255, 0.85)',
+                justifyContent: open ? 'flex-start' : 'center',
+                backgroundColor: 'transparent',
+                minHeight: 44,
                 '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  color: 'white',
                 },
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
               title="Se déconnecter"
             >
-              <ListItemIcon sx={{ minWidth: open ? 40 : 'auto', justifyContent: 'center' }}>
+              <ListItemIcon sx={{ 
+                minWidth: open ? 40 : 0, 
+                justifyContent: 'center', 
+                mr: open ? 1.5 : 0,
+              }}>
                 <Avatar
                   sx={{
-                    bgcolor: 'white',
+                    backgroundColor: 'white',
                     width: 32,
                     height: 32,
                   }}
                 >
-                  <ArrowRightOnRectangleIcon sx={{ color: '#3A75C4' }} />
+                  <ArrowRightOnRectangleIcon className="w-5 h-5" style={{ color: '#3A75C4' }} />
                 </Avatar>
               </ListItemIcon>
               {open && (
                 <ListItemText
                   primary="Déconnexion"
                   secondary="Se déconnecter"
-                  primaryTypographyProps={{ variant: 'body2', fontWeight: 'bold', color: 'white' }}
-                  secondaryTypographyProps={{ variant: 'caption', color: 'rgba(255, 255, 255, 0.8)' }}
+                  primaryTypographyProps={{ 
+                    variant: 'body2', 
+                    fontWeight: 500, 
+                    color: 'inherit',
+                    fontSize: '0.875rem',
+                  }}
+                  secondaryTypographyProps={{ 
+                    variant: 'caption', 
+                    color: 'rgba(255, 255, 255, 0.65)',
+                    fontSize: '0.8125rem',
+                  }}
                 />
               )}
             </ListItemButton>
@@ -850,21 +984,34 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
         sx={{
           position: 'fixed',
           top: '50%',
-          left: open ? 240 : 64,
+          left: open ? 256 : 64,
           transform: 'translateY(-50%)',
           zIndex: 1000,
-          backgroundColor: 'rgba(255, 255, 255, 0.9)',
-          backdropFilter: 'blur(10px)',
-          border: '2px solid rgba(255, 255, 255, 0.5)',
+          backgroundColor: 'white',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          width: 32,
+          height: 32,
           '&:hover': {
-            backgroundColor: 'rgba(255, 255, 255, 1)',
+            backgroundColor: '#f5f5f5',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.12)',
           },
-          transition: 'all 0.3s ease-in-out',
+          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           display: { xs: 'none', sm: 'flex' },
         }}
         title={open ? 'Réduire la sidebar' : 'Étendre la sidebar'}
       >
-        {open ? <ChevronLeftIcon color="primary" /> : <ChevronRightIcon color="primary" />}
+        {open ? (
+          <ChevronLeftIcon 
+            className="w-6 h-6"
+            style={{ color: '#3A75C4' }}
+          />
+        ) : (
+          <ChevronRightIcon 
+            className="w-6 h-6"
+            style={{ color: '#3A75C4' }}
+          />
+        )}
       </IconButton>
 
       {/* Mobile Bottom Bar */}
@@ -877,31 +1024,57 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
             right: 0,
             zIndex: 1000,
             backgroundColor: '#3A75C4',
-            borderTop: '1px solid rgba(255, 255, 255, 0.2)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: '0 -1px 3px rgba(0, 0, 0, 0.1)',
             display: { xs: 'block', sm: 'none' },
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', py: 1 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-around', 
+            py: 1.5,
+            px: 1,
+          }}>
             {menuItems.map((item) => {
               const IconComponent = item.icon;
+              const active = isActive(item.path);
               return (
                 <IconButton
                   key={item.path}
                   onClick={() => handleNavigation(item.path)}
                   sx={{
                     flexDirection: 'column',
-                    color: 'white',
-                    p: 1,
+                    color: active ? 'white' : 'rgba(255, 255, 255, 0.7)',
+                    p: 1.5,
                     minWidth: 0,
                     flex: 1,
+                    borderRadius: 2,
+                    position: 'relative',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     '&:hover': {
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                      color: 'white',
                     },
                   }}
                   title={item.title}
                 >
-                  <IconComponent sx={{ fontSize: 20, mb: 0.5 }} />
-                  <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'white' }}>
+                  <IconComponent 
+                    className="w-6 h-6 mb-1"
+                    style={{
+                      filter: active ? 'drop-shadow(0 2px 4px rgba(255, 255, 255, 0.3))' : 'none',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    }} 
+                  />
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      fontSize: '0.7rem', 
+                      color: 'inherit',
+                      fontWeight: active ? 600 : 400,
+                      letterSpacing: '0.02em',
+                    }}
+                  >
                     {item.title.split(' ')[0]}
                   </Typography>
                 </IconButton>

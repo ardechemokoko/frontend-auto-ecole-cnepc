@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -6,43 +7,28 @@ import {
   Alert
 } from '@mui/material';
 import DemandesInscriptionTable from '../tables/DemandesInscriptionTable';
-import CandidatDetailsSheet from '../components/CandidatDetailsSheet';
 // Utiliser le même formulaire d'inscription que dans CNEPC
 import { InscriptionFormationForm } from '../../cnepc/forms';
 import type { AutoEcole } from '../../cnepc/types/auto-ecole';
 import { authService } from '../../auth/services/authService';
 import { DemandeInscription } from '../types/inscription';
+import { ROUTES } from '../../../shared/constants';
 
 const DemandesInscriptionPage: React.FC = () => {
-  const [selectedCandidat, setSelectedCandidat] = useState<DemandeInscription | null>(null);
+  const navigate = useNavigate();
   const [inscriptionOpen, setInscriptionOpen] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [autoEcole, setAutoEcole] = useState<AutoEcole | null>(null);
   const [loadingAutoEcole, setLoadingAutoEcole] = useState(false);
   const [uiError, setUiError] = useState<string | null>(null);
 
   const handleCandidatSelect = (candidat: DemandeInscription) => {
-    setSelectedCandidat(candidat);
-    setSheetOpen(true);
+    // Naviguer vers la page de détails au lieu d'ouvrir un sheet
+    navigate(ROUTES.DEMANDE_DETAILS.replace(':id', candidat.id));
   };
 
   const handleCloseInscription = () => {
     setInscriptionOpen(false);
-    setSelectedCandidat(null);
-  };
-
-  const handleCloseSheet = () => {
-    setSheetOpen(false);
-    setSelectedCandidat(null);
-  };
-
-  const handleValidationSuccess = (eleveValide: any) => {
-    console.log('✅ Demande validée avec succès - l\'élève a été transféré vers StudentsTable:', eleveValide);
-    // Rafraîchir la liste des demandes pour cacher la demande validée
-    setRefreshTrigger(prev => prev + 1);
-    // Note: StudentsTable se rafraîchira automatiquement quand on y navigue
-    // car il appelle getElevesValides() qui récupère depuis le stockage local
   };
 
   const handleDeleteSuccess = () => {
@@ -123,14 +109,6 @@ const DemandesInscriptionPage: React.FC = () => {
         onCandidatSelect={handleCandidatSelect} 
         refreshTrigger={refreshTrigger}
         onDelete={handleDeleteSuccess}
-      />
-      
-      {/* Détails du candidat (sheet) */}
-      <CandidatDetailsSheet
-        open={sheetOpen}
-        onClose={handleCloseSheet}
-        candidat={selectedCandidat}
-        onValidationSuccess={handleValidationSuccess}
       />
       
       {/* Formulaire d'inscription d'un candidat à une formation (même composant que côté CNEPC) */}

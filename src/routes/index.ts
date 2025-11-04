@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { ROUTES } from '../shared/constants';
 import { useAppStore } from '../store';
 import AppLayout from '../shared/components/AppLayout';
+import AuthLoader from '../shared/components/AuthLoader';
 
 // Import des composants de pages
 import LoginPage from '../modules/auth/forms/LoginForm';
@@ -37,11 +38,20 @@ import {
   TestPage
 } from '../modules/candidat_examen/pages';
 import { ReceptionDossiersPage } from '../modules/reception';
+import DemandeDetailsPage from '../modules/eleves/pages/DemandeDetailsPage';
+import EleveInscritDetailsPage from '../modules/eleves/pages/EleveInscritDetailsPage';
+import ProfilePage from '../modules/auth/pages/ProfilePage';
 
 
 // Composant de protection des routes
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAppStore();
+  const { isAuthenticated, isLoading } = useAppStore();
+  
+  // Attendre que le chargement soit terminé avant de rediriger
+  if (isLoading) {
+    return React.createElement(AuthLoader);
+  }
+  
   return isAuthenticated ? React.createElement(React.Fragment, null, children) : React.createElement(Navigate, { to: ROUTES.LOGIN, replace: true });
 };
 
@@ -106,6 +116,30 @@ const AppRoutes: React.FC = () => {
       path: ROUTES.AUTO_ECOLES, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(AutoEcolePage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.CANDIDAT_DETAILS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CandidateDetailsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.DEMANDE_DETAILS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(DemandeDetailsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.ELEVE_INSCRIT_DETAILS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(EleveInscritDetailsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.PROFILE, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(ProfilePage))
       ) 
     }),
     React.createElement(Route, { 
