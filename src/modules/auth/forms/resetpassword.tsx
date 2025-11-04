@@ -114,7 +114,7 @@ const ResetPasswordForm: React.FC = () => {
               justifyContent: 'center'
             }}>
               <img
-                src="/src/assets/img/blason.png"
+                src="/assets/img/blason.png"
                 alt="Blason du Gabon"
                 style={{
                   width: '100%',
@@ -131,7 +131,7 @@ const ResetPasswordForm: React.FC = () => {
               justifyContent: 'center'
             }}>
               <img
-                src="/src/assets/img/mtt.png"
+                src="/assets/img/mtt.png"
                 alt="Ministère des Transports"
                 style={{
                   width: '100%',
@@ -221,7 +221,7 @@ const ResetPasswordForm: React.FC = () => {
           p: { xs: 2, sm: 3, md: 4 },
           minHeight: { xs: '60vh', lg: 'auto' },
           position: 'relative',
-          backgroundImage: 'url(/src/assets/img/back-driver.jpg)',
+          backgroundImage: 'url(/assets/img/back-driver.jpg)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
@@ -232,7 +232,7 @@ const ResetPasswordForm: React.FC = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundImage: 'url(/src/assets/img/back-driver.jpg)',
+            backgroundImage: 'url(/assets/img/back-driver.jpg)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             filter: 'blur(8px)',

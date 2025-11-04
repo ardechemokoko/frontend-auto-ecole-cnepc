@@ -250,7 +250,7 @@ const LoginForm: React.FC = () => {
         sx={{
           flex: 1,
           minHeight: { xs: 300, md: '100vh' },
-          backgroundImage: 'url(/src/assets/img/img1.avif)',
+          backgroundImage: 'url(/assets/img/img1.avif)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           position: 'relative',
@@ -284,7 +284,7 @@ const LoginForm: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box
               component="img"
-              src="/src/assets/img/drapeau_sceau.jpg"
+              src="/assets/img/drapeau_sceau.jpg"
               alt="Drapeau Gabon"
               sx={{
                 width: 70,
@@ -348,7 +348,7 @@ const LoginForm: React.FC = () => {
               opacity: 0.8,
             }}
           >
-            Copyright © 2025. Rengus Digital, tous droits reservés.
+            Copyright © 2025. MINISTÈRE DES TRANSPORTS, tous droits reservés.
           </Typography>
         </Box>
       </Box>
