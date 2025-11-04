@@ -38,6 +38,9 @@ import {
   TestPage
 } from '../modules/candidat_examen/pages';
 import { ReceptionDossiersPage } from '../modules/reception';
+import DemandeDetailsPage from '../modules/eleves/pages/DemandeDetailsPage';
+import EleveInscritDetailsPage from '../modules/eleves/pages/EleveInscritDetailsPage';
+import ProfilePage from '../modules/auth/pages/ProfilePage';
 
 
 // Composant de protection des routes
@@ -119,6 +122,24 @@ const AppRoutes: React.FC = () => {
       path: ROUTES.CANDIDAT_DETAILS, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(CandidateDetailsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.DEMANDE_DETAILS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(DemandeDetailsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.ELEVE_INSCRIT_DETAILS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(EleveInscritDetailsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.PROFILE, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(ProfilePage))
       ) 
     }),
     React.createElement(Route, { 

@@ -4,6 +4,8 @@ export const ROUTES = {
   DASHBOARD: '/dashboard',
   VALIDATION: '/validation',
   ELEVES: '/eleves',
+  DEMANDE_DETAILS: '/eleves/demandes/:id',
+  ELEVE_INSCRIT_DETAILS: '/eleves/inscrits/:id',
   CNEPC: '/cnepc',
   RECEPTION: '/reception',
   AUTO_ECOLES: '/auto-ecoles',
@@ -11,6 +13,7 @@ export const ROUTES = {
   SETTINGS: '/settings',
   USER_MANAGEMENT: '/user-management',
   UPDATE: '/updateinfo',
+  PROFILE: '/profile',
 
   REF: '/referentiel',
   CPW: '/change-password',
