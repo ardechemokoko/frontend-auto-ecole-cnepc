@@ -304,23 +304,26 @@ const LoginForm: React.FC = () => {
               variant="h3"
               sx={{
                 color: 'white',
-                fontWeight: 700,
-                fontSize: { md: '2.5rem', lg: '3rem' },
-                lineHeight: 1.2,
+                fontWeight: 600,
+                fontSize: { md: '2rem', lg: '3rem' },
+                lineHeight: 1,
                 mb: 3,
+                textAlign: 'justify',
+                
               }}
             >
-              Bienvenue dans l'espace de gestion des auto-écoles
-              et des examens de permis de conduire !
+              Bienvenue dans l'espace de gestion des auto-écoles 
+              et des examens de permis de conduire!
             </Typography>
 
             <Typography
               variant="body1"
               sx={{
                 color: 'white',
-                fontSize: '1.1rem',
-                lineHeight: 1.7,
+                fontSize: '1rem',
+                lineHeight: 1.5,
                 opacity: 0.95,
+                textAlign: 'justify',
               }}
             >
               Connectez-vous pour gérer les dossiers, inscrire des candidats, gérer les examens,
