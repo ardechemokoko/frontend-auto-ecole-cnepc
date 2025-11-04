@@ -51,7 +51,7 @@ import { autoEcoleService } from '../services';
 import { Dossier, Formation } from '../types/auto-ecole';
 
 const CandidateDetailsPage: React.FC = () => {
-  const { dossierId } = useParams<{ dossierId: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -61,6 +61,9 @@ const CandidateDetailsPage: React.FC = () => {
   const [formationsCache, setFormationsCache] = useState<Map<string, Formation>>(new Map());
   const [documentPreviewOpen, setDocumentPreviewOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
+
+  // Utiliser l'ID du paramètre de route comme dossierId
+  const dossierId = id;
 
   // Fonction utilitaire pour extraire le type de permis
   const getTypePermisLabel = (formation: Formation): string => {
@@ -143,6 +146,7 @@ const CandidateDetailsPage: React.FC = () => {
     }
   };
 
+
   // Charger les détails du dossier
   useEffect(() => {
     const loadDossierDetails = async () => {
@@ -174,8 +178,36 @@ const CandidateDetailsPage: React.FC = () => {
         // Sinon, essayer l'API
         try {
           const dossier = await autoEcoleService.getDossierById(dossierId);
+          
+          // Mapper les documents selon la structure de l'API
+          // Les documents de l'API ont la structure: { id, documentable_id, documentable_type, nom_fichier, chemin_fichier, etc. }
+          if (dossier.documents && Array.isArray(dossier.documents)) {
+            dossier.documents = dossier.documents.map((doc: any) => ({
+              id: doc.id,
+              dossier_id: doc.documentable_id || dossier.id,
+              type_document_id: doc.type_document_id || null,
+              nom: doc.nom_fichier || doc.nom || 'Document',
+              nom_fichier: doc.nom_fichier || doc.nom || 'Document',
+              chemin_fichier: doc.chemin_fichier,
+              type_mime: doc.type_mime || 'application/octet-stream',
+              taille_fichier: doc.taille_fichier || 0,
+              taille_fichier_formate: doc.taille_fichier_formate || '0 B',
+              statut: doc.statut || 'en_attente',
+              valide: doc.valide !== undefined ? doc.valide : false,
+              valide_libelle: doc.valide_libelle || (doc.valide ? 'Validé' : 'Non validé'),
+              date_upload: doc.created_at || doc.date_upload || new Date().toISOString(),
+              commentaires: doc.commentaires || null,
+              created_at: doc.created_at,
+              updated_at: doc.updated_at
+            }));
+          }
+          
           setDossier(dossier);
           console.log('✅ Dossier chargé via API:', dossier);
+          console.log('📄 Documents dans le dossier:', dossier.documents?.length || 0);
+          
+          // Enrichir les données de formation en arrière-plan
+          enrichFormationData(dossier);
         } catch (apiError: any) {
           console.warn('⚠️ API non disponible, utilisation des données de base:', apiError);
           

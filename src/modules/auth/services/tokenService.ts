@@ -31,7 +31,14 @@ class TokenService {
   }
 
   isTokenValid(): boolean {
-    const token = this.getToken();
+    // Essayer d'abord avec access_token (utilisé par l'API)
+    let token = this.getTokenApi();
+    
+    // Si pas trouvé, essayer avec auth_token (fallback)
+    if (!token) {
+      token = this.getToken();
+    }
+    
     if (!token) return false;
 
     try {
