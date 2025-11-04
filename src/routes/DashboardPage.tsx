@@ -7,14 +7,17 @@ import {
   Grid,
   Avatar,
   Paper,
+  CircularProgress
 } from '@mui/material';
 import {
-  People as UserGroupIcon,
-  CheckCircle as CheckCircleIcon,
-  Send as PaperAirplaneIcon,
-  BarChart as ChartBarIcon,
-} from '@mui/icons-material';
+  UserGroupIcon,
+  CheckCircleIcon,
+  PaperAirplaneIcon,
+  ChartBarIcon
+} from '@heroicons/react/24/outline';
 import tokenService from '../modules/auth/services/tokenService';
+import { autoEcoleService } from '../modules/cnepc/services/auto-ecole.service';
+import { getAutoEcoleId } from '../shared/utils/autoEcoleUtils';
 
 const DashboardPage: React.FC = () => {
   const [stats, setStats] = useState({
@@ -22,15 +25,70 @@ const DashboardPage: React.FC = () => {
     dossiersValides: 0,
     transmisCNEPC: 0
   });
-const [user, setUser]= useState();
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState();
+
   useEffect(() => {
-    // Simuler le chargement des statistiques
-    setStats({
-      totalEleves: 156,
-      dossiersValides: 89,
-      transmisCNEPC: 23
-    });
-    setUser(tokenService.getUser())
+    const chargerStatistiques = async () => {
+      try {
+        setLoading(true);
+        const autoEcoleId = getAutoEcoleId();
+
+        if (!autoEcoleId) {
+          console.warn('⚠️ Aucun ID d\'auto-école trouvé pour charger les statistiques');
+          setStats({
+            totalEleves: 0,
+            dossiersValides: 0,
+            transmisCNEPC: 0
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Charger tous les dossiers pour calculer les statistiques
+        const response = await autoEcoleService.getDossiersByAutoEcoleId(autoEcoleId);
+        const dossiers = response.dossiers || [];
+
+        // 1. Total Élèves : nombre total de dossiers (tous statuts confondus)
+        const totalEleves = dossiers.length;
+
+        // 2. Dossiers Validés : dossiers avec statut "valide" ou "validated"
+        const dossiersValides = dossiers.filter((d: any) => {
+          const statut = d.statut?.toLowerCase();
+          return statut === 'valide' || statut === 'validated' || statut === 'validee';
+        }).length;
+
+        // 3. Transmis CNEPC : dossiers avec statut "transmis" ou "transmitted"
+        const transmisCNEPC = dossiers.filter((d: any) => {
+          const statut = d.statut?.toLowerCase();
+          return statut === 'transmis' || statut === 'transmitted';
+        }).length;
+
+        setStats({
+          totalEleves,
+          dossiersValides,
+          transmisCNEPC
+        });
+
+        console.log('📊 Statistiques du dashboard chargées:', {
+          totalEleves,
+          dossiersValides,
+          transmisCNEPC
+        });
+      } catch (error) {
+        console.error('❌ Erreur lors du chargement des statistiques:', error);
+        setStats({
+          totalEleves: 0,
+          dossiersValides: 0,
+          transmisCNEPC: 0
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    chargerStatistiques();
+    setUser(tokenService.getUser());
   }, []);
 
   return (
@@ -42,7 +100,7 @@ const [user, setUser]= useState();
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0 }}>
                 <Avatar sx={{ bgcolor: 'primary.light', width: 48, height: 48, flexShrink: 0 }}>
-                  <ChartBarIcon />
+                  <ChartBarIcon className="w-6 h-6" />
                 </Avatar>
                 <Box sx={{ minWidth: 0, flex: 1 }}>
                   <Typography 
@@ -87,14 +145,18 @@ const [user, setUser]= useState();
                 <Paper sx={{ p: 3, bgcolor: 'grey.100' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Box>
-                      <Typography variant="h3" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                        {stats.totalEleves}
-                      </Typography>
+                      {loading ? (
+                        <CircularProgress size={24} sx={{ mb: 1 }} />
+                      ) : (
+                        <Typography variant="h3" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+                          {stats.totalEleves}
+                        </Typography>
+                      )}
                       <Typography variant="body2" color="text.secondary">
                         Total Élèves
                       </Typography>
                     </Box>
-                    <UserGroupIcon sx={{ fontSize: 32, color: 'text.secondary' }} />
+                    <UserGroupIcon className="w-8 h-8 text-gray-500" />
                   </Box>
                 </Paper>
               </Grid>
@@ -102,14 +164,18 @@ const [user, setUser]= useState();
                 <Paper sx={{ p: 3, bgcolor: 'grey.100' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Box>
-                      <Typography variant="h3" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                        {stats.dossiersValides}
-                      </Typography>
+                      {loading ? (
+                        <CircularProgress size={24} sx={{ mb: 1 }} />
+                      ) : (
+                        <Typography variant="h3" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+                          {stats.dossiersValides}
+                        </Typography>
+                      )}
                       <Typography variant="body2" color="text.secondary">
                         Dossiers Validés
                       </Typography>
                     </Box>
-                    <CheckCircleIcon sx={{ fontSize: 32, color: 'text.secondary' }} />
+                    <CheckCircleIcon className="w-8 h-8 text-gray-500" />
                   </Box>
                 </Paper>
               </Grid>
@@ -117,14 +183,18 @@ const [user, setUser]= useState();
                 <Paper sx={{ p: 3, bgcolor: 'grey.100' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Box>
-                      <Typography variant="h3" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                        {stats.transmisCNEPC}
-                      </Typography>
+                      {loading ? (
+                        <CircularProgress size={24} sx={{ mb: 1 }} />
+                      ) : (
+                        <Typography variant="h3" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+                          {stats.transmisCNEPC}
+                        </Typography>
+                      )}
                       <Typography variant="body2" color="text.secondary">
                         Transmis CNEPC
                       </Typography>
                     </Box>
-                    <PaperAirplaneIcon sx={{ fontSize: 32, color: 'text.secondary' }} />
+                    <PaperAirplaneIcon className="w-8 h-8 text-gray-500" />
                   </Box>
                 </Paper>
               </Grid>
