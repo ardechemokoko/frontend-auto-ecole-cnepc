@@ -114,7 +114,7 @@ const ResetPasswordForm: React.FC = () => {
               justifyContent: 'center'
             }}>
               <img
-                src="/src/assets/img/blason.png"
+                src="/assets/img/blason.png"
                 alt="Blason du Gabon"
                 style={{
                   width: '100%',
