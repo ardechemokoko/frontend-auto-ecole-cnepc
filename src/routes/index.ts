@@ -38,9 +38,11 @@ import {
   TestPage
 } from '../modules/candidat_examen/pages';
 import { ReceptionDossiersPage } from '../modules/reception';
+import ReceptionDossierDetailsPage from '../modules/reception/pages/ReceptionDossierDetailsPage';
 import DemandeDetailsPage from '../modules/eleves/pages/DemandeDetailsPage';
 import EleveInscritDetailsPage from '../modules/eleves/pages/EleveInscritDetailsPage';
 import ProfilePage from '../modules/auth/pages/ProfilePage';
+import FormationsPage from '../modules/cnepc/pages/FormationsPage';
 
 
 // Composant de protection des routes
@@ -101,6 +103,12 @@ const AppRoutes: React.FC = () => {
       ) 
     }),
     React.createElement(Route, { 
+      path: ROUTES.FORMATIONS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(FormationsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
       path: ROUTES.CNEPC, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(CNEPCPage))
@@ -110,6 +118,12 @@ const AppRoutes: React.FC = () => {
       path: ROUTES.RECEPTION, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(ReceptionDossiersPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.RECEPTION_DETAILS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(ReceptionDossierDetailsPage))
       ) 
     }),
     React.createElement(Route, { 

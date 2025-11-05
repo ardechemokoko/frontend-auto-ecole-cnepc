@@ -29,6 +29,7 @@ import {
   Cog6ToothIcon,
   EnvelopeIcon,
   UserPlusIcon,
+  AcademicCapIcon,
 } from '@heroicons/react/24/outline';
 import { ROUTES } from '../constants';
 import tokenService from '../../modules/auth/services/tokenService';
@@ -65,12 +66,6 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
     //   description: 'modifier les informations de l\' auto-école',
     //   key: 'update'
     // },
-     {
-      title: 'Referentiel',
-      icon: ArrowPathIcon,
-      path: ROUTES.REF,
-      description: 'reference de l\' auto-école'
-    },
     //  {
     //   title: 'Change mot de passe',
     //   icon: Password,
@@ -99,6 +94,12 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
         }
       ]
     },
+    {
+      title: 'Nos formations',
+      icon: AcademicCapIcon,
+      path: ROUTES.FORMATIONS,
+      description: 'Consulter les formations de votre auto-école'
+    },
       {
       title: 'Validation des Dossiers',
       icon: CheckCircleIcon,
@@ -126,7 +127,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       title: 'Referentiel',
       icon: ArrowPathIcon,
       path: ROUTES.REF,
-      description: 'reference de l\' auto-école'
+      description: 'reference de l\' auto-école',
+      key: 'referentiel'
     },
     // {
     //   title: 'Change mot de passe',
@@ -225,9 +227,9 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
 
   // Préparer la liste des menus selon le rôle
   const baseMenuItems = user?.role === "responsable_auto_ecole" ? allMenuItemsAutoEcole : allMenuItems;
-  // Pour l'administrateur: n'afficher que le menu CNEPC et Workflow
+  // Pour l'administrateur: n'afficher que le menu CNEPC, Workflow et Referentiel
   const roleAdjustedMenuItems = user?.role === 'admin'
-    ? allMenuItems.filter(item => item.title === 'CNEPC' || item.title === 'Workflow')
+    ? allMenuItems.filter(item => item.title === 'CNEPC' || item.title === 'Workflow' || item.title === 'Referentiel')
     : baseMenuItems;
 
   // Filtrer les menus selon les permissions de l'utilisateur

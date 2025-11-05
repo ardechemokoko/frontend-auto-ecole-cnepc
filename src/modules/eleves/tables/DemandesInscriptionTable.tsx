@@ -611,7 +611,7 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
               <TableCell>Date demande</TableCell>
               <TableCell>Statut</TableCell>
               <TableCell>Documents</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -698,25 +698,27 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
                     )}
                   </Box>
                 </TableCell>
-                <TableCell>
-                  <IconButton
-                    size="small"
-                    onClick={() => handleVoirDetails(demande)}
-                    color="primary"
-                  >
-                    <EyeIcon className="w-4 h-4" />
-                  </IconButton>
-                  <IconButton size="small" color="secondary">
-                    <PencilIcon className="w-4 h-4" />
-                  </IconButton>
-                  <IconButton 
-                    size="small" 
-                    color="error"
-                    onClick={() => handleDeleteClick(demande)}
-                    title="Supprimer la demande"
-                  >
-                    <TrashIcon className="w-4 h-4" />
-                  </IconButton>
+                <TableCell align="right">
+                  <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleVoirDetails(demande)}
+                      color="primary"
+                    >
+                      <EyeIcon className="w-4 h-4" />
+                    </IconButton>
+                    <IconButton size="small" color="secondary">
+                      <PencilIcon className="w-4 h-4" />
+                    </IconButton>
+                    <IconButton 
+                      size="small" 
+                      color="error"
+                      onClick={() => handleDeleteClick(demande)}
+                      title="Supprimer la demande"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </IconButton>
+                  </Box>
                 </TableCell>
               </TableRow>
             ))}
