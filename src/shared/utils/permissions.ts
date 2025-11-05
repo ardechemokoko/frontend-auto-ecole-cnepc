@@ -8,6 +8,7 @@ export const PERMISSIONS = {
   MANAGE_USERS: 'manage_users',
   MANAGE_SETTINGS: 'manage_settings',
   VIEW_ALL_DATA: 'view_all_data',
+  MANAGE_REFERENTIEL: 'manage_referentiel',
   
   // Permissions Responsable Auto-École
   MANAGE_CANDIDATES: 'manage_candidates',
@@ -27,6 +28,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.VALIDATE_DOSSIERS,
     PERMISSIONS.SEND_CNEPC,
     PERMISSIONS.UPDATE_INFO,
+    PERMISSIONS.MANAGE_REFERENTIEL,
   ],
   responsable_auto_ecole: [
     PERMISSIONS.VIEW_DASHBOARD,
@@ -85,6 +87,7 @@ export function canAccessMenu(user: User | null, menuKey: string): boolean {
     'cnepc': PERMISSIONS.SEND_CNEPC,
     'settings': PERMISSIONS.MANAGE_SETTINGS,
     'update': PERMISSIONS.UPDATE_INFO,
+    'referentiel': PERMISSIONS.MANAGE_REFERENTIEL,
   };
   
   const requiredPermission = menuPermissions[menuKey];
