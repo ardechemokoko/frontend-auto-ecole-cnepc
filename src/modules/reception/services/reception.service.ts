@@ -13,23 +13,21 @@ class ReceptionService extends BaseService {
 
   async listIncoming(): Promise<ReceptionDossier[]> {
     try {
-      console.log('📋 Chargement des dossiers de réception (statut: transmis)...');
+      console.log('📋 Chargement des dossiers de réception via /programme-sessions...');
       
-      // Récupérer l'ID de l'auto-école (même méthode que DemandesInscriptionTable.tsx)
+      // Récupérer l'ID de l'auto-école pour filtrer si nécessaire (optionnel pour les admins CNEPC)
       const autoEcoleId = getAutoEcoleId();
       
-      if (!autoEcoleId) {
-        console.warn('⚠️ Aucun ID d\'auto-école trouvé');
-        return [];
-      }
+      console.log('🏫 Auto-école ID:', autoEcoleId || 'Aucun (affichage de tous les programme-sessions)');
       
-      console.log('🏫 Auto-école ID:', autoEcoleId);
+      // Faire un GET sur /programme-sessions pour récupérer tous les programme_sessions avec leurs dossiers
+      console.log('🔍 Récupération des programme-sessions...');
+      const response = await axiosClient.get('/programme-sessions');
       
-      // Utiliser la même méthode que DemandesInscriptionTable.tsx : getDossiersByAutoEcoleId
-      // avec filtre statut: 'transmis'
-      const filters = {
-        statut: 'transmis' as any
-      };
+      console.log('📦 Programme-sessions récupérés (raw):', response.data);
+      console.log('📦 Type de la réponse:', typeof response.data);
+      console.log('📦 Est un tableau?:', Array.isArray(response.data));
+      console.log('📦 Clés de response.data:', response.data ? Object.keys(response.data) : 'null');
       
       console.log('🔍 Filtres envoyés à l\'API:', filters);
       
@@ -43,102 +41,52 @@ class ReceptionService extends BaseService {
         return [];
       }
       
-      // Récupérer les vraies données complètes de chaque dossier (comme dans DemandesInscriptionTable.tsx)
-      console.log('🔄 Récupération des vraies données depuis l\'API pour chaque dossier...');
-      
-      const dossiersComplets = await Promise.all(
-        response.dossiers.map(async (dossier: any) => {
-          try {
-            console.log(`📋 Récupération des vraies données du dossier ${dossier.id}...`);
-            const dossierComplet = await autoEcoleService.getDossierById(dossier.id);
-            console.log(`✅ Dossier ${dossier.id} avec vraies données récupéré`);
-            return dossierComplet;
-          } catch (error) {
-            console.error(`❌ Erreur lors de la récupération du dossier ${dossier.id}:`, error);
-            // Retourner le dossier original en cas d'erreur
-            return dossier;
-          }
-        })
-      );
-      
-      console.log(`📊 ${dossiersComplets.length} dossier(s) complet(s) récupéré(s) avec statut "transmis"`);
-      
       // Charger d'abord les candidats, formations et auto-écoles pour le mapping
       await this.chargerCandidatsEtFormations();
       
       // Mapper les dossiers vers ReceptionDossier
-      const mapped: ReceptionDossier[] = await Promise.all(dossiersComplets.map(async (dossier: any, index: number) => {
+      const mapped: ReceptionDossier[] = await Promise.all(response.dossiers.map(async (dossier: any) => {
         const candidat = dossier.candidat;
-        const formation = dossier.formation;
-        const autoEcoleId = dossier.auto_ecole_id;
-        
-        console.log(`\n🔄 Mapping dossier ${index + 1}:`);
-        console.log('  • Dossier ID:', dossier.id);
-        console.log('  • Candidat ID:', candidat?.id);
-        console.log('  • Formation ID:', formation?.id);
-        console.log('  • Auto-école ID:', autoEcoleId);
+        let formation = dossier.formation;
+        const autoEcole = dossier.auto_ecole;
         
         // Récupérer les informations depuis les maps
         const candidatFromMap = this.candidatsMap.get(candidat?.id) || this.candidatsMap.get(`personne_${candidat?.personne_id}`);
-        let formationFromMap = this.formationsMap.get(formation?.id);
+        const formationFromMap = this.formationsMap.get(formation?.id);
         const autoEcoleFromMap = this.autoEcolesMap.get(autoEcoleId);
         
-        // Utiliser les données du dossier complet en priorité, avec fallback sur les maps
+        // Utiliser les données du dossier en priorité, avec fallback sur les maps
         const candidatFinal = candidatFromMap || candidat;
         const formationFinal = formationFromMap || formation;
         const autoEcoleFinal = autoEcoleFromMap || dossier.auto_ecole || {};
         
         const candidatPersonne = candidatFinal?.personne || candidat?.personne || {};
         
-        const result = {
+        const result: ReceptionDossier = {
           id: dossier.id,
           reference: dossier.id,
           candidatNom: candidatPersonne.nom || '',
           candidatPrenom: candidatPersonne.prenom || '',
           autoEcoleNom: autoEcoleFinal.nom_auto_ecole || autoEcoleFinal.nom || '',
-          dateEnvoi: dossier.updated_at || dossier.created_at || new Date().toISOString(),
-          statut: 'transmis',
-          dateExamen: '', // Sera rempli si on récupère les programme-sessions
+          dateEnvoi: programmeSession.created_at || dossier.updated_at || dossier.created_at || new Date().toISOString(),
+          statut: 'valide',
+          dateExamen: programmeSession.date_examen || '',
           details: {
-            dossier,
+            dossier: dossierComplet || dossier,
             candidat_complet: candidatFinal,
             formation_complete: formationFinal,
-            auto_ecole_complete: autoEcoleFinal
+            auto_ecole_complete: autoEcoleFinal,
+            programme_session: programmeSession
           },
-        } as ReceptionDossier;
+        };
         
-        // Fusionner les épreuves locales persistées (pour persistance après reload)
-        try {
-          const localEpreuves = this.getEpreuvesLocal(result.id);
-          if (localEpreuves) {
-            (result as any).epreuves = localEpreuves;
-          }
-        } catch {}
-        
-        console.log('  • Résultat candidat:', `${result.candidatNom} ${result.candidatPrenom}`);
-        console.log('  • Résultat auto-école:', result.autoEcoleNom);
-        console.log('  • Résultat formation:', formationFinal?.type_permis?.libelle || formationFinal?.nom || 'N/A');
+        // Récupérer les épreuves depuis les données du dossier si disponibles
+        if (dossier.epreuves) {
+          (result as any).epreuves = dossier.epreuves;
+        }
         
         return result;
       }));
-      
-      console.log('✅ Dossiers mappés avec succès:', mapped.length);
-      
-      // Afficher les détails des dossiers mappés
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('📋 DOSSIERS DE RÉCEPTION MAPPÉS');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      mapped.forEach((dossier, index) => {
-        console.log(`\n📦 Dossier ${index + 1}:`);
-        console.log('  • ID:', dossier.id);
-        console.log('  • Référence:', dossier.reference);
-        console.log('  • Candidat:', `${dossier.candidatNom} ${dossier.candidatPrenom}`);
-        console.log('  • Auto-école:', dossier.autoEcoleNom);
-        console.log('  • Date envoi:', dossier.dateEnvoi);
-        console.log('  • Date examen:', dossier.dateExamen || 'N/A');
-        console.log('  • Statut:', dossier.statut);
-      });
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
       return mapped;
     } catch (e) {
@@ -183,23 +131,14 @@ class ReceptionService extends BaseService {
         const formations = await autoEcoleService.getAllFormations();
         const formationsMapTemp = new Map<string, any>();
         
-        console.log('📚 Formations brutes reçues:', formations.length);
-        console.log('📚 Première formation:', formations[0]);
-        
-        for (const formation of formations) {
-          try {
-            const formationDetails = await autoEcoleService.getFormationById(formation.id);
-            formationsMapTemp.set(formation.id, formationDetails);
-            console.log(`✅ Formation ${formation.id} chargée:`, formationDetails?.type_permis?.libelle || 'N/A');
-          } catch (error) {
-            console.warn(`⚠️ Impossible de récupérer les détails de la formation ${formation.id}:`, error);
+        formations.forEach((formation: any) => {
+          if (formation.id) {
             formationsMapTemp.set(formation.id, formation);
           }
-        }
+        });
         
         this.formationsMap = formationsMapTemp;
         console.log('✅ Formations chargées:', formationsMapTemp.size);
-        console.log('📚 IDs formations:', Array.from(formationsMapTemp.keys()));
       } catch (error) {
         console.error('❌ Erreur lors du chargement des formations:', error);
         this.formationsMap = new Map();
@@ -241,37 +180,16 @@ class ReceptionService extends BaseService {
     return this.post<ReceptionActionResponse>(API_ENDPOINTS.RECEPTION.RECEIVE(id));
   }
 
-  // Enregistre les résultats des épreuves pour un dossier (API + fallback localStorage)
+  // Enregistre les résultats des épreuves pour un dossier via l'API
   async saveEpreuves(dossierProgrammeId: string, results: EpreuvesResultat): Promise<{ success: boolean }> {
     try {
-      // Essai API supposée
+      // Enregistrer via l'API
       await axiosClient.post(`/programme-sessions/${dossierProgrammeId}/epreuves`, results);
-      this.persistEpreuvesLocal(dossierProgrammeId, results);
       return { success: true };
-    } catch {
-      // Fallback: localStorage
-      this.persistEpreuvesLocal(dossierProgrammeId, results);
-      return { success: true };
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'enregistrement des épreuves:', error);
+      throw error;
     }
-  }
-
-  getEpreuvesLocal(dossierProgrammeId: string): EpreuvesResultat | null {
-    try {
-      const raw = localStorage.getItem('reception_epreuves');
-      const obj = raw ? JSON.parse(raw) : {};
-      return obj[dossierProgrammeId] || null;
-    } catch {
-      return null;
-    }
-  }
-
-  private persistEpreuvesLocal(dossierProgrammeId: string, results: EpreuvesResultat) {
-    try {
-      const raw = localStorage.getItem('reception_epreuves');
-      const obj = raw ? JSON.parse(raw) : {};
-      obj[dossierProgrammeId] = { ...results, dateSaisie: results.dateSaisie || new Date().toISOString() };
-      localStorage.setItem('reception_epreuves', JSON.stringify(obj));
-    } catch {}
   }
 }
 

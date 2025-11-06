@@ -75,15 +75,15 @@ const DemandesInscriptionPage: React.FC = () => {
 
   return (
     <Box sx={{ flexGrow: 1, backgroundColor: 'gray-100' }}>
-      <Typography variant="h4" component="h1" gutterBottom className="font-display p-4">
+      <Typography variant="h5" component="h1" gutterBottom className="font-display" sx={{ px: 2, pt: 2, pb: 0.5 }}>
         Demandes d'inscriptions
       </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }} className="font-primary p-4 ">
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, px: 2 }} className="font-primary">
         Gestion des demandes d'inscription des élèves
       </Typography>
 
       {/* Bouton pour ouvrir le formulaire d'inscription (même que CNEPC) */}
-      <Box className="p-4" sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <Box sx={{ px: 2, pb: 1, display: 'flex', justifyContent: 'flex-end' }}>
         {uiError && (
           <Alert severity="warning" sx={{ mr: 2 }} onClose={() => setUiError(null)}>
             {uiError}

@@ -16,8 +16,8 @@ const EpreuveDialog: React.FC<EpreuveDialogProps> = ({ open, onClose, dossier, o
 
   React.useEffect(() => {
     if (open && dossier) {
-      const local = receptionService.getEpreuvesLocal(dossier.id);
-      setValues(local || dossier.epreuves || {});
+      // Utiliser uniquement les épreuves depuis les données du dossier (depuis l'API)
+      setValues(dossier.epreuves || {});
     }
   }, [open, dossier]);
 

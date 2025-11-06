@@ -37,35 +37,8 @@ export class ValidationService {
       const response = await axiosClient.post('/programme-sessions', payload);
       const data = response.data;
 
-      // Persister pour le module Réception si success et objet disponible
-      try {
-        if (data?.success && data?.programme_session?.dossier) {
-          const ps = data.programme_session;
-          const dossier = ps.dossier;
-          const personne = dossier?.candidat?.personne || {};
-          const autoEcole = dossier?.auto_ecole || dossier?.formation?.auto_ecole;
-
-          const incomingItem = {
-            id: ps.id,
-            reference: dossier.id,
-            candidatNom: personne.nom || '',
-            candidatPrenom: personne.prenom || '',
-            autoEcoleNom: autoEcole?.nom_auto_ecole || autoEcole?.nom || '',
-            dateEnvoi: new Date().toISOString(),
-            statut: 'envoye'
-          };
-
-          const key = 'reception_incoming';
-          const raw = localStorage.getItem(key);
-          const arr = raw ? JSON.parse(raw) : [];
-          // éviter doublons par id
-          const filtered = Array.isArray(arr) ? arr.filter((x: any) => x.id !== incomingItem.id) : [];
-          filtered.unshift(incomingItem);
-          localStorage.setItem(key, JSON.stringify(filtered));
-          // garder la dernière réponse complète aussi
-          localStorage.setItem('reception_last_response', JSON.stringify(data));
-        }
-      } catch {}
+      // Les données sont maintenant stockées directement dans la base de données
+      // Plus besoin de localStorage
 
       return data;
     } catch (error: any) {

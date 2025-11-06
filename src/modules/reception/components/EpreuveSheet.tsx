@@ -115,8 +115,8 @@ const EpreuveSheet: React.FC<EpreuveSheetProps> = ({ open, onClose, dossier, onS
 
   React.useEffect(() => {
     if (!open || !dossier) return;
-    const local = receptionService.getEpreuvesLocal(dossier.id);
-    const initial: EpreuvesResultat = local || dossier.epreuves || {};
+    // Utiliser uniquement les épreuves depuis les données du dossier (depuis l'API)
+    const initial: EpreuvesResultat = dossier.epreuves || {};
     setValues({
       ...initial,
       creneauxAttempts: initial.creneauxAttempts || [],

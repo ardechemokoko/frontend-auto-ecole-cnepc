@@ -6,7 +6,8 @@ import {
   TableCell, 
   TableContainer, 
   TableHead, 
-  TableRow, 
+  TableRow,
+  TablePagination,
   Paper, 
   Chip, 
   TextField, 
@@ -32,6 +33,8 @@ const StudentsTable: React.FC = () => {
   const [elevesValides, setElevesValides] = useState<EleveValide[]>([]);
   const [loading, setLoading] = useState(true);
   const [statistiques, setStatistiques] = useState<any>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   // Charger les élèves validés au montage du composant
   useEffect(() => {
@@ -137,26 +140,35 @@ const StudentsTable: React.FC = () => {
     }
   };
 
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
   if (loading) {
     return (
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: 1.5 }}>
         <Typography>Chargement des élèves validés...</Typography>
       </Box>
     );
   }
 
   return (
-    <Box>
+    <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* Statistiques */}
       {statistiques && (
-        <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid container spacing={1} sx={{ mb: 1.5, flexShrink: 0 }}>
           <Grid item xs={12} sm={6} md={3}>
             <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
+              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography color="text.secondary" gutterBottom variant="body2" sx={{ mb: 0.5 }}>
                   Total validés
                 </Typography>
-                <Typography variant="h4">
+                <Typography variant="h5">
                   {statistiques.total}
                 </Typography>
               </CardContent>
@@ -164,11 +176,11 @@ const StudentsTable: React.FC = () => {
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
+              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography color="text.secondary" gutterBottom variant="body2" sx={{ mb: 0.5 }}>
                   Documents complets
                 </Typography>
-                <Typography variant="h4" color="success.main">
+                <Typography variant="h5" color="success.main">
                   {statistiques.documentsComplets}
                 </Typography>
               </CardContent>
@@ -176,11 +188,11 @@ const StudentsTable: React.FC = () => {
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
+              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography color="text.secondary" gutterBottom variant="body2" sx={{ mb: 0.5 }}>
                   Documents incomplets
                 </Typography>
-                <Typography variant="h4" color="warning.main">
+                <Typography variant="h5" color="warning.main">
                   {statistiques.documentsIncomplets}
                 </Typography>
               </CardContent>
@@ -188,11 +200,11 @@ const StudentsTable: React.FC = () => {
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
+              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography color="text.secondary" gutterBottom variant="body2" sx={{ mb: 0.5 }}>
                   Taux de complétude
                 </Typography>
-                <Typography variant="h4" color="info.main">
+                <Typography variant="h5" color="info.main">
                   {statistiques.total > 0 ? Math.round((statistiques.documentsComplets / statistiques.total) * 100) : 0}%
                 </Typography>
               </CardContent>
@@ -201,36 +213,53 @@ const StudentsTable: React.FC = () => {
         </Grid>
       )}
 
-      <Box className="mb-4 flex gap-4 items-center">
+      <Box sx={{ mb: 1.5, display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
         <TextField
-          label="Rechercher un élève"
+          placeholder="Rechercher un élève"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           InputProps={{
-            startAdornment: <MagnifyingGlassIcon className="w-5 h-5 mr-2 text-gray-400" />
+            startAdornment: <MagnifyingGlassIcon className="w-5 h-5 mr-1 text-gray-400" />
           }}
-          className="flex-1"
+          sx={{ minWidth: 200 }}
         />
       </Box>
 
-      <TableContainer component={Paper}>
-        <Table>
+      <Box
+        component={Paper}
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0,
+          maxHeight: 'calc(100vh - 400px)',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}
+      >
+        <TableContainer 
+          sx={{
+            overflow: 'auto',
+            flex: 1,
+            minHeight: 0
+          }}
+        >
+          <Table stickyHeader>
           <TableHead>
-            <TableRow>
-              <TableCell>Nom</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Téléphone</TableCell>
-              <TableCell>Auto-École</TableCell>
-              <TableCell>Statut</TableCell>
-              <TableCell>Documents</TableCell>
-              <TableCell>Date de validation</TableCell>
-              <TableCell>Actions</TableCell>
+            <TableRow sx={{ backgroundColor: 'white' }}>
+              <TableCell sx={{ py: 1.25, fontWeight: 600, fontSize: '0.875rem', color: 'black' }}>Nom</TableCell>
+              <TableCell sx={{ py: 1.25, fontWeight: 600, fontSize: '0.875rem', color: 'black' }}>Email</TableCell>
+              <TableCell sx={{ py: 1.25, fontWeight: 600, fontSize: '0.875rem', color: 'black' }}>Téléphone</TableCell>
+              <TableCell sx={{ py: 1.25, fontWeight: 600, fontSize: '0.875rem', color: 'black' }}>Auto-École</TableCell>
+              <TableCell sx={{ py: 1.25, fontWeight: 600, fontSize: '0.875rem', color: 'black' }}>Statut</TableCell>
+              <TableCell sx={{ py: 1.25, fontWeight: 600, fontSize: '0.875rem', color: 'black' }}>Documents</TableCell>
+              <TableCell sx={{ py: 1.25, fontWeight: 600, fontSize: '0.875rem', color: 'black' }}>Date de validation</TableCell>
+              <TableCell align="right" sx={{ py: 1.25, fontWeight: 600, fontSize: '0.875rem', color: 'black' }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
                   <Typography variant="body2" color="text.secondary">
                     Chargement...
                   </Typography>
@@ -238,7 +267,7 @@ const StudentsTable: React.FC = () => {
               </TableRow>
             ) : filteredStudents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
                   <Typography variant="body2" color="text.secondary">
                     {elevesValides.length === 0 
                       ? 'Aucun élève validé trouvé. Les dossiers avec statut "valide" apparaîtront ici.' 
@@ -252,44 +281,82 @@ const StudentsTable: React.FC = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredStudents.map((eleve) => (
-                <TableRow key={eleve.id}>
-                  <TableCell>{eleve.firstName} {eleve.lastName}</TableCell>
-                  <TableCell>{eleve.email}</TableCell>
-                  <TableCell>{eleve.phone}</TableCell>
-                  <TableCell>{eleve.autoEcole.name}</TableCell>
-                  <TableCell>
+              filteredStudents
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((eleve) => (
+                <TableRow key={eleve.id} hover sx={{ '&:hover': { backgroundColor: '#f9fafb' } }}>
+                  <TableCell sx={{ py: 1 }}>
+                    <Typography variant="body2" fontWeight={500} sx={{ lineHeight: 1.4 }}>
+                      {eleve.firstName} {eleve.lastName}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ py: 1 }}>
+                    <Typography variant="body2" sx={{ lineHeight: 1.4 }}>
+                      {eleve.email}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ py: 1 }}>
+                    <Typography variant="body2" sx={{ lineHeight: 1.4 }}>
+                      {eleve.phone}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ py: 1 }}>
+                    <Typography variant="body2" sx={{ lineHeight: 1.4 }}>
+                      {eleve.autoEcole.name}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ py: 1 }}>
                     <Chip
                       label={getStatusLabel(eleve.status)}
                       color={getStatusColor(eleve.status) as any}
                       size="small"
+                      sx={{ height: 24, fontSize: '0.75rem', fontWeight: 500 }}
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ py: 1 }}>
                     <Chip
                       label={`${eleve.documentsCount}/4`}
                       color={eleve.documentsCount === 4 ? 'success' : 'warning'}
                       size="small"
+                      sx={{ height: 24, fontSize: '0.75rem', fontWeight: 500 }}
                     />
                   </TableCell>
-                  <TableCell>
-                    {new Date(eleve.validatedAt).toLocaleDateString('fr-FR')}
+                  <TableCell sx={{ py: 1 }}>
+                    <Typography variant="body2" sx={{ lineHeight: 1.4 }}>
+                      {new Date(eleve.validatedAt).toLocaleDateString('fr-FR')}
+                    </Typography>
                   </TableCell>
-                  <TableCell>
-                    <Box className="flex gap-1">
+                  <TableCell align="right" sx={{ py: 1 }}>
+                    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
                       <IconButton
                         size="small"
                         onClick={() => handleViewStudent(eleve.id)}
                         title="Voir détails"
+                        sx={{ 
+                          padding: 0.75,
+                          color: '#3A75C4',
+                          '&:hover': { 
+                            backgroundColor: '#e3f2fd',
+                            color: '#2A5A9A'
+                          }
+                        }}
                       >
-                        <EyeIcon className="w-5 h-5 text-blue-600" />
+                        <EyeIcon className="w-5 h-5" />
                       </IconButton>
                       <IconButton
                         size="small"
                         onClick={() => handleDeleteStudent(eleve.id)}
                         title="Supprimer"
+                        sx={{ 
+                          padding: 0.75,
+                          color: '#d32f2f',
+                          '&:hover': { 
+                            backgroundColor: '#ffebee',
+                            color: '#c62828'
+                          }
+                        }}
                       >
-                        <TrashIcon className="w-5 h-5 text-red-600" />
+                        <TrashIcon className="w-5 h-5" />
                       </IconButton>
                     </Box>
                   </TableCell>
@@ -298,7 +365,20 @@ const StudentsTable: React.FC = () => {
             )}
           </TableBody>
         </Table>
-      </TableContainer>
+        </TableContainer>
+        <TablePagination
+          sx={{ flexShrink: 0, py: 0.75, borderTop: '1px solid #e5e7eb' }}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          component="div"
+          count={filteredStudents.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          labelRowsPerPage="Lignes:"
+          labelDisplayedRows={({ from, to, count }) => `${from}-${to} sur ${count !== -1 ? count : `plus de ${to}`}`}
+        />
+      </Box>
     </Box>
   );
 };

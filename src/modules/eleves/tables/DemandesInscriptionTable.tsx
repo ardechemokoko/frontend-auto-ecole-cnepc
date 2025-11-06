@@ -6,6 +6,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   Paper,
   Chip,
   IconButton,
@@ -68,6 +69,8 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
   const [dataSource, setDataSource] = useState<'api' | null>(null);
   const [currentAutoEcoleId, setCurrentAutoEcoleId] = useState<string | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   useEffect(() => {
     chargerDemandes();
@@ -464,6 +467,15 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
   const getStatutColor = (statut: string) => {
     switch (statut) {
       case 'en_attente': return 'warning';
@@ -506,27 +518,19 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
     );
   }
 
-  if (loadingDetails) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography>Récupération des vraies données depuis l'API...</Typography>
-      </Box>
-    );
-  }
-
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* Statistiques */}
       {statistiques && (
-        <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid container spacing={1} sx={{ mb: 1.5, flexShrink: 0 }}>
           <Grid item xs={12} sm={6} md={3}>
             <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
+              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography color="text.secondary" gutterBottom variant="body2" sx={{ mb: 0.5 }}>
                   Total
                 </Typography>
-                <Typography variant="h4">
+                <Typography variant="h5">
                   {statistiques.total}
                 </Typography>
               </CardContent>
@@ -534,11 +538,11 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
+              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography color="text.secondary" gutterBottom variant="body2" sx={{ mb: 0.5 }}>
                   En attente
                 </Typography>
-                <Typography variant="h4" color="warning.main">
+                <Typography variant="h5" color="warning.main">
                   {statistiques.enAttente}
                 </Typography>
               </CardContent>
@@ -546,11 +550,11 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
+              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography color="text.secondary" gutterBottom variant="body2" sx={{ mb: 0.5 }}>
                   Validées
                 </Typography>
-                <Typography variant="h4" color="success.main">
+                <Typography variant="h5" color="success.main">
                   {statistiques.validees}
                 </Typography>
               </CardContent>
@@ -558,11 +562,11 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
+              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography color="text.secondary" gutterBottom variant="body2" sx={{ mb: 0.5 }}>
                   Rejetées
                 </Typography>
-                <Typography variant="h4" color="error.main">
+                <Typography variant="h5" color="error.main">
                   {statistiques.rejetees}
                 </Typography>
               </CardContent>
@@ -572,7 +576,7 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
       )}
 
       {/* Filtres et actions */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+      <Box sx={{ mb: 1.5, display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
         <TextField
           placeholder="Rechercher..."
           value={recherche}
@@ -600,114 +604,122 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
       </Box>
 
       {/* Tableau des demandes */}
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Numéro</TableCell>
-              <TableCell>Nom & Prenom</TableCell>
-              <TableCell>Formation</TableCell>
-              <TableCell>Étape</TableCell>
-              <TableCell>Date demande</TableCell>
-              <TableCell>Statut</TableCell>
-              <TableCell>Documents</TableCell>
-              <TableCell align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {demandes.map((demande) => (
+      <Box
+        component={Paper}
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0,
+          maxHeight: 'calc(100vh - 400px)'
+        }}
+      >
+        <TableContainer 
+          sx={{
+            overflow: 'auto',
+            flex: 1,
+            minHeight: 0
+          }}
+        >
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow sx={{ backgroundColor: 'white' }}>
+                <TableCell sx={{ py: 1, fontWeight: 600, color: 'black' }}>Numéro</TableCell>
+                <TableCell sx={{ py: 1, fontWeight: 600, color: 'black' }}>Nom & Prenom</TableCell>
+                <TableCell sx={{ py: 1, fontWeight: 600, color: 'black' }}>Formation</TableCell>
+                <TableCell sx={{ py: 1, fontWeight: 600, color: 'black' }}>Étape</TableCell>
+                <TableCell sx={{ py: 1, fontWeight: 600, color: 'black' }}>Date demande</TableCell>
+                <TableCell sx={{ py: 1, fontWeight: 600, color: 'black' }}>Statut</TableCell>
+                <TableCell sx={{ py: 1, fontWeight: 600, color: 'black' }}>Documents</TableCell>
+                <TableCell align="right" sx={{ py: 1, fontWeight: 600, color: 'black' }}>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+            {demandes
+              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+              .map((demande) => (
               <TableRow key={demande.id}>
-                <TableCell>
+                <TableCell sx={{ py: 0.75 }}>
                   <Typography variant="body2" fontWeight="bold">
                     {demande.numero}
                   </Typography>
                 </TableCell>
-                <TableCell>
+                <TableCell sx={{ py: 0.75 }}>
                   <Box>
-                    <Typography variant="body2" fontWeight="bold">
+                    <Typography variant="body2" fontWeight="bold" sx={{ mb: 0.25 }}>
                       {demande.eleve.firstName} {demande.eleve.lastName}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ lineHeight: 1.2 }}>
                       {demande.eleve.email}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" display="block">
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ lineHeight: 1.2 }}>
                       {demande.eleve.phone}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" display="flex" alignItems="center" gap={0.5}>
-                      <IdentificationIcon className="w-4 h-4" /> {demande.numero}
-                    </Typography>
                   </Box>
                 </TableCell>
-                <TableCell>
+                <TableCell sx={{ py: 0.75 }}>
                   <Box>
-                    <Typography variant="body2" fontWeight="bold" color="primary">
+                    <Typography variant="body2" fontWeight="bold" color="primary" sx={{ mb: 0.25 }}>
                       {(demande as any).formation?.nom || 'Formation'}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" display="flex" alignItems="center" gap={0.5}>
-                      <CurrencyDollarIcon className="w-4 h-4" /> {(demande as any).formation?.montant || 'N/A'}
+                    <Typography variant="caption" color="text.secondary" display="flex" alignItems="center" gap={0.5} sx={{ lineHeight: 1.2 }}>
+                      <CurrencyDollarIcon className="w-3 h-3" /> {(demande as any).formation?.montant || 'N/A'}
                     </Typography>
-                    {(demande as any).formation?.description && (
-                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                        📝 {(demande as any).formation.description.substring(0, 30)}...
-                      </Typography>
-                    )}
                   </Box>
                 </TableCell>
-                <TableCell>
+                <TableCell sx={{ py: 0.75 }}>
                   <Box>
                     { (demande as any).etape?.libelle ? (
-                      <>
-                    <Typography variant="body2">
-                          {(demande as any).etape?.libelle}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                          Ordre: {(demande as any).etape?.ordre || '-'}
-                    </Typography>
-                      </>
+                      <Typography variant="body2" sx={{ lineHeight: 1.3 }}>
+                        {(demande as any).etape?.libelle}
+                      </Typography>
                     ) : (
                       <Chip 
-                        icon={<ExclamationTriangleIcon className="w-4 h-4" />} 
-                        label="Étape: Demande d'inscription" 
+                        icon={<ExclamationTriangleIcon className="w-3 h-3" />} 
+                        label="Demande d'inscription" 
                         color="warning" 
                         size="small"
+                        sx={{ height: 20, fontSize: '0.7rem' }}
                       />
                     )}
                   </Box>
                 </TableCell>
-                <TableCell>
-                  <Typography variant="body2">
+                <TableCell sx={{ py: 0.75 }}>
+                  <Typography variant="body2" sx={{ lineHeight: 1.3 }}>
                     {new Date(demande.dateDemande).toLocaleDateString('fr-FR')}
                   </Typography>
                 </TableCell>
-                <TableCell>
+                <TableCell sx={{ py: 0.75 }}>
                   <Chip
                     label={getStatutLabel(demande.statut)}
                     color={getStatutColor(demande.statut) as any}
                     size="small"
+                    sx={{ height: 22, fontSize: '0.7rem' }}
                   />
                 </TableCell>
-                <TableCell>
+                <TableCell sx={{ py: 0.75 }}>
                   <Box>
-                    <Typography variant="body2" fontWeight="bold">
-                      {demande.documents.length} document(s)
+                    <Typography variant="body2" fontWeight="bold" sx={{ lineHeight: 1.3 }}>
+                      {demande.documents.length} doc(s)
                     </Typography>
                     {demande.documents.length > 0 && (
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2 }}>
                         {demande.documents.filter((doc: any) => doc.valide).length} validé(s)
                       </Typography>
                     )}
                   </Box>
                 </TableCell>
-                <TableCell align="right">
-                  <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                <TableCell align="right" sx={{ py: 0.75 }}>
+                  <Box sx={{ display: 'flex', gap: 0.25, justifyContent: 'flex-end' }}>
                     <IconButton
                       size="small"
                       onClick={() => handleVoirDetails(demande)}
                       color="primary"
+                      sx={{ padding: 0.5 }}
                     >
                       <EyeIcon className="w-4 h-4" />
                     </IconButton>
-                    <IconButton size="small" color="secondary">
+                    <IconButton size="small" color="secondary" sx={{ padding: 0.5 }}>
                       <PencilIcon className="w-4 h-4" />
                     </IconButton>
                     <IconButton 
@@ -715,6 +727,7 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
                       color="error"
                       onClick={() => handleDeleteClick(demande)}
                       title="Supprimer la demande"
+                      sx={{ padding: 0.5 }}
                     >
                       <TrashIcon className="w-4 h-4" />
                     </IconButton>
@@ -724,7 +737,20 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
             ))}
           </TableBody>
         </Table>
-      </TableContainer>
+        </TableContainer>
+        <TablePagination
+          sx={{ flexShrink: 0, py: 0.5, borderTop: '1px solid #e5e7eb' }}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          component="div"
+          count={demandes.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          labelRowsPerPage="Lignes:"
+          labelDisplayedRows={({ from, to, count }) => `${from}-${to} sur ${count !== -1 ? count : `plus de ${to}`}`}
+        />
+      </Box>
 
       {/* Dialogue de confirmation de suppression */}
       <Dialog
