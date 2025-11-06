@@ -4,6 +4,8 @@ export interface Circuit {
     'actif': boolean,
     'nom_entite': string,
     'description'?: string,
+    'type_permis'?: string,
+    'etranger'?: string
     // 'entite_cle_nom': string, 
 }
 
@@ -12,5 +14,7 @@ export interface CircuitFormData {
     'actif': boolean,
     'nom_entite': string,
     'description'?: string,
+    'type_permis'?: string,
+    'etranger'?: string
     // 'entite_cle_nom': string, 
 }
