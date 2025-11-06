@@ -15,6 +15,10 @@ import {
   Alert,
   CircularProgress,
   DialogContentText,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import { Circuit } from '../types/circuit'
@@ -40,6 +44,7 @@ const CircuitPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = React.useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [etrangerValues, setEtrangerValues] = useState<string[]>([])
 
   // === Charger la liste ===
   const fetchCircuits = async () => {
@@ -61,19 +66,23 @@ const CircuitPage: React.FC = () => {
       const res = await typePermisService.getAll({
         type_ref: "TYPE_PERMIS"
       })
-      setTypePermis(res?.data)
-      console.log(typePermis);
-      
+      setTypePermis(res?.data)      
     } catch (err: any) {
       console.log(err);
-    } finally {
       setTypePermis([]);
+    } finally {
+      // setTypePermis([]);
     }
   }
 
   useEffect(() => {
     fetchCircuits();
     fetchTypePermis();
+    setEtrangerValues([
+      "",
+      "OUI",
+      "NON"
+    ])
   }, [])
 
   // === Ouvrir / fermer le dialog ===
@@ -232,6 +241,49 @@ const CircuitPage: React.FC = () => {
               }}
               margin="normal"
             />
+
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Type de permis</InputLabel>
+              <Select
+                value={formData.type_permis ?? ''}
+                label="Type de permis"
+                onChange={(e) =>
+                  setFormData({ ...formData, type_permis: e.target.value as string })
+                }
+              >
+                {Array.isArray(typePermis) && typePermis.length > 0 ? (
+                  typePermis.map((item) => (
+                    <MenuItem key={item.id} value={item.code}>
+                      {item.libelle}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>Aucun type de permis disponible</MenuItem>
+                )}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Etranger ?</InputLabel>
+              <Select
+                value={formData.etranger ?? ''}
+                label="Etranger"
+                onChange={(e) =>
+                  setFormData({ ...formData, etranger: e.target.value as string })
+                }
+              >
+                {Array.isArray(etrangerValues) && etrangerValues.length > 0 ? (
+                  etrangerValues.map((item) => (
+                    <MenuItem key={item} value={item}>
+                      {item}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>Aucune réponse disponible</MenuItem>
+                )}
+              </Select>
+            </FormControl>
+            
             <TextField
               fullWidth
               label="Description"
