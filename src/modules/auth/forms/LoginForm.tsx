@@ -250,7 +250,7 @@ const LoginForm: React.FC = () => {
         sx={{
           flex: 1,
           minHeight: { xs: 300, md: '100vh' },
-          backgroundImage: 'url(/src/assets/img/img1.avif)',
+          backgroundImage: 'url(/assets/img/img1.avif)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           position: 'relative',
@@ -284,7 +284,7 @@ const LoginForm: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box
               component="img"
-              src="/src/assets/img/drapeau_sceau.jpg"
+              src="/assets/img/drapeau_sceau.jpg"
               alt="Drapeau Gabon"
               sx={{
                 width: 70,
@@ -306,35 +306,39 @@ const LoginForm: React.FC = () => {
           </Box>
 
           {/* Main Content */}
-          <Box sx={{ maxWidth: '500px' }}>
+          <Box sx={{ maxWidth: '600px' }}>
             <Typography
               variant="h3"
               sx={{
                 color: 'white',
-                fontWeight: 700,
-                fontSize: { md: '2.5rem', lg: '3rem' },
-                lineHeight: 1.2,
-                mb: 3,
+                fontWeight: 600,
+                fontSize: { md: '2rem', lg: '3rem' },
+                lineHeight: 1,
+                mb: 8,
+                textAlign: 'justify'
+                
+                
               }}
             >
-              Bienvenue dans l'espace de gestion des auto-écoles
-              et des examens de permis de conduire !
+              Bienvenue dans l'espace de gestion des auto-écoles 
+              et des examens!
             </Typography>
 
             <Typography
               variant="body1"
               sx={{
                 color: 'white',
-                fontSize: '1.1rem',
-                lineHeight: 1.7,
+                fontSize: '1rem',
+                lineHeight: 1.5,
                 opacity: 0.95,
+                textAlign: 'justify',
+          
               }}
             >
-              Connectez-vous pour gérer les dossiers, inscrire des candidats, gérer les examens,
-              accéder à vos documents officiels ou utiliser les services en
-              ligne du ministère des Transports. Votre compte vous ouvre les
-              portes d'une administration plus rapide, plus simple et entièrement
-              numérique.
+             Connectez-vous pour gérer vos dossiers,
+             inscrire des candidats, suivre les examens
+             et accéder à vos documents officiels en ligne, 
+             simplement et efficacement.
             </Typography>
           </Box>
 
