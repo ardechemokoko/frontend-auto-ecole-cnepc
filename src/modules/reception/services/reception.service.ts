@@ -13,122 +13,237 @@ class ReceptionService extends BaseService {
 
   async listIncoming(): Promise<ReceptionDossier[]> {
     try {
-      console.log('📋 Chargement des dossiers de réception (statut: transmis)...');
+      console.log('📋 Chargement des dossiers de réception via /programme-sessions...');
       
-      // Récupérer l'ID de l'auto-école (même méthode que DemandesInscriptionTable.tsx)
+      // Récupérer l'ID de l'auto-école pour filtrer si nécessaire (optionnel pour les admins CNEPC)
       const autoEcoleId = getAutoEcoleId();
       
-      if (!autoEcoleId) {
-        console.warn('⚠️ Aucun ID d\'auto-école trouvé');
-        return [];
-      }
+      console.log('🏫 Auto-école ID:', autoEcoleId || 'Aucun (affichage de tous les programme-sessions)');
       
-      console.log('🏫 Auto-école ID:', autoEcoleId);
+      // Faire un GET sur /programme-sessions pour récupérer tous les programme_sessions avec leurs dossiers
+      console.log('🔍 Récupération des programme-sessions...');
+      const response = await axiosClient.get('/programme-sessions');
       
-      // Utiliser la même méthode que DemandesInscriptionTable.tsx : getDossiersByAutoEcoleId
-      // avec filtre statut: 'transmis'
-      const filters = {
-        statut: 'transmis' as any
-      };
+      console.log('📦 Programme-sessions récupérés (raw):', response.data);
+      console.log('📦 Type de la réponse:', typeof response.data);
+      console.log('📦 Est un tableau?:', Array.isArray(response.data));
+      console.log('📦 Clés de response.data:', response.data ? Object.keys(response.data) : 'null');
       
-      console.log('🔍 Filtres envoyés à l\'API:', filters);
-      
-      const response = await autoEcoleService.getDossiersByAutoEcoleId(autoEcoleId, filters);
-      
-      console.log('📦 Dossiers récupérés depuis l\'API:', response.dossiers?.length || 0);
-      console.log('📋 Structure de la réponse:', response);
-      
-      if (!response.dossiers || response.dossiers.length === 0) {
-        console.log('⚠️ Aucun dossier transmis trouvé pour cette auto-école');
-        return [];
-      }
-      
-      // Récupérer les vraies données complètes de chaque dossier (comme dans DemandesInscriptionTable.tsx)
-      console.log('🔄 Récupération des vraies données depuis l\'API pour chaque dossier...');
-      
-      const dossiersComplets = await Promise.all(
-        response.dossiers.map(async (dossier: any) => {
-          try {
-            console.log(`📋 Récupération des vraies données du dossier ${dossier.id}...`);
-            const dossierComplet = await autoEcoleService.getDossierById(dossier.id);
-            console.log(`✅ Dossier ${dossier.id} avec vraies données récupéré`);
-            return dossierComplet;
-          } catch (error) {
-            console.error(`❌ Erreur lors de la récupération du dossier ${dossier.id}:`, error);
-            // Retourner le dossier original en cas d'erreur
-            return dossier;
+      // La réponse peut être soit un tableau, soit un objet avec une propriété data ou programme_sessions
+      // Structure attendue: { success: true, programme_session: {...} } ou [{ programme_session: {...} }]
+      let programmeSessions: any[] = [];
+      if (Array.isArray(response.data)) {
+        programmeSessions = response.data;
+        console.log('✅ Réponse est un tableau direct');
+      } else if (response.data?.data && Array.isArray(response.data.data)) {
+        programmeSessions = response.data.data;
+        console.log('✅ Réponse dans response.data.data');
+      } else if (response.data?.programme_sessions && Array.isArray(response.data.programme_sessions)) {
+        programmeSessions = response.data.programme_sessions;
+        console.log('✅ Réponse dans response.data.programme_sessions');
+      } else if (response.data?.programme_session) {
+        // Si c'est un seul programme_session, le mettre dans un tableau
+        programmeSessions = [response.data];
+        console.log('✅ Réponse est un seul programme_session dans response.data');
+      } else if (response.data?.success && response.data?.data) {
+        programmeSessions = Array.isArray(response.data.data) ? response.data.data : [response.data.data];
+        console.log('✅ Réponse dans response.data.success.data');
+      } else {
+        console.warn('⚠️ Structure de réponse non reconnue, tentative d\'extraction...');
+        // Dernière tentative : chercher programme_session dans la structure
+        if (response.data && typeof response.data === 'object') {
+          const keys = Object.keys(response.data);
+          console.log('📋 Clés disponibles:', keys);
+          // Essayer de trouver un tableau quelque part
+          for (const key of keys) {
+            if (Array.isArray((response.data as any)[key])) {
+              programmeSessions = (response.data as any)[key];
+              console.log(`✅ Trouvé un tableau dans response.data.${key}`);
+              break;
+            }
           }
-        })
-      );
+        }
+      }
       
-      console.log(`📊 ${dossiersComplets.length} dossier(s) complet(s) récupéré(s) avec statut "transmis"`);
+      console.log(`📊 ${programmeSessions.length} programme-session(s) récupéré(s)`);
+      if (programmeSessions.length > 0) {
+        console.log('📋 Premier programme-session:', programmeSessions[0]);
+      }
       
-      // Charger d'abord les candidats, formations et auto-écoles pour le mapping
+      if (programmeSessions.length === 0) {
+        console.log('⚠️ Aucun programme-session trouvé');
+        return [];
+      }
+      
+      // Filtrer par auto-école seulement si un autoEcoleId est disponible
+      // Sinon, afficher tous les programme-sessions (cas d'un admin CNEPC)
+      const programmeSessionsFiltres = autoEcoleId 
+        ? programmeSessions.filter((ps: any) => {
+            const dossier = ps.dossier || ps.programme_session?.dossier;
+            return dossier && dossier.auto_ecole_id === autoEcoleId;
+          })
+        : programmeSessions; // Afficher tous les programme-sessions si pas d'auto-école
+      
+      console.log(`📋 ${programmeSessionsFiltres.length} programme-session(s) ${autoEcoleId ? `pour l'auto-école ${autoEcoleId}` : '(tous)'}`);
+      
+      // Charger d'abord les candidats, formations et auto-écoles pour le mapping (optionnel, car les données sont déjà dans le dossier)
       await this.chargerCandidatsEtFormations();
       
-      // Mapper les dossiers vers ReceptionDossier
-      const mapped: ReceptionDossier[] = await Promise.all(dossiersComplets.map(async (dossier: any, index: number) => {
+      // Mapper les programme-sessions vers ReceptionDossier
+      // Récupérer le dossier complet pour chaque programme-session car programme_session.dossier ne contient que les IDs
+      const mapped: (ReceptionDossier | null)[] = await Promise.all(programmeSessionsFiltres.map(async (ps: any, index: number) => {
+        // Extraire le programme_session et le dossier
+        const programmeSession = ps.programme_session || ps;
+        const dossierMinimal = programmeSession.dossier || ps.dossier;
+        
+        if (!dossierMinimal || !dossierMinimal.id) {
+          console.warn(`⚠️ Programme-session ${programmeSession.id} n'a pas de dossier associé`);
+          return null;
+        }
+        
+        console.log(`\n🔄 Mapping programme-session ${index + 1}:`);
+        console.log('  • Programme-session ID:', programmeSession.id);
+        console.log('  • Dossier ID:', dossierMinimal.id);
+        console.log('  • Date examen:', programmeSession.date_examen);
+        
+        // Récupérer le dossier complet avec toutes les relations (candidat, formation, auto_ecole)
+        let dossierComplet: any = null;
+        try {
+          console.log(`  📋 Récupération du dossier complet ${dossierMinimal.id}...`);
+          dossierComplet = await autoEcoleService.getDossierById(dossierMinimal.id);
+          console.log(`  ✅ Dossier complet récupéré`);
+        } catch (error) {
+          console.error(`  ❌ Erreur lors de la récupération du dossier complet:`, error);
+          // Utiliser le dossier minimal en fallback
+          dossierComplet = dossierMinimal;
+        }
+        
+        const dossier = dossierComplet || dossierMinimal;
         const candidat = dossier.candidat;
-        const formation = dossier.formation;
-        const autoEcoleId = dossier.auto_ecole_id;
+        let formation = dossier.formation;
+        const autoEcole = dossier.auto_ecole;
         
-        console.log(`\n🔄 Mapping dossier ${index + 1}:`);
-        console.log('  • Dossier ID:', dossier.id);
-        console.log('  • Candidat ID:', candidat?.id);
-        console.log('  • Formation ID:', formation?.id);
-        console.log('  • Auto-école ID:', autoEcoleId);
+        console.log('  • Candidat ID:', candidat?.id || dossierMinimal.candidat_id);
+        console.log('  • Formation ID:', formation?.id || dossierMinimal.formation_id);
+        console.log('  • Auto-école ID:', dossier.auto_ecole_id || dossierMinimal.auto_ecole_id);
+        console.log('  • Formation complète (raw):', formation);
+        console.log('  • Montant dans formation:', {
+          montant: formation?.montant,
+          montant_formate: formation?.montant_formate,
+          prix: formation?.prix
+        });
         
-        // Récupérer les informations depuis les maps
-        const candidatFromMap = this.candidatsMap.get(candidat?.id) || this.candidatsMap.get(`personne_${candidat?.personne_id}`);
-        let formationFromMap = this.formationsMap.get(formation?.id);
-        const autoEcoleFromMap = this.autoEcolesMap.get(autoEcoleId);
+        // Enrichir les données de formation si nécessaire (charger type_permis si seulement l'ID est présent)
+        if (formation && !formation.type_permis && formation.type_permis_id) {
+          try {
+            console.log(`  📋 Enrichissement du type de permis pour la formation ${formation.id}...`);
+            const typePermisResponse = await axiosClient.get(`/referentiels/${formation.type_permis_id}`);
+            if (typePermisResponse.data.success && typePermisResponse.data.data) {
+              formation.type_permis = typePermisResponse.data.data;
+              console.log(`  ✅ Type de permis récupéré:`, formation.type_permis?.libelle || formation.type_permis?.nom);
+            }
+          } catch (error) {
+            console.warn(`  ⚠️ Impossible de charger le type de permis pour la formation ${formation.id}:`, error);
+          }
+        }
+        
+        // Enrichir la session si nécessaire
+        if (formation && !formation.session && formation.session_id) {
+          try {
+            console.log(`  📋 Enrichissement de la session pour la formation ${formation.id}...`);
+            const sessionResponse = await axiosClient.get(`/referentiels/${formation.session_id}`);
+            if (sessionResponse.data.success && sessionResponse.data.data) {
+              formation.session = sessionResponse.data.data;
+              console.log(`  ✅ Session récupérée:`, formation.session?.libelle || formation.session?.nom);
+            }
+          } catch (error) {
+            console.warn(`  ⚠️ Impossible de charger la session pour la formation ${formation.id}:`, error);
+          }
+        }
+        
+        // Récupérer les informations depuis les maps si le dossier complet n'a pas les relations
+        const candidatFromMap = candidat ? null : (this.candidatsMap.get(dossierMinimal.candidat_id) || this.candidatsMap.get(`personne_${candidat?.personne_id}`));
+        const formationFromMap = formation ? null : this.formationsMap.get(dossierMinimal.formation_id);
+        const autoEcoleFromMap = autoEcole ? null : this.autoEcolesMap.get(dossier.auto_ecole_id || dossierMinimal.auto_ecole_id);
+        
+        // Si la formation du map a le type_permis, l'utiliser
+        if (formationFromMap && formationFromMap.type_permis && !formation?.type_permis) {
+          formation = { ...formation, type_permis: formationFromMap.type_permis };
+        }
+        
+        // Si la formation du map a le montant mais pas la formation du dossier, utiliser le montant du map
+        if (formationFromMap) {
+          // Fusionner les propriétés de montant du map si elles manquent dans la formation du dossier
+          if (!formation?.montant && formationFromMap.montant) {
+            formation = { ...formation, montant: formationFromMap.montant };
+          }
+          if (!formation?.montant_formate && formationFromMap.montant_formate) {
+            formation = { ...formation, montant_formate: formationFromMap.montant_formate };
+          }
+          if (!formation?.prix && formationFromMap.prix) {
+            formation = { ...formation, prix: formationFromMap.prix };
+          }
+          
+          console.log('  • Montant depuis map:', {
+            mapMontant: formationFromMap.montant,
+            mapMontantFormate: formationFromMap.montant_formate,
+            mapPrix: formationFromMap.prix,
+            formationMontant: formation?.montant,
+            formationMontantFormate: formation?.montant_formate,
+            formationPrix: formation?.prix
+          });
+        }
         
         // Utiliser les données du dossier complet en priorité, avec fallback sur les maps
-        const candidatFinal = candidatFromMap || candidat;
-        const formationFinal = formationFromMap || formation;
-        const autoEcoleFinal = autoEcoleFromMap || dossier.auto_ecole || {};
+        const candidatFinal = candidat || candidatFromMap;
+        const formationFinal = formation || formationFromMap;
+        const autoEcoleFinal = autoEcole || autoEcoleFromMap || {};
         
         const candidatPersonne = candidatFinal?.personne || candidat?.personne || {};
         
-        const result = {
+        const result: ReceptionDossier = {
           id: dossier.id,
           reference: dossier.id,
           candidatNom: candidatPersonne.nom || '',
           candidatPrenom: candidatPersonne.prenom || '',
           autoEcoleNom: autoEcoleFinal.nom_auto_ecole || autoEcoleFinal.nom || '',
-          dateEnvoi: dossier.updated_at || dossier.created_at || new Date().toISOString(),
-          statut: 'transmis',
-          dateExamen: '', // Sera rempli si on récupère les programme-sessions
+          dateEnvoi: programmeSession.created_at || dossier.updated_at || dossier.created_at || new Date().toISOString(),
+          statut: 'valide',
+          dateExamen: programmeSession.date_examen || '',
           details: {
-            dossier,
+            dossier: dossierComplet || dossier,
             candidat_complet: candidatFinal,
             formation_complete: formationFinal,
-            auto_ecole_complete: autoEcoleFinal
+            auto_ecole_complete: autoEcoleFinal,
+            programme_session: programmeSession
           },
-        } as ReceptionDossier;
+        };
         
-        // Fusionner les épreuves locales persistées (pour persistance après reload)
-        try {
-          const localEpreuves = this.getEpreuvesLocal(result.id);
-          if (localEpreuves) {
-            (result as any).epreuves = localEpreuves;
-          }
-        } catch {}
+        // Récupérer les épreuves depuis les données du dossier si disponibles
+        if (dossier.epreuves) {
+          (result as any).epreuves = dossier.epreuves;
+        }
         
         console.log('  • Résultat candidat:', `${result.candidatNom} ${result.candidatPrenom}`);
         console.log('  • Résultat auto-école:', result.autoEcoleNom);
         console.log('  • Résultat formation:', formationFinal?.type_permis?.libelle || formationFinal?.nom || 'N/A');
+        console.log('  • Type permis présent:', formationFinal?.type_permis ? 'Oui' : 'Non');
+        console.log('  • Montant formation:', formationFinal?.montant_formate || formationFinal?.montant || formationFinal?.prix || 'Non disponible');
+        console.log('  • Date examen:', result.dateExamen);
         
         return result;
       }));
       
-      console.log('✅ Dossiers mappés avec succès:', mapped.length);
+      // Filtrer les nulls
+      const mappedFiltered = mapped.filter((d: ReceptionDossier | null) => d !== null) as ReceptionDossier[];
+      
+      console.log('✅ Dossiers mappés avec succès:', mappedFiltered.length);
       
       // Afficher les détails des dossiers mappés
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('📋 DOSSIERS DE RÉCEPTION MAPPÉS');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      mapped.forEach((dossier, index) => {
+      mappedFiltered.forEach((dossier, index) => {
         console.log(`\n📦 Dossier ${index + 1}:`);
         console.log('  • ID:', dossier.id);
         console.log('  • Référence:', dossier.reference);
@@ -137,10 +252,13 @@ class ReceptionService extends BaseService {
         console.log('  • Date envoi:', dossier.dateEnvoi);
         console.log('  • Date examen:', dossier.dateExamen || 'N/A');
         console.log('  • Statut:', dossier.statut);
+        console.log('  • Formation complète:', dossier.details?.formation_complete ? 'Oui' : 'Non');
+        console.log('  • Candidat complet:', dossier.details?.candidat_complet ? 'Oui' : 'Non');
+        console.log('  • Montant formation:', dossier.details?.formation_complete?.montant_formate || dossier.details?.formation_complete?.montant || dossier.details?.formation_complete?.prix || 'Non disponible');
       });
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
-      return mapped;
+      return mappedFiltered;
     } catch (e) {
       console.error('❌ Erreur lors du chargement des dossiers de réception:', e);
       // Fallback sur l'ancien endpoint si disponible
@@ -241,37 +359,16 @@ class ReceptionService extends BaseService {
     return this.post<ReceptionActionResponse>(API_ENDPOINTS.RECEPTION.RECEIVE(id));
   }
 
-  // Enregistre les résultats des épreuves pour un dossier (API + fallback localStorage)
+  // Enregistre les résultats des épreuves pour un dossier via l'API
   async saveEpreuves(dossierProgrammeId: string, results: EpreuvesResultat): Promise<{ success: boolean }> {
     try {
-      // Essai API supposée
+      // Enregistrer via l'API
       await axiosClient.post(`/programme-sessions/${dossierProgrammeId}/epreuves`, results);
-      this.persistEpreuvesLocal(dossierProgrammeId, results);
       return { success: true };
-    } catch {
-      // Fallback: localStorage
-      this.persistEpreuvesLocal(dossierProgrammeId, results);
-      return { success: true };
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'enregistrement des épreuves:', error);
+      throw error;
     }
-  }
-
-  getEpreuvesLocal(dossierProgrammeId: string): EpreuvesResultat | null {
-    try {
-      const raw = localStorage.getItem('reception_epreuves');
-      const obj = raw ? JSON.parse(raw) : {};
-      return obj[dossierProgrammeId] || null;
-    } catch {
-      return null;
-    }
-  }
-
-  private persistEpreuvesLocal(dossierProgrammeId: string, results: EpreuvesResultat) {
-    try {
-      const raw = localStorage.getItem('reception_epreuves');
-      const obj = raw ? JSON.parse(raw) : {};
-      obj[dossierProgrammeId] = { ...results, dateSaisie: results.dateSaisie || new Date().toISOString() };
-      localStorage.setItem('reception_epreuves', JSON.stringify(obj));
-    } catch {}
   }
 }
 

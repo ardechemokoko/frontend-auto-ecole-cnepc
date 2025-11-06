@@ -29,7 +29,7 @@ export interface ReceptionDossier {
   candidatPrenom: string;
   autoEcoleNom: string;
   dateEnvoi: string; // ISO
-  statut: 'envoye' | 'recu' | 'en_attente' | 'transmis';
+  statut: 'envoye' | 'recu' | 'en_attente' | 'transmis' | 'Cnepc' | 'valide';
   dateExamen?: string; // ISO
   details?: any; // réponse complète (programme_session)
   epreuves?: EpreuvesResultat;

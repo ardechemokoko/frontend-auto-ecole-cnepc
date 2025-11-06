@@ -917,45 +917,64 @@ const EleveInscritDetailsPage: React.FC = () => {
                 const resp = await ValidationService.envoyerAuCNEPC(payload);
                 console.log('✅ Réponse CNEPC (raw):', resp);
                 
-                // Mettre à jour le statut du dossier à "transmis" via PUT /dossiers/{id}
+                // Mettre à jour le statut du dossier à "valide" via PUT /dossiers/{id}
+                let statutUpdated = false;
                 try {
-                  console.log('🔄 Mise à jour du statut du dossier à "transmis"...');
-                  await autoEcoleService.updateDossier(candidat.id, {
-                    statut: 'transmis'
-                  } as any);
-                  console.log('✅ Statut du dossier mis à jour à "transmis"');
+                  console.log('🔄 Mise à jour du statut du dossier à "valide"...');
+                  console.log('📋 ID du dossier:', candidat.id);
+                  
+                  // Récupérer le dossier complet pour avoir tous les champs requis
+                  const currentDossier = await autoEcoleService.getDossierById(candidat.id);
+                  console.log('📋 Dossier actuel:', currentDossier);
+                  
+                  // Préparer les données de mise à jour avec tous les champs requis
+                  const updateData = {
+                    candidat_id: currentDossier.candidat_id,
+                    auto_ecole_id: currentDossier.auto_ecole_id,
+                    formation_id: currentDossier.formation_id,
+                    statut: 'valide' as const,
+                    date_creation: currentDossier.date_creation,
+                    commentaires: currentDossier.commentaires || ''
+                  };
+                  
+                  console.log('📤 Données de mise à jour:', updateData);
+                  
+                  const updateResponse = await autoEcoleService.updateDossier(candidat.id, updateData);
+                  console.log('✅ Statut du dossier mis à jour à "valide"', updateResponse);
+                  
+                  // Recharger les données du dossier pour vérifier la mise à jour
+                  const updatedDossier = await autoEcoleService.getDossierById(candidat.id);
+                  console.log('📋 Dossier mis à jour:', updatedDossier);
+                  if (updatedDossier) {
+                    setCandidat((prev: any) => ({
+                      ...prev,
+                      statut: updatedDossier.statut || 'valide'
+                    }));
+                    statutUpdated = true;
+                  }
                 } catch (updateError: any) {
                   console.error('⚠️ Erreur lors de la mise à jour du statut du dossier:', updateError);
-                  // Ne pas bloquer l'envoi si la mise à jour du statut échoue
+                  console.error('📋 Détails de l\'erreur:', {
+                    message: updateError?.message,
+                    response: updateError?.response?.data,
+                    status: updateError?.response?.status,
+                    errors: updateError?.response?.data?.errors,
+                    fullResponse: updateError?.response
+                  });
+                  
+                  // Afficher les erreurs de validation si disponibles
+                  if (updateError?.response?.data?.errors) {
+                    console.error('❌ Erreurs de validation:', JSON.stringify(updateError.response.data.errors, null, 2));
+                  }
                 }
-                
-                // Persister une entrée locale enrichie avec les infos élève/auto-école si la réponse ne les inclut pas
-                try {
-                  const ps = resp?.programme_session || {};
-                  const key = 'reception_incoming';
-                  const raw = localStorage.getItem(key);
-                  const arr = raw ? JSON.parse(raw) : [];
-                  const incomingItem = {
-                    id: ps.id || `ps-${Date.now()}`,
-                    reference: ps.dossier_id || candidat.id,
-                    candidatNom: candidat.eleve.lastName || '',
-                    candidatPrenom: candidat.eleve.firstName || '',
-                    autoEcoleNom: candidat.autoEcole?.name || '',
-                    dateEnvoi: new Date().toISOString(),
-                    statut: 'envoye',
-                    dateExamen: ps.date_examen || new Date(sendDate).toISOString(),
-                    details: ps,
-                  };
-                  const filtered = Array.isArray(arr) ? arr.filter((x: any) => x.id !== incomingItem.id) : [];
-                  filtered.unshift(incomingItem);
-                  localStorage.setItem(key, JSON.stringify(filtered));
-                } catch {}
                 
                 // Afficher un message de succès
                 setSnackbar({
                   open: true,
-                  message: 'Dossier envoyé au CNEPC avec succès',
-                  severity: 'success'
+                  message: statutUpdated 
+                    ? 'Dossier envoyé au CNEPC avec succès et statut mis à jour'
+                    : 'Dossier envoyé au CNEPC avec succès (vérifiez le statut manuellement)',
+                  severity: statutUpdated ? 'success' : 'error'
                 });
                 
                 // Fermer le modal immédiatement et rediriger

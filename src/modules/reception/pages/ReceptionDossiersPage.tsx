@@ -14,27 +14,10 @@ const ReceptionDossiersPage: React.FC = () => {
     setError(null);
     try {
       const data = await receptionService.listIncoming();
-      // Fusion avec les éléments persistés localement suite aux envois
-      let localArr: any[] = [];
-      try {
-        const raw = localStorage.getItem('reception_incoming');
-        localArr = raw ? JSON.parse(raw) : [];
-      } catch {}
-      const byId: Record<string, any> = {};
-      [...localArr, ...data].forEach((item: any) => {
-        byId[item.id] = item;
-      });
-      setDossiers(Object.values(byId) as any);
+      setDossiers(data);
     } catch (e: any) {
-      // Fallback: afficher les éléments locaux même si l'API n'existe pas/404
-      try {
-        const raw = localStorage.getItem('reception_incoming');
-        const localArr = raw ? JSON.parse(raw) : [];
-        if (Array.isArray(localArr) && localArr.length > 0) {
-          setDossiers(localArr as any);
-        }
-      } catch {}
       setError(e?.message || 'Erreur lors du chargement');
+      setDossiers([]);
     } finally {
       setLoading(false);
     }
@@ -47,15 +30,6 @@ const ReceptionDossiersPage: React.FC = () => {
   const handleReceive = async (id: string) => {
     try {
       await receptionService.receiveDossier(id);
-      // MàJ localStorage statut
-      try {
-        const raw = localStorage.getItem('reception_incoming');
-        const arr = raw ? JSON.parse(raw) : [];
-        const updated = Array.isArray(arr)
-          ? arr.map((x: any) => (x.id === id ? { ...x, statut: 'recu' } : x))
-          : [];
-        localStorage.setItem('reception_incoming', JSON.stringify(updated));
-      } catch {}
       fetchDossiers();
     } catch (e: any) {
       setError(e?.message || 'Erreur lors de la réception du dossier');
