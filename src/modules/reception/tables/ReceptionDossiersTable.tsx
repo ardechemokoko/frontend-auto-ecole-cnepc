@@ -1,6 +1,6 @@
 import React from 'react';
 import { ReceptionDossier, EpreuveStatut } from '../types';
-import { Box, Button, Table, TableBody, TableCell, TableHead, TableRow, Typography, Chip } from '@mui/material';
+import { Box, Button, Table, TableBody, TableCell, TableHead, TableRow, Typography, Chip, Snackbar, Alert } from '@mui/material';
 import EpreuveSheet from '../components/EpreuveSheet';
 import CandidatDetailsSheet from '../components/CandidatDetailsSheet';
 import { EyeIcon } from '@heroicons/react/24/outline';
@@ -65,6 +65,11 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
   const [openDetails, setOpenDetails] = React.useState(false);
   const [selected, setSelected] = React.useState<ReceptionDossier | null>(null);
   const [selectedForDetails, setSelectedForDetails] = React.useState<ReceptionDossier | null>(null);
+  const [snackbar, setSnackbar] = React.useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
 
   const handleOpenEpreuve = (d: ReceptionDossier) => {
     setSelected(d);
@@ -204,6 +209,16 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
         }}
         dossier={selectedForDetails}
       />
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

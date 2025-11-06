@@ -12,7 +12,8 @@ import {
   Tooltip,
   LinearProgress,
   Snackbar,
-  Alert
+  Alert,
+  CircularProgress
 } from '@mui/material';
 // Heroicons imports
 import { 
@@ -25,7 +26,8 @@ import {
   MapPinIcon, 
   EyeIcon,
   ArrowDownTrayIcon,
-  CloudArrowUpIcon
+  CloudArrowUpIcon,
+  PaperAirplaneIcon
 } from '@heroicons/react/24/outline';
 import { ReceptionDossier } from '../types';
 import axiosClient from '../../../shared/environment/envdev';
@@ -45,6 +47,7 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
   const [loading, setLoading] = useState(false);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [sendingToCNEDDT, setSendingToCNEDDT] = useState(false);
   const [documentsFromApi, setDocumentsFromApi] = useState<any[]>([]);
   const [dossierComplet, setDossierComplet] = useState<any>(null);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
@@ -645,6 +648,79 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
     }
   };
 
+  const handleSendToCNEDDT = async () => {
+    if (!dossier?.reference) {
+      setSnackbar({
+        open: true,
+        message: 'ID du dossier manquant',
+        severity: 'error'
+      });
+      return;
+    }
+
+    try {
+      setSendingToCNEDDT(true);
+      
+      console.log('🚚 Envoi du dossier à la CNEDDT:', dossier.reference);
+      const payload = {
+        dossier_id: dossier.reference
+      };
+      
+      console.log('📤 Payload envoyé:', payload);
+      
+      const response = await axiosClient.post('/dossiers/transfert', payload);
+      console.log('✅ Réponse CNEDDT:', response.data);
+      
+      setSnackbar({
+        open: true,
+        message: 'Dossier envoyé à la CNEDDT avec succès',
+        severity: 'success'
+      });
+    } catch (error: any) {
+      console.error('❌ Erreur lors de l\'envoi à la CNEDDT:', error);
+      console.error('📋 Détails de l\'erreur:', {
+        message: error?.message,
+        status: error?.response?.status,
+        statusText: error?.response?.statusText,
+        data: error?.response?.data,
+        errors: error?.response?.data?.errors,
+        fullResponse: error?.response
+      });
+      
+      // Construire un message d'erreur détaillé
+      let errorMessage = 'Erreur lors de l\'envoi à la CNEDDT';
+      
+      if (error?.response?.status === 500) {
+        errorMessage = 'Erreur serveur (500). Veuillez contacter l\'administrateur.';
+        if (error?.response?.data?.message) {
+          errorMessage = `Erreur serveur: ${error.response.data.message}`;
+        }
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      // Ajouter les erreurs de validation si disponibles
+      if (error?.response?.data?.errors) {
+        const validationErrors = Object.entries(error.response.data.errors)
+          .map(([key, value]: [string, any]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+          .join('; ');
+        errorMessage += ` (${validationErrors})`;
+      }
+      
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error'
+      });
+    } finally {
+      setSendingToCNEDDT(false);
+    }
+  };
+
   return (
     <Drawer
       anchor="right"
@@ -669,7 +745,7 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
         {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
           <Typography variant="h5" component="h2" fontWeight="bold" className="font-display">
-            Détails du candidat
+            Détails du candidatsss
           </Typography>
           <IconButton onClick={onClose} size="small">
             <XMarkIcon className="w-5 h-5" />
@@ -929,6 +1005,17 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
           <Stack direction="row" spacing={2} justifyContent="flex-end">
             <Button variant="outlined" onClick={onClose} className="font-primary">
               Fermer
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              color="secondary"
+              startIcon={sendingToCNEDDT ? <CircularProgress size={16} /> : <PaperAirplaneIcon className="w-4 h-4" />}
+              onClick={handleSendToCNEDDT}
+              disabled={sendingToCNEDDT || !dossier?.reference}
+              className="font-primary"
+            >
+              CNEDDT
             </Button>
           </Stack>
         </Box>
