@@ -36,7 +36,7 @@ const CircuitPage: React.FC = () => {
     actif: true,
     nom_entite: '',
     type_permis: '',
-    etranger: ''
+    nationalite: ''
   })
   const [circuits, setCircuits] = useState<Circuit[]>([])
   const [typePermis, setTypePermis] = useState<Referentiel[]>([])
@@ -95,7 +95,7 @@ const CircuitPage: React.FC = () => {
         actif: circuit.actif,
         nom_entite: circuit.nom_entite,
         type_permis: circuit?.type_permis,
-        etranger: circuit?.etranger
+        nationalite: circuit?.nationalite
       })
     } else {
       setEditingCircuit(null)
@@ -105,7 +105,7 @@ const CircuitPage: React.FC = () => {
         actif: true,
         nom_entite: '',
         type_permis: '',
-        etranger: ''
+        nationalite: ''
       })
     }
     setOpenDialog(true)
@@ -120,7 +120,7 @@ const CircuitPage: React.FC = () => {
       actif: true,
       nom_entite: '',
       type_permis: '',
-      etranger: ''
+      nationalite: ''
     })
   }
 
@@ -266,10 +266,10 @@ const CircuitPage: React.FC = () => {
             <FormControl fullWidth margin="normal">
               <InputLabel>Etranger ?</InputLabel>
               <Select
-                value={formData.etranger ?? ''}
+                value={formData.nationalite ?? ''}
                 label="Etranger"
                 onChange={(e) =>
-                  setFormData({ ...formData, etranger: e.target.value as string })
+                  setFormData({ ...formData, nationalite: e.target.value as string })
                 }
               >
                 {Array.isArray(etrangerValues) && etrangerValues.length > 0 ? (
