@@ -132,7 +132,7 @@ const CircuitDetailPage: React.FC = () => {
       setEtapes(etapesData)
       setStatuts(statutsData?.data || statutsData)
       setTypeDocuments(typeDocuments?.data);
-      setRoles(rolesData);
+      setRoles(rolesData.roles);
       setTransitions(transitionsData);
     } catch (err: any) {
       setError(err.message ?? 'Erreur lors du chargement des données')

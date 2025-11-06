@@ -352,7 +352,7 @@ const LoginForm: React.FC = () => {
               opacity: 0.8,
             }}
           >
-            Copyright © 2025. Rengus Digital, tous droits reservés.
+            Copyright © 2025. Ministère des Transports , de la Marine Marchande et de la Logistique, tous droits reservés.
           </Typography>
         </Box>
       </Box>

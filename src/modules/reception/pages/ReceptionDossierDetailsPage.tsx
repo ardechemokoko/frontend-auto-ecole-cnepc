@@ -14,12 +14,7 @@ import {
   Alert,
   Snackbar,
   Avatar,
-  Grid,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField
+  Grid
 } from '@mui/material';
 import { 
   DocumentTextIcon,
@@ -31,10 +26,9 @@ import {
 } from '@heroicons/react/24/outline';
 import { ROUTES } from '../../../shared/constants';
 import axiosClient from '../../../shared/environment/envdev';
-import ValidationService from '../services/validationService';
 import { autoEcoleService } from '../../cnepc/services/auto-ecole.service';
 
-const EleveInscritDetailsPage: React.FC = () => {
+const ReceptionDossierDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [candidat, setCandidat] = useState<any>(null);
@@ -47,10 +41,6 @@ const EleveInscritDetailsPage: React.FC = () => {
   });
   const [documentsFromApi, setDocumentsFromApi] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [sendDialogOpen, setSendDialogOpen] = useState(false);
-  const [sendDate, setSendDate] = useState<string>('');
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
 
   // Charger les données du dossier depuis l'API
   useEffect(() => {
@@ -60,90 +50,89 @@ const EleveInscritDetailsPage: React.FC = () => {
       try {
         setLoading(true);
         
-        // Appeler l'endpoint dossiers/{id} (id est le demandeId du dossier)
-        const response = await axiosClient.get(`/dossiers/${id}`);
+        // Appeler l'endpoint pour récupérer le dossier complet
+        const dossierData = await autoEcoleService.getDossierById(id);
         
-        if (response.data.success && response.data.data) {
-          const dossier = response.data.data;
+        if (dossierData) {
+          const candidatData = dossierData.candidat || {};
+          const personne = candidatData.personne || {};
+          const formation = dossierData.formation || {};
+          const autoEcole = dossierData.auto_ecole || {};
           
           // Mapper les données du dossier vers le format attendu par la page
           const candidatMapped = {
-            id: dossier.id,
-            numero: dossier.id,
-            dateDemande: dossier.date_creation || dossier.created_at,
-            statut: dossier.statut || 'validated',
-            commentaires: Array.isArray(dossier.commentaires) 
-              ? dossier.commentaires.filter((c: any) => c !== null).join(', ') 
-              : dossier.commentaires || '',
+            id: dossierData.id,
+            numero: dossierData.id,
+            dateDemande: dossierData.date_creation || dossierData.created_at,
+            statut: dossierData.statut || 'transmis',
+            commentaires: Array.isArray(dossierData.commentaires) 
+              ? dossierData.commentaires.filter((c: any) => c !== null).join(', ') 
+              : dossierData.commentaires || '',
             eleve: {
-              firstName: dossier.candidat?.personne?.prenom || '',
-              lastName: dossier.candidat?.personne?.nom || '',
-              email: dossier.candidat?.personne?.email || '',
-              phone: dossier.candidat?.personne?.contact || '',
-              address: dossier.candidat?.personne?.adresse || '',
-              birthDate: dossier.candidat?.date_naissance,
-              lieuNaissance: dossier.candidat?.lieu_naissance || '',
-              nationality: dossier.candidat?.nationalite || '',
-              nationaliteEtrangere: undefined,
-              gender: dossier.candidat?.genre || '',
-              numeroCandidat: dossier.candidat?.numero_candidat || '',
-              nip: dossier.candidat?.nip || '',
-              typePiece: dossier.candidat?.type_piece || '',
-              numeroPiece: dossier.candidat?.numero_piece || '',
+              firstName: personne.prenom || '',
+              lastName: personne.nom || '',
+              email: personne.email || '',
+              phone: personne.contact || '',
+              address: personne.adresse || '',
+              birthDate: candidatData.date_naissance,
+              lieuNaissance: candidatData.lieu_naissance || '',
+              nationality: candidatData.nationalite || '',
+              gender: candidatData.genre || '',
+              numeroCandidat: candidatData.numero_candidat || '',
+              nip: candidatData.nip || '',
+              typePiece: candidatData.type_piece || '',
+              numeroPiece: candidatData.numero_piece || '',
             },
             autoEcole: {
-              id: dossier.auto_ecole?.id || '',
-              name: dossier.auto_ecole?.nom_auto_ecole || '',
-              adresse: dossier.auto_ecole?.adresse || '',
-              email: dossier.auto_ecole?.email || '',
-              contact: dossier.auto_ecole?.contact || '',
+              id: autoEcole.id || '',
+              name: autoEcole.nom_auto_ecole || autoEcole.nom || '',
+              adresse: autoEcole.adresse || '',
+              email: autoEcole.email || '',
+              contact: autoEcole.contact || '',
             },
-            formation: dossier.formation || null,
-            documents: dossier.documents || [],
-            dossierData: dossier // Garder les données complètes du dossier
+            formation: formation || null,
+            documents: dossierData.documents || [],
+            dossierData: dossierData // Garder les données complètes du dossier
           };
           
-          // Enrichir les données de formation si nécessaire (charger type_permis et session si seulement les IDs sont présents)
-          if (dossier.formation && !dossier.formation.type_permis && dossier.formation.type_permis_id) {
+          // Enrichir les données de formation si nécessaire
+          if (formation && !formation.type_permis && formation.type_permis_id) {
             try {
-              // Charger le type de permis via l'endpoint référentiels
-              const typePermisResponse = await axiosClient.get(`/referentiels/${dossier.formation.type_permis_id}`);
+              const typePermisResponse = await axiosClient.get(`/referentiels/${formation.type_permis_id}`);
               if (typePermisResponse.data.success && typePermisResponse.data.data) {
-                dossier.formation.type_permis = typePermisResponse.data.data;
+                formation.type_permis = typePermisResponse.data.data;
               }
             } catch (error) {
               console.warn('⚠️ Impossible de charger le type de permis:', error);
             }
           }
 
-          if (dossier.formation && !dossier.formation.session && dossier.formation.session_id) {
+          if (formation && !formation.session && formation.session_id) {
             try {
-              // Charger la session via l'endpoint référentiels
-              const sessionResponse = await axiosClient.get(`/referentiels/${dossier.formation.session_id}`);
+              const sessionResponse = await axiosClient.get(`/referentiels/${formation.session_id}`);
               if (sessionResponse.data.success && sessionResponse.data.data) {
-                dossier.formation.session = sessionResponse.data.data;
+                formation.session = sessionResponse.data.data;
               }
             } catch (error) {
               console.warn('⚠️ Impossible de charger la session:', error);
             }
           }
 
-          // Mettre à jour la formation dans candidatMapped avec les données enrichies
-          candidatMapped.formation = dossier.formation || null;
+          candidatMapped.formation = formation || null;
           
           setCandidat(candidatMapped);
           
-          // Les documents sont déjà dans la réponse, pas besoin de les charger séparément
-          if (dossier.documents && Array.isArray(dossier.documents)) {
-            setDocumentsFromApi(dossier.documents);
+          // Les documents sont déjà dans la réponse
+          if (dossierData.documents && Array.isArray(dossierData.documents)) {
+            setDocumentsFromApi(dossierData.documents);
           }
         } else {
           setSnackbar({
             open: true,
-            message: 'Élève non trouvé',
+            message: 'Dossier non trouvé',
             severity: 'error'
           });
-          setTimeout(() => navigate(ROUTES.ELEVES + '/inscrits'), 2000);
+          setTimeout(() => navigate(ROUTES.RECEPTION), 2000);
         }
       } catch (error: any) {
         console.error('Erreur lors du chargement:', error);
@@ -154,7 +143,7 @@ const EleveInscritDetailsPage: React.FC = () => {
           severity: 'error'
         });
         if (error?.response?.status === 404) {
-          setTimeout(() => navigate(ROUTES.ELEVES + '/inscrits'), 2000);
+          setTimeout(() => navigate(ROUTES.RECEPTION), 2000);
         }
       } finally {
         setLoading(false);
@@ -166,21 +155,17 @@ const EleveInscritDetailsPage: React.FC = () => {
 
   // Fonction pour obtenir tous les documents
   const getAllDocuments = () => {
-    // Les documents viennent directement de l'API dossiers/{id}
-    // Priorité aux documents de l'API
     const apiDocs = documentsFromApi || [];
     const dossierDocs = candidat?.documents || [];
     
     const allDocsMap = new Map();
     
-    // D'abord les documents depuis l'API (les plus à jour)
     apiDocs.forEach((doc: any) => {
       if (doc.id) {
         allDocsMap.set(doc.id, doc);
       }
     });
     
-    // Ensuite les documents du dossier (si pas déjà présents)
     dossierDocs.forEach((doc: any) => {
       if (doc.id && !allDocsMap.has(doc.id)) {
         allDocsMap.set(doc.id, doc);
@@ -192,6 +177,9 @@ const EleveInscritDetailsPage: React.FC = () => {
 
   const getStatutLabel = (statut: string) => {
     const labels: Record<string, string> = {
+      'transmis': 'Transmis',
+      'recu': 'Reçu',
+      'en_attente': 'En attente',
       'pending': 'En attente',
       'validated': 'Validé',
       'rejected': 'Rejeté',
@@ -203,6 +191,9 @@ const EleveInscritDetailsPage: React.FC = () => {
 
   const getStatutColor = (statut: string) => {
     const colors: Record<string, 'default' | 'primary' | 'success' | 'error' | 'warning'> = {
+      'transmis': 'primary',
+      'recu': 'success',
+      'en_attente': 'warning',
       'pending': 'warning',
       'validated': 'success',
       'rejected': 'error',
@@ -226,19 +217,12 @@ const EleveInscritDetailsPage: React.FC = () => {
         type_mime: document.type_mime
       });
 
-      // Essayer différentes méthodes pour récupérer le fichier
       const endpoints = [
-        // Méthode 1: Endpoint direct avec Accept header pour forcer le binaire
         { url: `/documents/${document.id}`, headers: { 'Accept': 'application/pdf,application/octet-stream,image/*,*/*' } },
-        // Méthode 2: Endpoint de téléchargement
         { url: `/documents/${document.id}/download`, headers: {} },
-        // Méthode 3: Endpoint file
         { url: `/documents/${document.id}/file`, headers: {} },
-        // Méthode 4: Endpoint view
         { url: `/documents/${document.id}/view`, headers: {} },
-        // Méthode 5: Via chemin_fichier avec storage
         ...(document.chemin_fichier ? [{ url: `/storage/${document.chemin_fichier}`, headers: {} }] : []),
-        // Méthode 6: Via files endpoint
         ...(document.chemin_fichier ? [{ url: `/files/${document.chemin_fichier}`, headers: {} }] : [])
       ];
 
@@ -249,10 +233,9 @@ const EleveInscritDetailsPage: React.FC = () => {
           const response = await axiosClient.get(endpoint.url, {
             responseType: 'blob',
             headers: endpoint.headers,
-            validateStatus: (status) => status < 500 // Accepter les erreurs 4xx mais pas 5xx
+            validateStatus: (status) => status < 500
           });
 
-          // Si c'est une erreur 404, continuer avec le prochain endpoint
           if (response.status === 404) {
             console.log(`⚠️ Endpoint ${endpoint.url} retourne 404, essai suivant...`);
             continue;
@@ -260,25 +243,22 @@ const EleveInscritDetailsPage: React.FC = () => {
 
           const contentType = response.headers['content-type'] || '';
           
-          // Si la réponse est JSON (erreur), continuer
           if (contentType.includes('application/json')) {
             console.log(`⚠️ Endpoint ${endpoint.url} retourne JSON, essai suivant...`);
             continue;
           }
 
-          // Vérifier que c'est bien un Blob avec des données
           if (response.data instanceof Blob && response.data.size > 0) {
             const blob = new Blob([response.data], {
               type: contentType || document.type_mime || 'application/pdf'
             });
             const url = URL.createObjectURL(blob);
             window.open(url, '_blank');
-            setTimeout(() => URL.revokeObjectURL(url), 10000); // Augmenter le délai de nettoyage
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
             console.log(`✅ Document ouvert avec succès via ${endpoint.url}`);
             return;
           }
         } catch (error: any) {
-          // Ne pas considérer les 404 comme des erreurs critiques
           if (error.response?.status === 404) {
             console.log(`⚠️ Endpoint ${endpoint.url} retourne 404, essai suivant...`);
             continue;
@@ -288,7 +268,6 @@ const EleveInscritDetailsPage: React.FC = () => {
         }
       }
 
-      // Si aucun endpoint n'a fonctionné
       throw lastError || new Error('Tous les endpoints ont échoué. Le document n\'est peut-être pas disponible sur le serveur.');
     } catch (error: any) {
       console.error('❌ Erreur lors de l\'ouverture du document:', error);
@@ -400,12 +379,6 @@ const EleveInscritDetailsPage: React.FC = () => {
       formData.append('commentaires', '');
       formData.append('fichier', file, file.name.trim());
 
-      console.log('📤 Upload document pour dossier:', {
-        documentable_id: candidat.id,
-        documentable_type: 'App\\Models\\Dossier',
-        fichier: `[File: ${file.name.trim()}, ${file.size} bytes, ${file.type}]`
-      });
-
       const response = await axiosClient.post('/documents', formData, {
         timeout: 300000,
         headers: {
@@ -442,11 +415,10 @@ const EleveInscritDetailsPage: React.FC = () => {
         
         // Recharger le dossier pour avoir les données à jour
         if (candidat?.id) {
-          const dossierResponse = await axiosClient.get(`/dossiers/${candidat.id}`);
-          if (dossierResponse.data.success && dossierResponse.data.data) {
-            const dossier = dossierResponse.data.data;
-            if (dossier.documents && Array.isArray(dossier.documents)) {
-              setDocumentsFromApi(dossier.documents);
+          const dossierResponse = await autoEcoleService.getDossierById(candidat.id);
+          if (dossierResponse) {
+            if (dossierResponse.documents && Array.isArray(dossierResponse.documents)) {
+              setDocumentsFromApi(dossierResponse.documents);
             }
           }
         }
@@ -487,7 +459,7 @@ const EleveInscritDetailsPage: React.FC = () => {
   if (!candidat) {
     return (
       <Box sx={{ p: 4 }}>
-        <Alert severity="error">Élève non trouvé</Alert>
+        <Alert severity="error">Dossier non trouvé</Alert>
       </Box>
     );
   }
@@ -498,7 +470,7 @@ const EleveInscritDetailsPage: React.FC = () => {
       <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
           <IconButton
-            onClick={() => navigate(ROUTES.ELEVES + '/inscrits')}
+            onClick={() => navigate(ROUTES.RECEPTION)}
             sx={{ 
               color: '#6b7280',
               '&:hover': { 
@@ -628,7 +600,7 @@ const EleveInscritDetailsPage: React.FC = () => {
 
                     <Grid item xs={6}>
                       <Typography variant="body2" color="text.secondary" gutterBottom>
-                        Date d'inscription
+                        Date d'envoi
                       </Typography>
                       <Typography variant="body1" fontWeight={500}>
                         {new Date(candidat.dateDemande).toLocaleDateString('fr-FR', {
@@ -763,7 +735,7 @@ const EleveInscritDetailsPage: React.FC = () => {
           <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
             <Button 
               variant="outlined" 
-              onClick={() => navigate(ROUTES.ELEVES + '/inscrits')}
+              onClick={() => navigate(ROUTES.RECEPTION)}
               sx={{ 
                 textTransform: 'none',
                 borderColor: '#e5e7eb',
@@ -775,17 +747,6 @@ const EleveInscritDetailsPage: React.FC = () => {
               }}
             >
               Retour
-            </Button>
-            <Button
-              variant="contained"
-              onClick={() => setSendDialogOpen(true)}
-              sx={{
-                backgroundColor: '#3A75C4',
-                textTransform: 'none',
-                '&:hover': { backgroundColor: '#2A5A9A' }
-              }}
-            >
-              Envoyer au CNEPC
             </Button>
           </Box>
         </Grid>
@@ -876,110 +837,9 @@ const EleveInscritDetailsPage: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-
-      {/* Modal d'envoi à la CNEPC */}
-      <Dialog open={sendDialogOpen} onClose={() => setSendDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Envoyer à la CNEPC</DialogTitle>
-        <DialogContent>
-          {sendError && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSendError(null)}>
-              {sendError}
-            </Alert>
-          )}
-          <TextField
-            label="Date d'examen"
-            type="datetime-local"
-            value={sendDate}
-            onChange={(e) => setSendDate(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            fullWidth
-            sx={{ mt: 2 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSendDialogOpen(false)}>Annuler</Button>
-          <Button
-            variant="contained"
-            onClick={async () => {
-              try {
-                setSending(true);
-                setSendError(null);
-                if (!sendDate) {
-                  setSendError('Veuillez sélectionner la date d\'examen.');
-                  setSending(false);
-                  return;
-                }
-                const payload = {
-                  dossier_id: candidat.id,
-                  date_examen: new Date(sendDate).toISOString(),
-                };
-                console.log('🚚 Envoi à la CNEPC - payload:', payload);
-                const resp = await ValidationService.envoyerAuCNEPC(payload);
-                console.log('✅ Réponse CNEPC (raw):', resp);
-                
-                // Mettre à jour le statut du dossier à "transmis" via PUT /dossiers/{id}
-                try {
-                  console.log('🔄 Mise à jour du statut du dossier à "transmis"...');
-                  await autoEcoleService.updateDossier(candidat.id, {
-                    statut: 'transmis'
-                  } as any);
-                  console.log('✅ Statut du dossier mis à jour à "transmis"');
-                } catch (updateError: any) {
-                  console.error('⚠️ Erreur lors de la mise à jour du statut du dossier:', updateError);
-                  // Ne pas bloquer l'envoi si la mise à jour du statut échoue
-                }
-                
-                // Persister une entrée locale enrichie avec les infos élève/auto-école si la réponse ne les inclut pas
-                try {
-                  const ps = resp?.programme_session || {};
-                  const key = 'reception_incoming';
-                  const raw = localStorage.getItem(key);
-                  const arr = raw ? JSON.parse(raw) : [];
-                  const incomingItem = {
-                    id: ps.id || `ps-${Date.now()}`,
-                    reference: ps.dossier_id || candidat.id,
-                    candidatNom: candidat.eleve.lastName || '',
-                    candidatPrenom: candidat.eleve.firstName || '',
-                    autoEcoleNom: candidat.autoEcole?.name || '',
-                    dateEnvoi: new Date().toISOString(),
-                    statut: 'envoye',
-                    dateExamen: ps.date_examen || new Date(sendDate).toISOString(),
-                    details: ps,
-                  };
-                  const filtered = Array.isArray(arr) ? arr.filter((x: any) => x.id !== incomingItem.id) : [];
-                  filtered.unshift(incomingItem);
-                  localStorage.setItem(key, JSON.stringify(filtered));
-                } catch {}
-                
-                // Afficher un message de succès
-                setSnackbar({
-                  open: true,
-                  message: 'Dossier envoyé au CNEPC avec succès',
-                  severity: 'success'
-                });
-                
-                // Fermer le modal immédiatement et rediriger
-                setSendDialogOpen(false);
-                
-                // Rediriger après un court délai pour laisser le temps de voir le toast
-                setTimeout(() => {
-                  navigate(ROUTES.ELEVES + '/inscrits');
-                }, 1500);
-              } catch (e: any) {
-                setSendError(e?.message || 'Erreur lors de l\'envoi');
-              } finally {
-                setSending(false);
-              }
-            }}
-            disabled={sending}
-          >
-            {sending ? 'Envoi...' : 'Envoyer'}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };
 
-export default EleveInscritDetailsPage;
+export default ReceptionDossierDetailsPage;
 
