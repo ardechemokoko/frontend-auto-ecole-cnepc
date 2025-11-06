@@ -62,38 +62,23 @@ const PageReferenciel: React.FC = () => {
   //   console.log("✅ Élément supprimé !");
   //   setOpen(false);
   // };
-
-
   const [formData, setFormData] = useState<ReferentielFormulaire>({ code: '', libelle: '', statut: true, type_ref: '', description: '' });
+  
   useEffect(() => {
     getReferentiel();
-  });
+  }, []);
 
   const getReferentiel = async () => {
     try {
       const res = await referentielService.getReferentiels();
+      setIsLoading(false);
+      setReferentiels(res);     
 
-      // On vérifie que res contient bien un tableau
-      if (Array.isArray(res)) {
-        setReferentiels(res);
-        setIsLoading(false);
-      } else if (Array.isArray(res)) {
-        setReferentiels(res);
-        setIsLoading(false);
-      } else {
-        console.warn("Format de données inattendu :", res);
-        setReferentiels([]);
-      }
     } catch (error) {
-      console.error("Erreur lors du chargement des référentiels :", error);
-
-      // Gestion fine de l'erreur (ex: 404, 500)
-      // if (error.response) {
-      //   console.error("Statut HTTP :", error.response.status);
-      //   console.error("Détails :", error.response.data);
-      // }
-
-      setReferentiels([]); // on vide la liste en cas d’erreur
+      // console.error("Erreur lors du chargement des référentiels :", error);
+      // setReferentiels([]); // on vide la liste en cas d’erreur;
+    } finally {
+      setIsLoading(false);
     }
   };
   // function onViewreferentiel(referentiel: Referentiel): void {
@@ -123,7 +108,7 @@ const PageReferenciel: React.FC = () => {
       console.log(res);
       if (res) {
         // showFormulaire()
-        getReferentiel();
+        // getReferentiel();
         setFormData({ code: '', libelle: '', statut: true, type_ref: '', description: '' })
         setMessage({ type: 'success', text: 'Sauvegarde réussie !' });
 
