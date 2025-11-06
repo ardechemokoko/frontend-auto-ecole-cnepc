@@ -13,28 +13,14 @@ const ReceptionDossiersPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      // Récupérer uniquement les données depuis l'API (base de données)
       const data = await receptionService.listIncoming();
-      // Fusion avec les éléments persistés localement suite aux envois
-      let localArr: any[] = [];
-      try {
-        const raw = localStorage.getItem('reception_incoming');
-        localArr = raw ? JSON.parse(raw) : [];
-      } catch {}
-      const byId: Record<string, any> = {};
-      [...localArr, ...data].forEach((item: any) => {
-        byId[item.id] = item;
-      });
-      setDossiers(Object.values(byId) as any);
+      console.log('📦 Dossiers récupérés depuis l\'API:', data.length);
+      setDossiers(data);
     } catch (e: any) {
-      // Fallback: afficher les éléments locaux même si l'API n'existe pas/404
-      try {
-        const raw = localStorage.getItem('reception_incoming');
-        const localArr = raw ? JSON.parse(raw) : [];
-        if (Array.isArray(localArr) && localArr.length > 0) {
-          setDossiers(localArr as any);
-        }
-      } catch {}
+      console.error('❌ Erreur lors du chargement des dossiers:', e);
       setError(e?.message || 'Erreur lors du chargement');
+      setDossiers([]);
     } finally {
       setLoading(false);
     }
@@ -47,15 +33,7 @@ const ReceptionDossiersPage: React.FC = () => {
   const handleReceive = async (id: string) => {
     try {
       await receptionService.receiveDossier(id);
-      // MàJ localStorage statut
-      try {
-        const raw = localStorage.getItem('reception_incoming');
-        const arr = raw ? JSON.parse(raw) : [];
-        const updated = Array.isArray(arr)
-          ? arr.map((x: any) => (x.id === id ? { ...x, statut: 'recu' } : x))
-          : [];
-        localStorage.setItem('reception_incoming', JSON.stringify(updated));
-      } catch {}
+      // Recharger les données depuis l'API (base de données)
       fetchDossiers();
     } catch (e: any) {
       setError(e?.message || 'Erreur lors de la réception du dossier');

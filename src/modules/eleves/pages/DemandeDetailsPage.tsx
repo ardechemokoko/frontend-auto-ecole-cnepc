@@ -14,15 +14,20 @@ import {
   Alert,
   Snackbar,
   Avatar,
-  Grid
+  Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField
 } from '@mui/material';
 import { 
   DocumentTextIcon,
   ArrowDownTrayIcon,
   CloudArrowUpIcon,
-  TrashIcon,
   EyeIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import { ROUTES } from '../../../shared/constants';
 import ValidationService from '../services/validationService';
@@ -42,6 +47,16 @@ const DemandeDetailsPage: React.FC = () => {
   });
   const [documentsFromApi, setDocumentsFromApi] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [validatingDocumentId, setValidatingDocumentId] = useState<number | null>(null);
+  const [validationDialog, setValidationDialog] = useState<{
+    open: boolean;
+    document: any | null;
+    commentaires: string;
+  }>({
+    open: false,
+    document: null,
+    commentaires: ''
+  });
 
   // Charger les données du dossier depuis l'API
   useEffect(() => {
@@ -509,6 +524,81 @@ const DemandeDetailsPage: React.FC = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
+  const handleOpenValidationDialog = (document: any) => {
+    setValidationDialog({
+      open: true,
+      document,
+      commentaires: document.commentaires || ''
+    });
+  };
+
+  const handleCloseValidationDialog = () => {
+    setValidationDialog({
+      open: false,
+      document: null,
+      commentaires: ''
+    });
+  };
+
+  const handleValidateDocument = async () => {
+    const { document, commentaires } = validationDialog;
+    if (!document || !document.id) return;
+
+    try {
+      setValidatingDocumentId(document.id);
+      
+      const response = await axiosClient.put(`/documents/${document.id}`, {
+        valide: true,
+        commentaires: commentaires || ''
+      });
+
+      if (response.data.success) {
+        // Mettre à jour le document dans la liste
+        setDocumentsFromApi(prev => 
+          prev.map(doc => 
+            doc.id === document.id 
+              ? {
+                  ...doc,
+                  valide: true,
+                  valide_libelle: 'Validé',
+                  commentaires: commentaires || doc.commentaires
+                }
+              : doc
+          )
+        );
+
+        setSnackbar({
+          open: true,
+          message: 'Document validé avec succès',
+          severity: 'success'
+        });
+
+        handleCloseValidationDialog();
+
+        // Recharger le dossier pour avoir les données à jour
+        if (candidat?.id) {
+          const dossierResponse = await axiosClient.get(`/dossiers/${candidat.id}`);
+          if (dossierResponse.data.success && dossierResponse.data.data) {
+            const dossier = dossierResponse.data.data;
+            if (dossier.documents && Array.isArray(dossier.documents)) {
+              setDocumentsFromApi(dossier.documents);
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('Erreur lors de la validation du document:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Erreur lors de la validation du document';
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error'
+      });
+    } finally {
+      setValidatingDocumentId(null);
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ p: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
@@ -740,12 +830,27 @@ const DemandeDetailsPage: React.FC = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
                         <DocumentTextIcon className="w-6 h-6 text-gray-500" />
                         <Box sx={{ flex: 1 }}>
-                          <Typography variant="body1" fontWeight={500}>
-                            {doc.nom_fichier || doc.nom || 'Document sans nom'}
-                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            <Typography variant="body1" fontWeight={500}>
+                              {doc.nom_fichier || doc.nom || 'Document sans nom'}
+                            </Typography>
+                            {doc.valide && (
+                              <Chip
+                                label={doc.valide_libelle || 'Validé'}
+                                color="success"
+                                size="small"
+                                sx={{ height: 20, fontSize: '0.7rem' }}
+                              />
+                            )}
+                          </Box>
                           <Typography variant="body2" color="text.secondary">
                             {doc.taille_fichier_formate || doc.taille || 'Taille inconnue'}
                           </Typography>
+                          {doc.commentaires && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                              {doc.commentaires}
+                            </Typography>
+                          )}
                         </Box>
                       </Box>
                       <Box sx={{ display: 'flex', gap: 0.5, ml: 2 }}>
@@ -767,14 +872,22 @@ const DemandeDetailsPage: React.FC = () => {
                             <ArrowDownTrayIcon className="w-5 h-5" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Supprimer">
-                          <IconButton
-                            size="small"
-                            sx={{ color: '#6b7280', '&:hover': { color: 'error.main' } }}
-                          >
-                            <TrashIcon className="w-5 h-5" />
-                          </IconButton>
-                        </Tooltip>
+                        {!doc.valide && (
+                          <Tooltip title="Valider le document">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenValidationDialog(doc)}
+                              disabled={validatingDocumentId === doc.id}
+                              sx={{ 
+                                color: '#6b7280', 
+                                '&:hover': { color: 'success.main' },
+                                '&:disabled': { opacity: 0.5 }
+                              }}
+                            >
+                              <CheckCircleIcon className="w-5 h-5" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </Box>
                     </Box>
                   ))}
@@ -901,6 +1014,58 @@ const DemandeDetailsPage: React.FC = () => {
 
         </Grid>
       </Grid>
+
+      {/* Dialog de validation de document */}
+      <Dialog
+        open={validationDialog.open}
+        onClose={handleCloseValidationDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Valider le document
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Document: <strong>{validationDialog.document?.nom_fichier || validationDialog.document?.nom || 'Document'}</strong>
+            </Typography>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Commentaires (optionnel)"
+              fullWidth
+              multiline
+              rows={4}
+              variant="outlined"
+              value={validationDialog.commentaires}
+              onChange={(e) => setValidationDialog(prev => ({ ...prev, commentaires: e.target.value }))}
+              sx={{ mt: 2 }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={handleCloseValidationDialog}
+            disabled={validatingDocumentId !== null}
+            sx={{ textTransform: 'none' }}
+          >
+            Annuler
+          </Button>
+          <Button
+            onClick={handleValidateDocument}
+            variant="contained"
+            disabled={validatingDocumentId !== null}
+            sx={{ 
+              backgroundColor: '#3A75C4',
+              textTransform: 'none',
+              '&:hover': { backgroundColor: '#2A5A9A' }
+            }}
+          >
+            {validatingDocumentId !== null ? 'Validation...' : 'Valider'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar */}
       <Snackbar

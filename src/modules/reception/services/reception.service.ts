@@ -43,47 +43,21 @@ class ReceptionService extends BaseService {
         return [];
       }
       
-      // Récupérer les vraies données complètes de chaque dossier (comme dans DemandesInscriptionTable.tsx)
-      console.log('🔄 Récupération des vraies données depuis l\'API pour chaque dossier...');
-      
-      const dossiersComplets = await Promise.all(
-        response.dossiers.map(async (dossier: any) => {
-          try {
-            console.log(`📋 Récupération des vraies données du dossier ${dossier.id}...`);
-            const dossierComplet = await autoEcoleService.getDossierById(dossier.id);
-            console.log(`✅ Dossier ${dossier.id} avec vraies données récupéré`);
-            return dossierComplet;
-          } catch (error) {
-            console.error(`❌ Erreur lors de la récupération du dossier ${dossier.id}:`, error);
-            // Retourner le dossier original en cas d'erreur
-            return dossier;
-          }
-        })
-      );
-      
-      console.log(`📊 ${dossiersComplets.length} dossier(s) complet(s) récupéré(s) avec statut "transmis"`);
-      
       // Charger d'abord les candidats, formations et auto-écoles pour le mapping
       await this.chargerCandidatsEtFormations();
       
       // Mapper les dossiers vers ReceptionDossier
-      const mapped: ReceptionDossier[] = await Promise.all(dossiersComplets.map(async (dossier: any, index: number) => {
+      const mapped: ReceptionDossier[] = await Promise.all(response.dossiers.map(async (dossier: any) => {
         const candidat = dossier.candidat;
         const formation = dossier.formation;
         const autoEcoleId = dossier.auto_ecole_id;
         
-        console.log(`\n🔄 Mapping dossier ${index + 1}:`);
-        console.log('  • Dossier ID:', dossier.id);
-        console.log('  • Candidat ID:', candidat?.id);
-        console.log('  • Formation ID:', formation?.id);
-        console.log('  • Auto-école ID:', autoEcoleId);
-        
         // Récupérer les informations depuis les maps
         const candidatFromMap = this.candidatsMap.get(candidat?.id) || this.candidatsMap.get(`personne_${candidat?.personne_id}`);
-        let formationFromMap = this.formationsMap.get(formation?.id);
+        const formationFromMap = this.formationsMap.get(formation?.id);
         const autoEcoleFromMap = this.autoEcolesMap.get(autoEcoleId);
         
-        // Utiliser les données du dossier complet en priorité, avec fallback sur les maps
+        // Utiliser les données du dossier en priorité, avec fallback sur les maps
         const candidatFinal = candidatFromMap || candidat;
         const formationFinal = formationFromMap || formation;
         const autoEcoleFinal = autoEcoleFromMap || dossier.auto_ecole || {};
@@ -115,30 +89,8 @@ class ReceptionService extends BaseService {
           }
         } catch {}
         
-        console.log('  • Résultat candidat:', `${result.candidatNom} ${result.candidatPrenom}`);
-        console.log('  • Résultat auto-école:', result.autoEcoleNom);
-        console.log('  • Résultat formation:', formationFinal?.type_permis?.libelle || formationFinal?.nom || 'N/A');
-        
         return result;
       }));
-      
-      console.log('✅ Dossiers mappés avec succès:', mapped.length);
-      
-      // Afficher les détails des dossiers mappés
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('📋 DOSSIERS DE RÉCEPTION MAPPÉS');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      mapped.forEach((dossier, index) => {
-        console.log(`\n📦 Dossier ${index + 1}:`);
-        console.log('  • ID:', dossier.id);
-        console.log('  • Référence:', dossier.reference);
-        console.log('  • Candidat:', `${dossier.candidatNom} ${dossier.candidatPrenom}`);
-        console.log('  • Auto-école:', dossier.autoEcoleNom);
-        console.log('  • Date envoi:', dossier.dateEnvoi);
-        console.log('  • Date examen:', dossier.dateExamen || 'N/A');
-        console.log('  • Statut:', dossier.statut);
-      });
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
       return mapped;
     } catch (e) {
@@ -183,23 +135,14 @@ class ReceptionService extends BaseService {
         const formations = await autoEcoleService.getAllFormations();
         const formationsMapTemp = new Map<string, any>();
         
-        console.log('📚 Formations brutes reçues:', formations.length);
-        console.log('📚 Première formation:', formations[0]);
-        
-        for (const formation of formations) {
-          try {
-            const formationDetails = await autoEcoleService.getFormationById(formation.id);
-            formationsMapTemp.set(formation.id, formationDetails);
-            console.log(`✅ Formation ${formation.id} chargée:`, formationDetails?.type_permis?.libelle || 'N/A');
-          } catch (error) {
-            console.warn(`⚠️ Impossible de récupérer les détails de la formation ${formation.id}:`, error);
+        formations.forEach((formation: any) => {
+          if (formation.id) {
             formationsMapTemp.set(formation.id, formation);
           }
-        }
+        });
         
         this.formationsMap = formationsMapTemp;
         console.log('✅ Formations chargées:', formationsMapTemp.size);
-        console.log('📚 IDs formations:', Array.from(formationsMapTemp.keys()));
       } catch (error) {
         console.error('❌ Erreur lors du chargement des formations:', error);
         this.formationsMap = new Map();

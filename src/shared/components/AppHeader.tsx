@@ -28,21 +28,34 @@ const AppHeader: React.FC<AppHeaderProps> = ({ sidebarOpen }) => {
     navigate(ROUTES.PROFILE);
   };
   return (
-    <header
-      className="fixed top-0 right-0 z-40 bg-white shadow-lg border-b border-gray-200 transition-all duration-300"
-      style={{
-        left: sidebarOpen ? '16rem' : '4rem',
-        width: sidebarOpen ? 'calc(100% - 16rem)' : 'calc(100% - 4rem)'
-      }}
-    >
-      {/* Ligne colorée (vert, jaune, bleu) */}
-      <div className="h-1 flex">
+    <>
+      {/* Ligne colorée (vert, jaune, bleu) - commence au tout début de la page */}
+      <div 
+        className="fixed top-0 left-0 right-0 h-1 flex"
+        style={{ 
+          zIndex: 9999,
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '4px'
+        }}
+      >
         <div className="flex-1 bg-green-500"></div>
         <div className="flex-1 bg-yellow-500"></div>
         <div className="flex-1 bg-blue-500"></div>
       </div>
 
-      <div className="px-4 py-3">
+      <header
+        className="fixed right-0 bg-white shadow-lg border-b border-gray-200 transition-all duration-300"
+        style={{
+          left: sidebarOpen ? '16rem' : '4rem',
+          width: sidebarOpen ? 'calc(100% - 16rem)' : 'calc(100% - 4rem)',
+          top: '4px',
+          zIndex: 1000
+        }}
+      >
+        <div className="px-4 py-3">
         <div className="flex items-center justify-end">
           {/* Notifications et utilisateur */}
           <div className="flex items-center space-x-4">
@@ -50,9 +63,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({ sidebarOpen }) => {
             <div className="relative">
               <button className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
                 <BellIcon className="w-6 h-6" />
-                <span className="absolute -top-1 -right-1 bg-gray-800 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  3
-                </span>
               </button>
             </div>
 
@@ -113,6 +123,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ sidebarOpen }) => {
         </div>
       </div>
     </header>
+    </>
   );
 };
 

@@ -1005,6 +1005,11 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
                 statut: 'transmis'
               } as any);
               console.log('✅ Statut du dossier mis à jour à "transmis"');
+              
+              // Émettre un événement pour rafraîchir les statistiques du dashboard
+              window.dispatchEvent(new CustomEvent('dossierTransmis', { 
+                detail: { dossierId: eleve.demandeId } 
+              }));
             } catch (updateError: any) {
               console.error('⚠️ Erreur lors de la mise à jour du statut du dossier:', updateError);
               // Ne pas bloquer l'envoi si la mise à jour du statut échoue
@@ -1027,27 +1032,8 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
               }
             } catch {}
             setSendResp(resp);
-            // Persister une entrée locale enrichie avec les infos élève/auto-école si la réponse ne les inclut pas
-            try {
-              const ps = resp?.programme_session || {};
-              const key = 'reception_incoming';
-              const raw = localStorage.getItem(key);
-              const arr = raw ? JSON.parse(raw) : [];
-              const incomingItem = {
-                id: ps.id || `ps-${Date.now()}`,
-                reference: ps.dossier_id || eleve.demandeId,
-                candidatNom: eleve.lastName || '',
-                candidatPrenom: eleve.firstName || '',
-                autoEcoleNom: eleve.autoEcole?.name || '',
-                dateEnvoi: new Date().toISOString(),
-                statut: 'envoye',
-                dateExamen: ps.date_examen || new Date(sendDate).toISOString(),
-                details: ps,
-              };
-              const filtered = Array.isArray(arr) ? arr.filter((x: any) => x.id !== incomingItem.id) : [];
-              filtered.unshift(incomingItem);
-              localStorage.setItem(key, JSON.stringify(filtered));
-            } catch {}
+            // Les données sont maintenant stockées directement dans la base de données
+            // Plus besoin de localStorage
             setSendSuccess('Dossier envoyé avec succès.');
             setTimeout(() => setSendDialogOpen(false), 1000);
           } catch (e: any) {

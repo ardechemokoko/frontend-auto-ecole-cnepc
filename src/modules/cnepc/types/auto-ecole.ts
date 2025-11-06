@@ -35,6 +35,7 @@ export interface AutoEcoleFormData {
   contact: string;
   statut: boolean;
   responsable_id: string;
+  province_id?: string;
 }
 
 export interface Candidat {
