@@ -64,7 +64,7 @@ const ReceptionDossierDetailsPage: React.FC = () => {
             id: dossierData.id,
             numero: dossierData.id,
             dateDemande: dossierData.date_creation || dossierData.created_at,
-            statut: dossierData.statut || 'transmis',
+            statut: dossierData.statut || 'Cnepc',
             commentaires: Array.isArray(dossierData.commentaires) 
               ? dossierData.commentaires.filter((c: any) => c !== null).join(', ') 
               : dossierData.commentaires || '',
@@ -177,6 +177,7 @@ const ReceptionDossierDetailsPage: React.FC = () => {
 
   const getStatutLabel = (statut: string) => {
     const labels: Record<string, string> = {
+      'Cnepc': 'CNEPC',
       'transmis': 'Transmis',
       'recu': 'Reçu',
       'en_attente': 'En attente',
@@ -191,6 +192,7 @@ const ReceptionDossierDetailsPage: React.FC = () => {
 
   const getStatutColor = (statut: string) => {
     const colors: Record<string, 'default' | 'primary' | 'success' | 'error' | 'warning'> = {
+      'Cnepc': 'primary',
       'transmis': 'primary',
       'recu': 'success',
       'en_attente': 'warning',

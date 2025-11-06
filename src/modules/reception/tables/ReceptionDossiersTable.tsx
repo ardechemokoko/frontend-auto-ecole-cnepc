@@ -4,7 +4,6 @@ import { Box, Button, Table, TableBody, TableCell, TableHead, TableRow, Typograp
 import EpreuveSheet from '../components/EpreuveSheet';
 import CandidatDetailsSheet from '../components/CandidatDetailsSheet';
 import { EyeIcon } from '@heroicons/react/24/outline';
-import { receptionService } from '../services/reception.service';
 
 interface ReceptionDossiersTableProps {
   dossiers: ReceptionDossier[];
@@ -15,14 +14,12 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
   // État pour stocker les épreuves de chaque dossier
   const [epreuvesMap, setEpreuvesMap] = React.useState<Map<string, EpreuveStatut>>(new Map());
 
-  // Charger les épreuves depuis localStorage pour chaque dossier
+  // Charger les épreuves depuis les données du dossier (depuis l'API)
   React.useEffect(() => {
     const newMap = new Map<string, EpreuveStatut>();
     dossiers.forEach(dossier => {
-      const epreuves = receptionService.getEpreuvesLocal(dossier.id);
-      if (epreuves?.general) {
-        newMap.set(dossier.id, epreuves.general);
-      } else if (dossier.epreuves?.general) {
+      // Utiliser les épreuves depuis les données du dossier
+      if (dossier.epreuves?.general) {
         newMap.set(dossier.id, dossier.epreuves.general);
       }
     });
@@ -135,7 +132,6 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
             // Récupérer les informations de formation depuis details
             const formationDetails = dossier.details?.formation_complete || dossier.details?.dossier?.formation;
             const formationNom = formationDetails?.type_permis?.libelle || formationDetails?.nom || 'Formation';
-            const formationMontant = formationDetails?.montant_formate || formationDetails?.montant || 'N/A';
             
             return (
               <TableRow key={dossier.id} hover>
@@ -145,9 +141,6 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
                   <Box>
                     <Typography variant="body2" fontWeight="bold" color="primary">
                       {formationNom}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      💰 {formationMontant}
                     </Typography>
                     {formationDetails?.description && (
                       <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
