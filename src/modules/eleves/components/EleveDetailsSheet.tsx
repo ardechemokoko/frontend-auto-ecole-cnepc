@@ -998,7 +998,7 @@ const EleveDetailsSheet: React.FC<EleveDetailsSheetProps> = ({
             const resp = await ValidationService.envoyerAuCNEPC(payload);
             console.log('✅ Réponse CNEPC (raw):', resp);
             
-            // Mettre à jour le statut du dossier à "transmis" via PUT /dossiers/{id}
+            // Mettre à jour le statut du dossier à "valide" via PUT /dossiers/{id}
             try {
               console.log('🔄 Mise à jour du statut du dossier à "transmis"...');
               await autoEcoleService.updateDossier(eleve.demandeId, {

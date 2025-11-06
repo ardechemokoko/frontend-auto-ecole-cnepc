@@ -917,7 +917,8 @@ const EleveInscritDetailsPage: React.FC = () => {
                 const resp = await ValidationService.envoyerAuCNEPC(payload);
                 console.log('✅ Réponse CNEPC (raw):', resp);
                 
-                // Mettre à jour le statut du dossier à "transmis" via PUT /dossiers/{id}
+                // Mettre à jour le statut du dossier à "valide" via PUT /dossiers/{id}
+                let statutUpdated = false;
                 try {
                   console.log('🔄 Mise à jour du statut du dossier à "transmis"...');
                   await autoEcoleService.updateDossier(candidat.id, {
@@ -931,7 +932,18 @@ const EleveInscritDetailsPage: React.FC = () => {
                   }));
                 } catch (updateError: any) {
                   console.error('⚠️ Erreur lors de la mise à jour du statut du dossier:', updateError);
-                  // Ne pas bloquer l'envoi si la mise à jour du statut échoue
+                  console.error('📋 Détails de l\'erreur:', {
+                    message: updateError?.message,
+                    response: updateError?.response?.data,
+                    status: updateError?.response?.status,
+                    errors: updateError?.response?.data?.errors,
+                    fullResponse: updateError?.response
+                  });
+                  
+                  // Afficher les erreurs de validation si disponibles
+                  if (updateError?.response?.data?.errors) {
+                    console.error('❌ Erreurs de validation:', JSON.stringify(updateError.response.data.errors, null, 2));
+                  }
                 }
                 
                 // Les données sont maintenant stockées directement dans la base de données
@@ -940,8 +952,10 @@ const EleveInscritDetailsPage: React.FC = () => {
                 // Afficher un message de succès
                 setSnackbar({
                   open: true,
-                  message: 'Dossier envoyé au CNEPC avec succès',
-                  severity: 'success'
+                  message: statutUpdated 
+                    ? 'Dossier envoyé au CNEPC avec succès et statut mis à jour'
+                    : 'Dossier envoyé au CNEPC avec succès (vérifiez le statut manuellement)',
+                  severity: statutUpdated ? 'success' : 'error'
                 });
                 
                 // Fermer le modal immédiatement et rediriger

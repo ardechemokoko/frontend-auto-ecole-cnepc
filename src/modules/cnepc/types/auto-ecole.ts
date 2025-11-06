@@ -126,7 +126,7 @@ export interface Dossier {
   candidat_id: string;
   auto_ecole_id: string;
   formation_id: string;
-  statut: 'en_attente' | 'en_cours' | 'valide' | 'rejete' | 'transmis';
+  statut: 'en_attente' | 'en_cours' | 'valide' | 'rejete' | 'transmis' | 'Cnepc';
   date_creation: string;
   date_modification: string;
   commentaires?: string;
@@ -213,7 +213,7 @@ export interface DossierFormData {
   auto_ecole_id: string;
   formation_id: string;
   numero_dossier?: string;
-  statut: 'en_attente' | 'en_cours' | 'valide' | 'rejete' | 'transmis';
+  statut: 'en_attente' | 'en_cours' | 'valide' | 'rejete' | 'transmis' | 'Cnepc';
   date_creation: string;
   commentaires?: string;
 }
