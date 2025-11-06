@@ -19,7 +19,9 @@ import {
 import AddIcon from '@mui/icons-material/Add'
 import { Circuit } from '../types/circuit'
 import { circuitService } from '../services/circuit.service'
+import { typePermisService } from '../services/type-permis.service'
 import CircuitTable from '../components/CircuitTable'
+import { Referentiel } from '../../../shared/model/referentiel'
 
 const CircuitPage: React.FC = () => {
   const [openDialog, setOpenDialog] = useState(false)
@@ -29,8 +31,11 @@ const CircuitPage: React.FC = () => {
     description: '',
     actif: true,
     nom_entite: '',
+    type_permis: '',
+    etranger: ''
   })
   const [circuits, setCircuits] = useState<Circuit[]>([])
+  const [typePermis, setTypePermis] = useState<Referentiel[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = React.useState(false);
@@ -50,8 +55,25 @@ const CircuitPage: React.FC = () => {
     }
   }
 
+  // === Charger la liste des types de permis===
+  const fetchTypePermis = async () => {
+    try {
+      const res = await typePermisService.getAll({
+        type_ref: "TYPE_PERMIS"
+      })
+      setTypePermis(res?.data)
+      console.log(typePermis);
+      
+    } catch (err: any) {
+      console.log(err);
+    } finally {
+      setTypePermis([]);
+    }
+  }
+
   useEffect(() => {
-    fetchCircuits()
+    fetchCircuits();
+    fetchTypePermis();
   }, [])
 
   // === Ouvrir / fermer le dialog ===
@@ -63,6 +85,8 @@ const CircuitPage: React.FC = () => {
         description: circuit.description,
         actif: circuit.actif,
         nom_entite: circuit.nom_entite,
+        type_permis: circuit?.type_permis,
+        etranger: circuit?.etranger
       })
     } else {
       setEditingCircuit(null)
@@ -71,6 +95,8 @@ const CircuitPage: React.FC = () => {
         description: '',
         actif: true,
         nom_entite: '',
+        type_permis: '',
+        etranger: ''
       })
     }
     setOpenDialog(true)
@@ -84,6 +110,8 @@ const CircuitPage: React.FC = () => {
       description: '',
       actif: true,
       nom_entite: '',
+      type_permis: '',
+      etranger: ''
     })
   }
 
