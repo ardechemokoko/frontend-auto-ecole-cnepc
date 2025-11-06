@@ -44,25 +44,71 @@ const DashboardPage: React.FC = () => {
         try {
           setAdminLoading(true);
           
+          console.log('🔄 Chargement des statistiques admin...');
+          
           // Récupérer les auto-écoles directement depuis l'endpoint /auto-ecoles
           const response = await axiosClient.get('/auto-ecoles');
+          
+          console.log('📦 Réponse complète de /auto-ecoles:', response);
+          console.log('📦 response.data:', response.data);
+          console.log('📦 response.data.data:', response.data?.data);
+          console.log('📦 response.data.meta:', response.data?.meta);
           
           // La réponse a la structure: { data: [...], links: {...}, meta: {...} }
           let autoEcoles: any[] = [];
           if (response.data?.data && Array.isArray(response.data.data)) {
             autoEcoles = response.data.data;
+            console.log('✅ Auto-écoles trouvées dans response.data.data:', autoEcoles.length);
           } else if (response.data?.success && response.data?.data) {
             autoEcoles = Array.isArray(response.data.data) ? response.data.data : [response.data.data];
+            console.log('✅ Auto-écoles trouvées dans response.data.success.data:', autoEcoles.length);
           } else if (Array.isArray(response.data)) {
             autoEcoles = response.data;
+            console.log('✅ Auto-écoles trouvées dans response.data (array):', autoEcoles.length);
+          } else {
+            console.warn('⚠️ Aucune structure de données reconnue. Structure reçue:', {
+              hasData: !!response.data,
+              hasDataData: !!response.data?.data,
+              isArray: Array.isArray(response.data),
+              keys: response.data ? Object.keys(response.data) : []
+            });
           }
+
+          console.log('📋 Auto-écoles extraites:', autoEcoles);
+          console.log('📋 Nombre d\'auto-écoles:', autoEcoles.length);
 
           const totalAutoEcoles = autoEcoles.length;
           const autoEcolesActives = autoEcoles.filter((ae: any) => {
-            const statut = ae.statut?.toLowerCase() || ae.statut_libelle?.toLowerCase() || '';
-            return statut === 'actif' || statut === 'active' || statut === 'activé' || ae.statut === true || ae.statut === 1;
+            // Gérer le cas où statut est un booléen
+            if (typeof ae.statut === 'boolean') {
+              const isActive = ae.statut === true;
+              console.log(`🔍 Auto-école ${ae.id}: statut (boolean)=${ae.statut}, isActive=${isActive}`);
+              return isActive;
+            }
+            
+            // Gérer le cas où statut est un nombre
+            if (typeof ae.statut === 'number') {
+              const isActive = ae.statut === 1;
+              console.log(`🔍 Auto-école ${ae.id}: statut (number)=${ae.statut}, isActive=${isActive}`);
+              return isActive;
+            }
+            
+            // Gérer le cas où statut est une chaîne de caractères
+            const statut = typeof ae.statut === 'string' ? ae.statut.toLowerCase() : '';
+            const statutLibelle = typeof ae.statut_libelle === 'string' ? ae.statut_libelle.toLowerCase() : '';
+            const isActive = statut === 'actif' || statut === 'active' || statut === 'activé' || 
+                           statutLibelle === 'actif' || statutLibelle === 'active' || statutLibelle === 'activé' ||
+                           ae.statut === true || ae.statut === 1;
+            console.log(`🔍 Auto-école ${ae.id}: statut="${ae.statut}", statut_libelle="${ae.statut_libelle}", isActive=${isActive}`);
+            return isActive;
           }).length;
           const autoEcolesInactives = totalAutoEcoles - autoEcolesActives;
+
+          console.log('📊 Calcul des statistiques:', {
+            totalAutoEcoles,
+            autoEcolesActives,
+            autoEcolesInactives
+          });
 
           setAdminStats({
             totalAutoEcoles,
@@ -70,14 +116,19 @@ const DashboardPage: React.FC = () => {
             autoEcolesInactives
           });
 
-          console.log('📊 Statistiques admin chargées depuis /auto-ecoles:', {
+          console.log('✅ Statistiques admin mises à jour:', {
             totalAutoEcoles,
             autoEcolesActives,
             autoEcolesInactives,
             meta: response.data?.meta
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error('❌ Erreur lors du chargement des statistiques admin:', error);
+          console.error('❌ Détails de l\'erreur:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+          });
           setAdminStats({
             totalAutoEcoles: 0,
             autoEcolesActives: 0,
@@ -199,6 +250,10 @@ const DashboardPage: React.FC = () => {
 
   // Dashboard pour les admins
   if (user?.role === 'admin') {
+    console.log('👤 Utilisateur admin détecté, affichage du dashboard admin');
+    console.log('📊 État actuel des statistiques admin:', adminStats);
+    console.log('⏳ État du chargement:', adminLoading);
+    
     return (
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
         <Box sx={{ p: 3 }}>
