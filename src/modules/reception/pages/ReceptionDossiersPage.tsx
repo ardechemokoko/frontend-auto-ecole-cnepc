@@ -13,9 +13,12 @@ const ReceptionDossiersPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      // Récupérer uniquement les données depuis l'API (base de données)
       const data = await receptionService.listIncoming();
+      console.log('📦 Dossiers récupérés depuis l\'API:', data.length);
       setDossiers(data);
     } catch (e: any) {
+      console.error('❌ Erreur lors du chargement des dossiers:', e);
       setError(e?.message || 'Erreur lors du chargement');
       setDossiers([]);
     } finally {
@@ -30,6 +33,7 @@ const ReceptionDossiersPage: React.FC = () => {
   const handleReceive = async (id: string) => {
     try {
       await receptionService.receiveDossier(id);
+      // Recharger les données depuis l'API (base de données)
       fetchDossiers();
     } catch (e: any) {
       setError(e?.message || 'Erreur lors de la réception du dossier');

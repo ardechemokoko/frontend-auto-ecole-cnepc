@@ -19,10 +19,14 @@ import {
   Card,
   CardContent,
   Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import { CheckCircle, Person, School } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
-import { AutoEcoleFormData, AutoEcole, autoEcoleService } from '../services';
+import { AutoEcoleFormData, AutoEcole, autoEcoleService, referentielService, Referentiel } from '../services';
 import { useAppStore } from '../../../store';
 
 interface AutoEcoleFormProps {
@@ -50,6 +54,8 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [provinces, setProvinces] = useState<Referentiel[]>([]);
+  const [loadingProvinces, setLoadingProvinces] = useState(false);
   const { user } = useAppStore();
 
   // Détermine si on est en mode création avec responsable fourni
@@ -68,8 +74,25 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
       contact: '',
       statut: true,
       responsable_id: responsableId || user?.id || '',
+      province_id: '',
     },
   });
+
+  // Charger les provinces au montage du composant
+  useEffect(() => {
+    const loadProvinces = async () => {
+      try {
+        setLoadingProvinces(true);
+        const provincesData = await referentielService.getReferentielsByType('province');
+        setProvinces(provincesData);
+      } catch (error) {
+        console.error('Erreur lors du chargement des provinces:', error);
+      } finally {
+        setLoadingProvinces(false);
+      }
+    };
+    loadProvinces();
+  }, []);
 
   // Réinitialiser le formulaire quand l'auto-école change
   useEffect(() => {
@@ -81,6 +104,7 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
         contact: autoEcole.contact,
         statut: autoEcole.statut,
         responsable_id: autoEcole.responsable_id,
+        province_id: (autoEcole as any).province_id || '',
       });
     } else {
       reset({
@@ -90,9 +114,10 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
         contact: '',
         statut: true,
         responsable_id: responsableId || user?.id || '',
+        province_id: '',
       });
     }
-  }, [autoEcole, reset, user]);
+  }, [autoEcole, reset, user, responsableId]);
 
   const onSubmit = async (data: AutoEcoleFormData) => {
     setLoading(true);
@@ -364,6 +389,45 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
                     helperText={errors.contact?.message}
                     required
                   />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="province_id"
+                control={control}
+                rules={{ required: 'La province est requise' }}
+                render={({ field }) => (
+                  <FormControl fullWidth error={!!errors.province_id} required>
+                    <InputLabel id="province-label">Province</InputLabel>
+                    <Select
+                      {...field}
+                      labelId="province-label"
+                      label="Province"
+                      disabled={loadingProvinces}
+                    >
+                      {loadingProvinces ? (
+                        <MenuItem disabled>
+                          <CircularProgress size={20} sx={{ mr: 1 }} />
+                          Chargement...
+                        </MenuItem>
+                      ) : provinces.length === 0 ? (
+                        <MenuItem disabled>Aucune province disponible</MenuItem>
+                      ) : (
+                        provinces.map((province) => (
+                          <MenuItem key={province.id} value={province.id}>
+                            {province.libelle}
+                          </MenuItem>
+                        ))
+                      )}
+                    </Select>
+                    {errors.province_id && (
+                      <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
+                        {errors.province_id.message}
+                      </Typography>
+                    )}
+                  </FormControl>
                 )}
               />
             </Grid>

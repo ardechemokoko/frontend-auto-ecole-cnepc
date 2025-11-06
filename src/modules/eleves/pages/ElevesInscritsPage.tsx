@@ -1,39 +1,21 @@
 import React from 'react';
 import {
   Box,
-  Typography,
-  Container,
-  Card,
-  CardContent,
-  Grid,
-  Button
+  Typography
 } from '@mui/material';
-import {
-  School as SchoolIcon,
-  PersonAdd as PersonAddIcon,
-  History as HistoryIcon
-} from '@mui/icons-material';
 import StudentsTable from '../tables/StudentsTable';
 
 const ElevesInscritsPage: React.FC = () => {
   return (
-    <Box sx={{ flexGrow: 1 }}>
-      <Typography variant="h4" component="h1" gutterBottom className="font-display">
+    <Box sx={{ flexGrow: 1, backgroundColor: 'gray-100' }}>
+      <Typography variant="h5" component="h1" gutterBottom className="font-display" sx={{ px: 2, pt: 2, pb: 0.5 }}>
         Élèves inscrits
       </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }} className="font-primary">
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, px: 2 }} className="font-primary">
         Gestion des élèves déjà inscrits dans l'auto-école
       </Typography>
       
-      <Container maxWidth="lg">
-        
-        
-        <Box sx={{ mt: 4 }}>
-          
-          
-          <StudentsTable />
-        </Box>
-      </Container>
+      <StudentsTable />
     </Box>
   );
 };

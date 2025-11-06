@@ -37,7 +37,8 @@ export class ValidationService {
       const response = await axiosClient.post('/programme-sessions', payload);
       const data = response.data;
 
-      // Plus besoin de persister dans localStorage, les dossiers sont récupérés depuis l'API avec le statut "valide"
+      // Les données sont maintenant stockées directement dans la base de données
+      // Plus besoin de localStorage
 
       return data;
     } catch (error: any) {

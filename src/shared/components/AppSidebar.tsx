@@ -20,7 +20,6 @@ import {
   HomeIcon,
   ArrowPathIcon,
   UserGroupIcon,
-  CheckCircleIcon,
   PaperAirplaneIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -100,13 +99,6 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       path: ROUTES.FORMATIONS,
       description: 'Consulter les formations de votre auto-école'
     },
-      {
-      title: 'Validation des Dossiers',
-      icon: CheckCircleIcon,
-      path: ROUTES.VALIDATION,
-      description: 'Valider les dossiers complets des élèves',
-      key: 'validation'
-    },
    ]
   const allMenuItems = [
     {
@@ -157,13 +149,6 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
           icon: UserPlusIcon
         }
       ]
-    },
-    {
-      title: 'Validation des Dossiers',
-      icon: CheckCircleIcon,
-      path: ROUTES.VALIDATION,
-      description: 'Valider les dossiers complets des élèves',
-      key: 'validation'
     },
     {
       title: 'CNEPC',
@@ -295,6 +280,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
             overflowX: 'hidden',
             backgroundColor: '#3A75C4',
             borderRight: 'none',
+            borderRadius: 0,
             boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1)',
           },
         }}
@@ -321,6 +307,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                   height: open ? 56 : 40,
                   fontSize: open ? '1.75rem' : '1.25rem',
                   fontWeight: 600,
+                  borderRadius: 0,
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
               >
@@ -389,8 +376,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                         mx: 0,
                         px: open ? 1.5 : 1,
                         py: 0.875,
-                        borderRadius: 2,
                         mb: 0.5,
+                        borderRadius: 0,
                         justifyContent: open ? 'flex-start' : 'center',
                         backgroundColor: isActive(item.path) 
                           ? 'rgba(255, 255, 255, 0.15)'
@@ -458,8 +445,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                                   mr: 1.5,
                                   px: 1.5,
                                   py: 0.75,
-                                  borderRadius: 2,
                                   mb: 0.5,
+                                  borderRadius: 0,
                                   backgroundColor: subActive 
                                     ? 'rgba(255, 255, 255, 0.12)'
                                     : 'transparent',
@@ -513,8 +500,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                                   mr: 1.5,
                                   px: 1.5,
                                   py: 0.75,
-                                  borderRadius: 2,
                                   mb: 0.5,
+                                  borderRadius: 0,
                                   backgroundColor: subActive 
                                     ? 'rgba(255, 255, 255, 0.12)'
                                     : 'transparent',
@@ -558,8 +545,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                                   mr: 1.5,
                                   px: 1.5,
                                   py: 0.75,
-                                  borderRadius: 2,
                                   mb: 0.5,
+                                  borderRadius: 0,
                                   backgroundColor: subActive 
                                     ? 'rgba(255, 255, 255, 0.12)'
                                     : 'transparent',
@@ -603,8 +590,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                                   mr: 1.5,
                                   px: 1.5,
                                   py: 0.75,
-                                  borderRadius: 2,
                                   mb: 0.5,
+                                  borderRadius: 0,
                                   backgroundColor: subActive 
                                     ? 'rgba(255, 255, 255, 0.12)'
                                     : 'transparent',
@@ -662,8 +649,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                         mx: 0,
                         px: open ? 1.5 : 1,
                         py: 0.875,
-                        borderRadius: 2,
                         mb: 0.5,
+                        borderRadius: 0,
                         justifyContent: open ? 'flex-start' : 'center',
                         backgroundColor: isActive(item.path) 
                           ? 'rgba(255, 255, 255, 0.15)'
@@ -731,8 +718,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                                   mr: 1.5,
                                   px: 1.5,
                                   py: 0.75,
-                                  borderRadius: 2,
                                   mb: 0.5,
+                                  borderRadius: 0,
                                   backgroundColor: subActive 
                                     ? 'rgba(255, 255, 255, 0.12)'
                                     : 'transparent',
@@ -786,8 +773,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                                   mr: 1.5,
                                   px: 1.5,
                                   py: 0.75,
-                                  borderRadius: 2,
                                   mb: 0.5,
+                                  borderRadius: 0,
                                   backgroundColor: subActive 
                                     ? 'rgba(255, 255, 255, 0.12)'
                                     : 'transparent',
@@ -831,8 +818,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                                   mr: 1.5,
                                   px: 1.5,
                                   py: 0.75,
-                                  borderRadius: 2,
                                   mb: 0.5,
+                                  borderRadius: 0,
                                   backgroundColor: subActive 
                                     ? 'rgba(255, 255, 255, 0.12)'
                                     : 'transparent',
@@ -876,8 +863,8 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                                   mr: 1.5,
                                   px: 1.5,
                                   py: 0.75,
-                                  borderRadius: 2,
                                   mb: 0.5,
+                                  borderRadius: 0,
                                   backgroundColor: subActive 
                                     ? 'rgba(255, 255, 255, 0.12)'
                                     : 'transparent',
@@ -930,7 +917,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                 mx: 0,
                 px: open ? 1.5 : 1,
                 py: 0.875,
-                borderRadius: 2,
+                borderRadius: 0,
                 color: 'rgba(255, 255, 255, 0.85)',
                 justifyContent: open ? 'flex-start' : 'center',
                 backgroundColor: 'transparent',
@@ -953,6 +940,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                     backgroundColor: 'white',
                     width: 32,
                     height: 32,
+                    borderRadius: 0,
                   }}
                 >
                   <ArrowRightOnRectangleIcon className="w-5 h-5" style={{ color: '#3A75C4' }} />
@@ -991,6 +979,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
           zIndex: 1000,
           backgroundColor: 'white',
           border: '1px solid rgba(0, 0, 0, 0.08)',
+          borderRadius: 0,
           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
           width: 32,
           height: 32,
@@ -1051,7 +1040,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                     p: 1.5,
                     minWidth: 0,
                     flex: 1,
-                    borderRadius: 2,
+                    borderRadius: 0,
                     position: 'relative',
                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     '&:hover': {

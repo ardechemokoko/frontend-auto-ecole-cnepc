@@ -920,38 +920,16 @@ const EleveInscritDetailsPage: React.FC = () => {
                 // Mettre à jour le statut du dossier à "valide" via PUT /dossiers/{id}
                 let statutUpdated = false;
                 try {
-                  console.log('🔄 Mise à jour du statut du dossier à "valide"...');
-                  console.log('📋 ID du dossier:', candidat.id);
+                  console.log('🔄 Mise à jour du statut du dossier à "transmis"...');
+                  await autoEcoleService.updateDossier(candidat.id, {
+                    statut: 'transmis'
+                  } as any);
+                  console.log('✅ Statut du dossier mis à jour à "transmis"');
                   
-                  // Récupérer le dossier complet pour avoir tous les champs requis
-                  const currentDossier = await autoEcoleService.getDossierById(candidat.id);
-                  console.log('📋 Dossier actuel:', currentDossier);
-                  
-                  // Préparer les données de mise à jour avec tous les champs requis
-                  const updateData = {
-                    candidat_id: currentDossier.candidat_id,
-                    auto_ecole_id: currentDossier.auto_ecole_id,
-                    formation_id: currentDossier.formation_id,
-                    statut: 'valide' as const,
-                    date_creation: currentDossier.date_creation,
-                    commentaires: currentDossier.commentaires || ''
-                  };
-                  
-                  console.log('📤 Données de mise à jour:', updateData);
-                  
-                  const updateResponse = await autoEcoleService.updateDossier(candidat.id, updateData);
-                  console.log('✅ Statut du dossier mis à jour à "valide"', updateResponse);
-                  
-                  // Recharger les données du dossier pour vérifier la mise à jour
-                  const updatedDossier = await autoEcoleService.getDossierById(candidat.id);
-                  console.log('📋 Dossier mis à jour:', updatedDossier);
-                  if (updatedDossier) {
-                    setCandidat((prev: any) => ({
-                      ...prev,
-                      statut: updatedDossier.statut || 'valide'
-                    }));
-                    statutUpdated = true;
-                  }
+                  // Émettre un événement pour rafraîchir les statistiques du dashboard
+                  window.dispatchEvent(new CustomEvent('dossierTransmis', { 
+                    detail: { dossierId: candidat.id } 
+                  }));
                 } catch (updateError: any) {
                   console.error('⚠️ Erreur lors de la mise à jour du statut du dossier:', updateError);
                   console.error('📋 Détails de l\'erreur:', {
@@ -967,6 +945,9 @@ const EleveInscritDetailsPage: React.FC = () => {
                     console.error('❌ Erreurs de validation:', JSON.stringify(updateError.response.data.errors, null, 2));
                   }
                 }
+                
+                // Les données sont maintenant stockées directement dans la base de données
+                // Plus besoin de localStorage
                 
                 // Afficher un message de succès
                 setSnackbar({
