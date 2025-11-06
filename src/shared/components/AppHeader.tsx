@@ -1,6 +1,5 @@
-import { BellIcon } from '@heroicons/react/24/outline';
-import { Close, Lock, Password, People, Person as PersonIcon } from '@mui/icons-material';
-import { Box, List, ListItemButton, ListItemIcon, ListItemText, styled } from '@mui/material';
+import { BellIcon, UserIcon } from '@heroicons/react/24/outline';
+import { Menu, MenuItem, IconButton } from '@mui/material';
 import React from 'react';
 import { useAppStore } from '../../store';
 import { ROUTES } from '../constants';
@@ -12,43 +11,22 @@ interface AppHeaderProps {
 
 const AppHeader: React.FC<AppHeaderProps> = ({ sidebarOpen }) => {
   const { user } = useAppStore();
-  const [showmenu, setShowmenu] = React.useState(false);
   const navigate = useNavigate();
-  const handleMenuToggle = (title?: string) => {
-    console.log(title);
-    if (title === 'Close' || title === '') {
-      setShowmenu(prev => !prev);
-      return;
-    }
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
 
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
   };
 
-  const handleRouter = (route?: string) => {
-    console.log(route);
-    if (!route) return;
-    navigate(route);
+  const handleClose = () => {
+    setAnchorEl(null);
   };
 
-  const data = [
-    { icon: PersonIcon, label: 'Modifier Vos informations personnelles', path: ROUTES.UPDATE, },
-    { icon: Password, label: 'Change mot de passe', path: ROUTES.CPW, },
-    // { icon: PermMedia, label: 'Storage' },
-
-  ];
-
-  const FireNav = styled(List)<{ component?: React.ElementType }>({
-    '& .MuiListItemButton-root': {
-      paddingLeft: 24,
-      paddingRight: 24,
-    },
-    '& .MuiListItemIcon-root': {
-      minWidth: 0,
-      marginRight: 16,
-    },
-    '& .MuiSvgIcon-root': {
-      fontSize: 20,
-    },
-  });
+  const handleProfileClick = () => {
+    handleClose();
+    navigate(ROUTES.PROFILE);
+  };
   return (
     <header
       className="fixed top-0 right-0 z-40 bg-white shadow-lg border-b border-gray-200 transition-all duration-300"
@@ -58,7 +36,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({ sidebarOpen }) => {
       }}
     >
       {/* Ligne colorée (vert, jaune, bleu) */}
-      <div className="h-1 bg-gradient-to-r from-green-500 via-yellow-500 to-blue-500"></div>
+      <div className="h-1 flex">
+        <div className="flex-1 bg-green-500"></div>
+        <div className="flex-1 bg-yellow-500"></div>
+        <div className="flex-1 bg-blue-500"></div>
+      </div>
 
       <div className="px-4 py-3">
         <div className="flex items-center justify-end">
@@ -75,60 +57,57 @@ const AppHeader: React.FC<AppHeaderProps> = ({ sidebarOpen }) => {
             </div>
 
             {/* Informations utilisateur */}
-            {!showmenu ? <div>
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: 60,
-                  right: 10,
-                  bgcolor: '#fdfdfdff',
-                  color: 'white',
-                  borderRadius: 2,
-                  boxShadow: 3,
-                  width: 250,
-                  zIndex: 100,
-                }}
-              >
-                <List>
-                  {data.map((item) => (
-                    <ListItemButton key={item.label} onClick={() => handleRouter(item.path)}>
-                      <ListItemIcon sx={{ color: 'black' }} >
-                        {React.createElement(item.icon)}
-                      </ListItemIcon>
-                      <ListItemText sx={{ color: 'black' }} primary={item.label} />
-                    </ListItemButton>))}
-
-                  {/* <ListItemButton>
-                    <ListItemIcon sx={{ color: 'black' }}>
-                      <Lock />
-                    </ListItemIcon>
-                    <ListItemText  sx={{ color: 'black' }} primary="Changer mot de passe" />
-                  </ListItemButton> */}
-
-                  <ListItemButton
-                    onClick={() => handleMenuToggle('Close')}
-                  >
-                    <ListItemIcon sx={{ color: 'black' }}>
-                      <Close />
-                    </ListItemIcon>
-                    <ListItemText sx={{ color: 'black' }} primary="Close" />
-                  </ListItemButton>
-                </List>
-              </Box>
-            </div> : <div className="flex items-center space-x-3" onClick={() => handleMenuToggle('')}>
+            <div className="flex items-center space-x-3">
               <div className="text-right">
                 <div className="text-sm font-medium text-gray-800">
                   Bonjour, {user?.name || 'Utilisateur'}
                 </div>
                 <div className="text-xs text-gray-500">{user?.role}</div>
               </div>
-              <div className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center">
-                <span className="text-sm font-bold text-white">
+              <IconButton
+                onClick={handleClick}
+                sx={{
+                  width: 32,
+                  height: 32,
+                  bgcolor: '#3A75C4',
+                  color: 'white',
+                  '&:hover': {
+                    bgcolor: '#2A5A9A',
+                  }
+                }}
+              >
+                <span className="text-sm font-bold">
                   {user?.name?.charAt(0) || 'U'}
                 </span>
-              </div>
+              </IconButton>
+            </div>
 
-            </div>}
+            {/* Menu Popup */}
+            <Menu
+              anchorEl={anchorEl}
+              open={open}
+              onClose={handleClose}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'right',
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+              PaperProps={{
+                sx: {
+                  mt: 1.5,
+                  minWidth: 200,
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                }
+              }}
+            >
+              <MenuItem onClick={handleProfileClick}>
+                <UserIcon className="w-5 h-5 mr-2" />
+                Profil
+              </MenuItem>
+            </Menu>
 
           </div>
         </div>
