@@ -53,6 +53,8 @@ const CircuitTable: React.FC<CircuitTableProps> = ({
           <TableRow>
             <TableCell>Nom</TableCell>
             <TableCell>Entité concernée</TableCell>
+            <TableCell>Type de permis</TableCell>
+            <TableCell>Etranger ?</TableCell>
             <TableCell>Description</TableCell>
             <TableCell>Actif</TableCell>
             <TableCell align="center">Actions</TableCell>
@@ -62,7 +64,7 @@ const CircuitTable: React.FC<CircuitTableProps> = ({
         <TableBody>
           {data.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} align="center">
+              <TableCell colSpan={7} align="center">
                 <Typography color="text.secondary" sx={{ py: 3 }}>
                   Aucun circuit enregistré
                 </Typography>
@@ -79,6 +81,14 @@ const CircuitTable: React.FC<CircuitTableProps> = ({
 
                 <TableCell>
                   <Typography variant="body2">{circuit.nom_entite}</Typography>
+                </TableCell>
+
+                <TableCell>
+                  <Typography variant="body2">{circuit.type_permis?.toUpperCase()}</Typography>
+                </TableCell>
+
+                <TableCell>
+                  <Typography variant="body2">{circuit.etranger?.toUpperCase()}</Typography>
                 </TableCell>
 
                 <TableCell>
