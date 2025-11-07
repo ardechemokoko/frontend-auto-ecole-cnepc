@@ -88,7 +88,7 @@ const CircuitTable: React.FC<CircuitTableProps> = ({
                 </TableCell>
 
                 <TableCell>
-                  <Typography variant="body2">{circuit.etranger?.toUpperCase()}</Typography>
+                  <Typography variant="body2">{circuit.nationalite?.toUpperCase()}</Typography>
                 </TableCell>
 
                 <TableCell>

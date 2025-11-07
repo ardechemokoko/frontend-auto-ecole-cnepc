@@ -18,20 +18,54 @@ class ReceptionService extends BaseService {
       // Récupérer l'ID de l'auto-école pour filtrer si nécessaire (optionnel pour les admins CNEPC)
       const autoEcoleId = getAutoEcoleId();
       
-      console.log('🏫 Auto-école ID:', autoEcoleId || 'Aucun (affichage de tous les programme-sessions)');
+      // Vérifier le rôle de l'utilisateur pour déterminer si on peut récupérer tous les dossiers
+      const userData = localStorage.getItem('user_data');
+      let userRole = null;
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          userRole = user.role;
+        } catch (e) {
+          console.warn('⚠️ Impossible de parser user_data');
+        }
+      }
       
-      // Faire un GET sur /programme-sessions pour récupérer tous les programme_sessions avec leurs dossiers
-      console.log('🔍 Récupération des programme-sessions...');
-      const response = await axiosClient.get('/programme-sessions');
+      const isAdmin = userRole === 'admin';
       
-      console.log('📦 Programme-sessions récupérés (raw):', response.data);
-      console.log('📦 Type de la réponse:', typeof response.data);
-      console.log('📦 Est un tableau?:', Array.isArray(response.data));
-      console.log('📦 Clés de response.data:', response.data ? Object.keys(response.data) : 'null');
+      console.log('🏫 Auto-école ID:', autoEcoleId || 'Aucun');
+      console.log('👤 Rôle utilisateur:', userRole || 'Non défini');
+      console.log('🔐 Est admin:', isAdmin);
       
+      // Récupérer les dossiers avec statut 'valide'
+      console.log('🔍 Récupération des dossiers validés...');
+      const filters = { statut: 'valide' as const };
       console.log('🔍 Filtres envoyés à l\'API:', filters);
       
-      const response = await autoEcoleService.getDossiersByAutoEcoleId(autoEcoleId, filters);
+      let response;
+      
+      // Si c'est un admin et qu'il n'y a pas d'autoEcoleId, récupérer tous les dossiers
+      if (isAdmin && !autoEcoleId) {
+        console.log('👑 Admin détecté: récupération de tous les dossiers validés...');
+        // Utiliser l'endpoint /dossiers sans auto_ecole_id pour récupérer tous les dossiers
+        const params = new URLSearchParams();
+        params.append('statut', 'valide');
+        const endpoint = `/dossiers?${params.toString()}`;
+        
+        const axiosResponse = await axiosClient.get(endpoint);
+        response = {
+          success: true,
+          dossiers: axiosResponse.data?.data || axiosResponse.data || [],
+          auto_ecole: undefined,
+          statistiques: undefined
+        };
+      } else if (autoEcoleId) {
+        // Si on a un autoEcoleId, utiliser la méthode existante
+        response = await autoEcoleService.getDossiersByAutoEcoleId(autoEcoleId, filters);
+      } else {
+        // Si ce n'est pas un admin et qu'il n'y a pas d'autoEcoleId, retourner un tableau vide
+        console.warn('⚠️ Aucun autoEcoleId disponible et utilisateur non-admin, retour d\'un tableau vide');
+        return [];
+      }
       
       console.log('📦 Dossiers récupérés depuis l\'API:', response.dossiers?.length || 0);
       console.log('📋 Structure de la réponse:', response);
@@ -44,16 +78,37 @@ class ReceptionService extends BaseService {
       // Charger d'abord les candidats, formations et auto-écoles pour le mapping
       await this.chargerCandidatsEtFormations();
       
+      // Charger toutes les programme-sessions pour récupérer les dates d'examen
+      let programmeSessionsMap = new Map<string, any>();
+      try {
+        console.log('📅 Chargement des programme-sessions pour récupérer les dates d\'examen...');
+        const programmeSessionsResponse = await axiosClient.get('/programme-sessions');
+        const programmeSessions = Array.isArray(programmeSessionsResponse.data?.data) 
+          ? programmeSessionsResponse.data.data 
+          : Array.isArray(programmeSessionsResponse.data) 
+          ? programmeSessionsResponse.data 
+          : [];
+        
+        // Créer un map dossier_id -> programme_session
+        programmeSessions.forEach((ps: any) => {
+          if (ps.dossier_id) {
+            programmeSessionsMap.set(ps.dossier_id, ps);
+          }
+        });
+        console.log(`✅ ${programmeSessionsMap.size} programme-session(s) chargé(s)`);
+      } catch (error) {
+        console.warn('⚠️ Erreur lors du chargement des programme-sessions:', error);
+      }
+      
       // Mapper les dossiers vers ReceptionDossier
       const mapped: ReceptionDossier[] = await Promise.all(response.dossiers.map(async (dossier: any) => {
         const candidat = dossier.candidat;
         let formation = dossier.formation;
-        const autoEcole = dossier.auto_ecole;
         
         // Récupérer les informations depuis les maps
         const candidatFromMap = this.candidatsMap.get(candidat?.id) || this.candidatsMap.get(`personne_${candidat?.personne_id}`);
         const formationFromMap = this.formationsMap.get(formation?.id);
-        const autoEcoleFromMap = this.autoEcolesMap.get(autoEcoleId);
+        const autoEcoleFromMap = autoEcoleId ? this.autoEcolesMap.get(autoEcoleId) : null;
         
         // Utiliser les données du dossier en priorité, avec fallback sur les maps
         const candidatFinal = candidatFromMap || candidat;
@@ -62,21 +117,30 @@ class ReceptionService extends BaseService {
         
         const candidatPersonne = candidatFinal?.personne || candidat?.personne || {};
         
+        // Récupérer la date d'examen depuis programme-sessions
+        // Priorité: programme-sessions chargées > programme_sessions dans dossier > null
+        const programmeSession = programmeSessionsMap.get(dossier.id) || 
+                                 dossier.programme_sessions?.[0] || 
+                                 null;
+        const dateExamen = programmeSession?.date_examen || 
+                          dossier.programme_sessions?.[0]?.date_examen || 
+                          '';
+        
         const result: ReceptionDossier = {
           id: dossier.id,
           reference: dossier.id,
           candidatNom: candidatPersonne.nom || '',
           candidatPrenom: candidatPersonne.prenom || '',
           autoEcoleNom: autoEcoleFinal.nom_auto_ecole || autoEcoleFinal.nom || '',
-          dateEnvoi: programmeSession.created_at || dossier.updated_at || dossier.created_at || new Date().toISOString(),
+          dateEnvoi: dossier.updated_at || dossier.created_at || new Date().toISOString(),
           statut: 'valide',
-          dateExamen: programmeSession.date_examen || '',
+          dateExamen: dateExamen,
           details: {
-            dossier: dossierComplet || dossier,
+            dossier: dossier,
             candidat_complet: candidatFinal,
             formation_complete: formationFinal,
             auto_ecole_complete: autoEcoleFinal,
-            programme_session: programmeSession
+            programme_session: programmeSession || dossier.programme_sessions?.[0] || null
           },
         };
         

@@ -57,7 +57,7 @@ const ReceptionDossierDetailsPage: React.FC = () => {
           const candidatData = dossierData.candidat || {};
           const personne = candidatData.personne || {};
           const formation = dossierData.formation || {};
-          const autoEcole = dossierData.auto_ecole || {};
+          const autoEcole = (dossierData as any).auto_ecole || {};
           
           // Mapper les données du dossier vers le format attendu par la page
           const candidatMapped = {
@@ -465,6 +465,9 @@ const ReceptionDossierDetailsPage: React.FC = () => {
       </Box>
     );
   }
+
+  console.log('🔍 ReceptionDossierDetailsPage - candidat:', candidat);
+  console.log('🔍 ReceptionDossierDetailsPage - candidat.id:', candidat?.id);
 
   return (
     <Box sx={{ flexGrow: 1, backgroundColor: '#f5f5f5', minHeight: '100vh', p: 3 }}>
