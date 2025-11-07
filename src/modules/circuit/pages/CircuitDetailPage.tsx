@@ -123,7 +123,7 @@ const CircuitDetailPage: React.FC = () => {
         etapeService.getByCircuitId(id),
         statutService.getAll(),
         typeDocumentService.getAll({
-          type_ref: "TYPE_DOCUMENT"
+          type_ref: "type_document"
         }),
         roleService.getAll(),
         transitionService.getByCircuitId(id),
