@@ -29,9 +29,34 @@ import {
   CloudArrowUpIcon,
   PaperAirplaneIcon
 } from '@heroicons/react/24/outline';
-import { ReceptionDossier } from '../types';
+import { ReceptionDossier, EpreuveStatut, EpreuveAttempt } from '../types';
 import axiosClient from '../../../shared/environment/envdev';
 import { autoEcoleService } from '../../cnepc/services/auto-ecole.service';
+
+// Fonctions de calcul du statut (copiées depuis EpreuveSheet)
+const MAX_ATTEMPTS = 3;
+
+function computeOverall(attempts?: EpreuveAttempt[], legacy?: EpreuveStatut): EpreuveStatut {
+  if (legacy && legacy !== 'non_saisi') return legacy;
+  if (!attempts || attempts.length === 0) return 'non_saisi';
+  if (attempts.some(a => a.result === 'reussi')) return 'reussi';
+  if (attempts.length >= MAX_ATTEMPTS && attempts.every(a => a.result !== 'reussi')) return 'echoue';
+  return attempts[attempts.length - 1].result;
+}
+
+function computeGeneral(
+  creneaux: EpreuveStatut,
+  codeConduite: EpreuveStatut,
+  tourVille: EpreuveStatut
+): EpreuveStatut {
+  const statuses: EpreuveStatut[] = [creneaux, codeConduite, tourVille];
+  
+  if (statuses.every(s => s === 'reussi')) return 'reussi';
+  if (statuses.some(s => s === 'echoue')) return 'echoue';
+  if (statuses.some(s => s === 'absent')) return 'absent';
+  
+  return 'non_saisi';
+}
 
 interface CandidatDetailsSheetProps {
   open: boolean;
@@ -50,6 +75,8 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
   const [sendingToCNEDDT, setSendingToCNEDDT] = useState(false);
   const [documentsFromApi, setDocumentsFromApi] = useState<any[]>([]);
   const [dossierComplet, setDossierComplet] = useState<any>(null);
+  const [epreuvesStatus, setEpreuvesStatus] = useState<EpreuveStatut | null>(null);
+  const [loadingEpreuves, setLoadingEpreuves] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
@@ -72,8 +99,102 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
         // Charger les documents après que le dossier complet soit chargé
         chargerDocuments();
       });
+      // Charger le statut des épreuves
+      chargerEpreuvesStatus();
+    } else if (!open) {
+      // Réinitialiser le statut quand le drawer se ferme
+      setEpreuvesStatus(null);
     }
   }, [open, dossier]);
+  
+  // Fonction pour charger le statut des épreuves
+  const chargerEpreuvesStatus = async () => {
+    if (!dossier?.reference) return;
+    
+    try {
+      setLoadingEpreuves(true);
+      console.log('📋 Chargement du statut des épreuves pour le dossier:', dossier.reference);
+      
+      // Utiliser d'abord le statut depuis dossier.epreuves?.general si disponible
+      if (dossier.epreuves?.general) {
+        setEpreuvesStatus(dossier.epreuves.general);
+        setLoadingEpreuves(false);
+        return;
+      }
+      
+      // Sinon, charger depuis /resultats
+      const response = await axiosClient.get('/resultats', {
+        params: { dossier_id: dossier.reference }
+      });
+      
+      const resultats = Array.isArray(response.data?.data) ? response.data.data : [];
+      
+      if (resultats.length === 0) {
+        setEpreuvesStatus('non_saisi');
+        setLoadingEpreuves(false);
+        return;
+      }
+      
+      // Organiser les résultats par type d'examen
+      const creneauxAttempts: EpreuveAttempt[] = [];
+      const codeConduiteAttempts: EpreuveAttempt[] = [];
+      const tourVilleAttempts: EpreuveAttempt[] = [];
+      
+      resultats.forEach((resultat: any) => {
+        const attempt: EpreuveAttempt = {
+          result: resultat.statut as EpreuveStatut,
+          date: resultat.date,
+          note: resultat.commentaire || ''
+        };
+        
+        const typeExamen = (resultat.typeExamen || '').toLowerCase().trim();
+        
+        if (typeExamen.includes('creneau') || typeExamen === 'creneaux') {
+          creneauxAttempts.push(attempt);
+        } else if (typeExamen.includes('code') || typeExamen === 'codeconduite' || typeExamen === 'code_conduite') {
+          codeConduiteAttempts.push(attempt);
+        } else if (typeExamen.includes('ville') || typeExamen === 'tourville' || typeExamen === 'tour_ville') {
+          tourVilleAttempts.push(attempt);
+        }
+      });
+      
+      // Trier par date
+      creneauxAttempts.sort((a, b) => {
+        const dateA = a.date ? new Date(a.date).getTime() : 0;
+        const dateB = b.date ? new Date(b.date).getTime() : 0;
+        return dateA - dateB;
+      });
+      codeConduiteAttempts.sort((a, b) => {
+        const dateA = a.date ? new Date(a.date).getTime() : 0;
+        const dateB = b.date ? new Date(b.date).getTime() : 0;
+        return dateA - dateB;
+      });
+      tourVilleAttempts.sort((a, b) => {
+        const dateA = a.date ? new Date(a.date).getTime() : 0;
+        const dateB = b.date ? new Date(b.date).getTime() : 0;
+        return dateA - dateB;
+      });
+      
+      // Calculer les statuts
+      const creneauxStatus = computeOverall(creneauxAttempts);
+      const codeStatus = computeOverall(codeConduiteAttempts);
+      const villeStatus = computeOverall(tourVilleAttempts);
+      const generalStatus = computeGeneral(creneauxStatus, codeStatus, villeStatus);
+      
+      setEpreuvesStatus(generalStatus);
+      console.log(`✅ Statut des épreuves calculé: ${generalStatus}`);
+    } catch (err: any) {
+      console.error('❌ Erreur lors du chargement du statut des épreuves:', err);
+      // En cas d'erreur (404 = pas de résultats), mettre 'non_saisi'
+      if (err?.response?.status === 404) {
+        setEpreuvesStatus('non_saisi');
+      } else {
+        setEpreuvesStatus(null);
+      }
+    } finally {
+      setLoadingEpreuves(false);
+    }
+  };
 
   // Recharger les documents si dossierComplet change et qu'il contient des documents
   useEffect(() => {
@@ -745,7 +866,7 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
         {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
           <Typography variant="h5" component="h2" fontWeight="bold" className="font-display">
-            Détails du candidatsss
+            Détails du candidat
           </Typography>
           <IconButton onClick={onClose} size="small">
             <XMarkIcon className="w-5 h-5" />
@@ -1006,17 +1127,23 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
             <Button variant="outlined" onClick={onClose} className="font-primary">
               Fermer
             </Button>
-            <Button
-              variant="contained"
-              size="small"
-              color="secondary"
-              startIcon={sendingToCNEDDT ? <CircularProgress size={16} /> : <PaperAirplaneIcon className="w-4 h-4" />}
-              onClick={handleSendToCNEDDT}
-              disabled={sendingToCNEDDT || !dossier?.reference}
-              className="font-primary"
+            <Tooltip 
+              title={epreuvesStatus !== 'reussi' ? 'Toutes les épreuves doivent être validées pour envoyer à la CNEDDT' : 'Envoyer le dossier à la CNEDDT'}
             >
-              CNEDDT
-            </Button>
+              <span>
+                <Button
+                  variant="contained"
+                  size="small"
+                  color="secondary"
+                  startIcon={sendingToCNEDDT ? <CircularProgress size={16} /> : <PaperAirplaneIcon className="w-4 h-4" />}
+                  onClick={handleSendToCNEDDT}
+                  disabled={sendingToCNEDDT || !dossier?.reference || epreuvesStatus !== 'reussi' || loadingEpreuves}
+                  className="font-primary"
+                >
+                  CNEDDT
+                </Button>
+              </span>
+            </Tooltip>
           </Stack>
         </Box>
       </Box>

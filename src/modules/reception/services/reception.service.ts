@@ -78,6 +78,28 @@ class ReceptionService extends BaseService {
       // Charger d'abord les candidats, formations et auto-écoles pour le mapping
       await this.chargerCandidatsEtFormations();
       
+      // Charger toutes les programme-sessions pour récupérer les dates d'examen
+      let programmeSessionsMap = new Map<string, any>();
+      try {
+        console.log('📅 Chargement des programme-sessions pour récupérer les dates d\'examen...');
+        const programmeSessionsResponse = await axiosClient.get('/programme-sessions');
+        const programmeSessions = Array.isArray(programmeSessionsResponse.data?.data) 
+          ? programmeSessionsResponse.data.data 
+          : Array.isArray(programmeSessionsResponse.data) 
+          ? programmeSessionsResponse.data 
+          : [];
+        
+        // Créer un map dossier_id -> programme_session
+        programmeSessions.forEach((ps: any) => {
+          if (ps.dossier_id) {
+            programmeSessionsMap.set(ps.dossier_id, ps);
+          }
+        });
+        console.log(`✅ ${programmeSessionsMap.size} programme-session(s) chargé(s)`);
+      } catch (error) {
+        console.warn('⚠️ Erreur lors du chargement des programme-sessions:', error);
+      }
+      
       // Mapper les dossiers vers ReceptionDossier
       const mapped: ReceptionDossier[] = await Promise.all(response.dossiers.map(async (dossier: any) => {
         const candidat = dossier.candidat;
@@ -95,6 +117,15 @@ class ReceptionService extends BaseService {
         
         const candidatPersonne = candidatFinal?.personne || candidat?.personne || {};
         
+        // Récupérer la date d'examen depuis programme-sessions
+        // Priorité: programme-sessions chargées > programme_sessions dans dossier > null
+        const programmeSession = programmeSessionsMap.get(dossier.id) || 
+                                 dossier.programme_sessions?.[0] || 
+                                 null;
+        const dateExamen = programmeSession?.date_examen || 
+                          dossier.programme_sessions?.[0]?.date_examen || 
+                          '';
+        
         const result: ReceptionDossier = {
           id: dossier.id,
           reference: dossier.id,
@@ -103,13 +134,13 @@ class ReceptionService extends BaseService {
           autoEcoleNom: autoEcoleFinal.nom_auto_ecole || autoEcoleFinal.nom || '',
           dateEnvoi: dossier.updated_at || dossier.created_at || new Date().toISOString(),
           statut: 'valide',
-          dateExamen: dossier.programme_sessions?.[0]?.date_examen || '',
+          dateExamen: dateExamen,
           details: {
             dossier: dossier,
             candidat_complet: candidatFinal,
             formation_complete: formationFinal,
             auto_ecole_complete: autoEcoleFinal,
-            programme_session: dossier.programme_sessions?.[0] || null
+            programme_session: programmeSession || dossier.programme_sessions?.[0] || null
           },
         };
         
