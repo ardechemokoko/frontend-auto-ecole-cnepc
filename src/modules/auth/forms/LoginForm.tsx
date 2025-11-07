@@ -175,7 +175,7 @@ const LoginForm: React.FC = () => {
         id: meResponse.user.id,
         email: meResponse.user.email,
         name: meResponse.user.personne.nom_complet,
-        role: meResponse.user.role as 'admin' | 'instructor' | 'student' | 'candidat' | 'responsable_auto_ecole',
+        role: meResponse.user.role as User['role'],
         createdAt: new Date(meResponse.user.created_at),
         created_at: meResponse.user.created_at,
         personne: meResponse.user.personne
@@ -183,7 +183,7 @@ const LoginForm: React.FC = () => {
 
       // Si l'utilisateur est responsable d'auto-école, récupérer les informations de l'auto-école
       let autoEcoleInfo: AutoEcoleDetailResponse | null = null;
-      if (user.role === 'responsable_auto_ecole') {
+      if (user.role === 'ROLE_AUTO_ECOLE') {
         console.log('🏫 Récupération des informations de l\'auto-école...');
         try {
           // Trouver l'ID du responsable dans les données utilisateur

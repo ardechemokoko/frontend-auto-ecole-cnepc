@@ -65,8 +65,9 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
     control,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<AutoEcoleFormData>({
+    mode: 'onChange', // Valider en temps réel
     defaultValues: {
       nom_auto_ecole: '',
       adresse: '',
@@ -145,7 +146,7 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
     }
 
     // ✅ Vérification des permissions
-    if (responsableId && responsableId !== user?.id && user?.role !== 'admin') {
+    if (responsableId && responsableId !== user?.id && user?.role !== 'ROLE_ADMIN') {
       setError('🚫 Seul un administrateur peut créer une auto-école pour un autre utilisateur.');
       setLoading(false);
       return;
@@ -301,7 +302,7 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
           )}
 
           {/* Vérification des permissions */}
-          {user?.role !== 'responsable_auto_ecole' && user?.role !== 'admin' && !isCreationWithResponsable && (
+          {user?.role !== 'ROLE_AUTO_ECOLE' && user?.role !== 'ROLE_ADMIN' && !isCreationWithResponsable && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               <Typography variant="body2">
                 <strong>⚠️ Attention :</strong> Seuls les responsables d'auto-école et les administrateurs peuvent créer ou modifier des auto-écoles.
@@ -480,7 +481,7 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
         <Button
           onClick={handleSubmit(onSubmit)}
           variant="contained"
-          disabled={loading || (user?.role !== 'responsable_auto_ecole' && user?.role !== 'admin')}
+          disabled={loading || (!isCreationWithResponsable && user?.role !== 'ROLE_AUTO_ECOLE' && user?.role !== 'ROLE_ADMIN') || (!autoEcole && !isValid)}
           startIcon={loading && <CircularProgress size={20} />}
         >
           {loading ? 'Sauvegarde...' : (autoEcole ? 'Modifier' : 'Créer')}

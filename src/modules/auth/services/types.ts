@@ -4,7 +4,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'instructor' | 'student' | 'responsable_auto_ecole';
+  role: 'ROLE_ADMIN' | 'instructor' | 'student' | 'ROLE_AUTO_ECOLE';
   createdAt: Date;
 }
 

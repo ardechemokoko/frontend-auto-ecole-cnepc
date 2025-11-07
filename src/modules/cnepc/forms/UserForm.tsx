@@ -47,7 +47,7 @@ const UserForm: React.FC<UserFormProps> = ({
       prenom: '',
       contact: '',
       adresse: '',
-      role: 'responsable_auto_ecole',
+      role: 'ROLE_AUTO_ECOLE',
     },
   });
 
@@ -251,8 +251,8 @@ const UserForm: React.FC<UserFormProps> = ({
                       {...field}
                       label="Rôle"
                     >
-                      <MenuItem value="responsable_auto_ecole">Responsable d'Auto-École</MenuItem>
-                      <MenuItem value="admin">Administrateur</MenuItem>
+                      <MenuItem value="ROLE_AUTO_ECOLE">Responsable d'Auto-École</MenuItem>
+                      <MenuItem value="ROLE_ADMIN">Administrateur</MenuItem>
                     </Select>
                   </FormControl>
                 )}

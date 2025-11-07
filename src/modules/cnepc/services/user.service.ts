@@ -9,7 +9,7 @@ export interface UserFormData {
   prenom: string;
   contact: string;
   adresse?: string;
-  role: 'candidat' | 'responsable_auto_ecole' | 'admin';
+  role: 'candidat' | 'ROLE_AUTO_ECOLE' | 'ROLE_ADMIN';
 }
 
 export interface User {

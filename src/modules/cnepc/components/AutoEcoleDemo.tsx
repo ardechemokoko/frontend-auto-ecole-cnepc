@@ -286,7 +286,7 @@ const AutoEcoleDemo: React.FC = () => {
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Typography variant="body2">
-            • <strong>POST /api/auto-ecoles</strong> - Créer une auto-école
+            • <strong>POST /api/auto-ecoles</strong> - Créer une auto-écoles
           </Typography>
           <Typography variant="body2">
             • <strong>GET /api/auto-ecoles</strong> - Lister les auto-écoles
