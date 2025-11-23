@@ -65,8 +65,9 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
     control,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<AutoEcoleFormData>({
+    mode: 'onChange', // Valider en temps réel
     defaultValues: {
       nom_auto_ecole: '',
       adresse: '',
@@ -301,7 +302,7 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
           )}
 
           {/* Vérification des permissions */}
-          {user?.role !== 'responsable_auto_ecole' && user?.role !== 'admin' && !isCreationWithResponsable && (
+          {user?.role !== 'ROLE_AUTO_ECOLE' && user?.role !== 'ROLE_ADMIN' && !isCreationWithResponsable && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               <Typography variant="body2">
                 <strong>⚠️ Attention :</strong> Seuls les responsables d'auto-école et les administrateurs peuvent créer ou modifier des auto-écoles.

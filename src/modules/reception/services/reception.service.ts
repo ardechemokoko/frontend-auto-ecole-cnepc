@@ -30,7 +30,7 @@ class ReceptionService extends BaseService {
         }
       }
       
-      const isAdmin = userRole === 'admin';
+      const isAdmin = userRole === 'ROLE_ADMIN';
       
       console.log('🏫 Auto-école ID:', autoEcoleId || 'Aucun');
       console.log('👤 Rôle utilisateur:', userRole || 'Non défini');

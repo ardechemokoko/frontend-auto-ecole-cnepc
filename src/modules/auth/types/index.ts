@@ -3,7 +3,7 @@ export interface User {
   id: string;
   email: string;
   name?: string;
-  role: 'admin' | 'instructor' | 'student' | 'candidat' | 'responsable_auto_ecole';
+  role: 'ROLE_ADMIN' | 'instructor' | 'student' | 'candidat' | 'ROLE_AUTO_ECOLE';
   createdAt?: Date;
   created_at?: string;
   updated_at?: string;

@@ -53,7 +53,7 @@ export class AuthService {
         console.log('\n🎭 RÔLE DÉTECTÉ:', user.role.toUpperCase());
 
         switch (user.role) {
-          case 'responsable_auto_ecole':
+          case 'ROLE_AUTO_ECOLE':
             console.log('  ➜ Type: Responsable d\'Auto-École');
             console.log('  ➜ Permissions: Gestion des candidats, dossiers, formations');
             console.log('  ➜ Action suivante: Récupération de l\'auto-école...');
@@ -62,7 +62,7 @@ export class AuthService {
             console.log('  ➜ Type: Candidat');
             console.log('  ➜ Permissions: Consultation de ses dossiers');
             break;
-          case 'admin':
+          case 'ROLE_ADMIN':
             console.log('  ➜ Type: Administrateur');
             console.log('  ➜ Permissions: Accès complet au système');
             break;

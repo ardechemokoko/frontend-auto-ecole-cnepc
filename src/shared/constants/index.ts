@@ -56,7 +56,7 @@ export const DOCUMENT_TYPES = {
 } as const;
 
 export const USER_ROLES = {
-  ADMIN: 'admin',
+  ADMIN: 'ROLE_ADMIN',
   INSTRUCTOR: 'instructor',
   STUDENT: 'student',
 } as const;

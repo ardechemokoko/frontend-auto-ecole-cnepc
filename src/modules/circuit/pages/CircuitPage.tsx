@@ -64,7 +64,7 @@ const CircuitPage: React.FC = () => {
   const fetchTypePermis = async () => {
     try {
       const res = await typePermisService.getAll({
-        type_ref: "TYPE_PERMIS"
+        type_ref: "type_permis"
       })
       setTypePermis(res?.data)      
     } catch (err: any) {

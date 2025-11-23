@@ -206,9 +206,9 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
   ];
 
   // Préparer la liste des menus selon le rôle
-  const baseMenuItems = user?.role === "responsable_auto_ecole" ? allMenuItemsAutoEcole : allMenuItems;
+  const baseMenuItems = user?.role === "ROLE_AUTO_ECOLE" ? allMenuItemsAutoEcole : allMenuItems;
   // Pour l'administrateur: n'afficher que le menu CNEPC, Workflow et Referentiel
-  const roleAdjustedMenuItems = user?.role === 'admin'
+  const roleAdjustedMenuItems = user?.role === 'ROLE_ADMIN'
     ? allMenuItems.filter(item => item.title === 'CNEPC' || item.title === 'Workflow' || item.title === 'Referentiel')
     : baseMenuItems;
 
@@ -344,7 +344,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
         {/* Navigation */}
         <Box sx={{ flexGrow: 1, overflow: 'auto', py: 1 }}>
           <List sx={{ px: open ? 1.5 : 1, py: 0 }}>
-            {user?.role !== "responsable_auto_ecole" ? menuItems.map((item) => {
+            {user?.role !== "ROLE_AUTO_ECOLE" ? menuItems.map((item) => {
               const IconComponent = item.icon;
               const isCandidatsItem = item.title === 'Gestion des Candidats';
               const isSettingsItem = item.title === 'Paramètres';
