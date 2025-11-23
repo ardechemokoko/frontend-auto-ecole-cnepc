@@ -112,6 +112,7 @@ export class ReferentielService {
     data: Partial<{
       libelle: string;
       code: string;
+      type_ref: string;
       description: string;
       statut: boolean;
     }>
