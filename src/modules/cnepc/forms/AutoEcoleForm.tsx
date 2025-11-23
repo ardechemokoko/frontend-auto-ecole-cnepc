@@ -144,8 +144,8 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
       return;
     }
 
-    // ✅ Vérification des permissions
-    if (responsableId && responsableId !== user?.id && user?.role !== 'admin') {
+    // ✅ Vérification des permissions (sauf en mode création avec responsable fourni)
+    if (!isCreationWithResponsable && responsableId && responsableId !== user?.id && user?.role !== 'admin') {
       setError('🚫 Seul un administrateur peut créer une auto-école pour un autre utilisateur.');
       setLoading(false);
       return;
@@ -480,7 +480,7 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
         <Button
           onClick={handleSubmit(onSubmit)}
           variant="contained"
-          disabled={loading || (user?.role !== 'responsable_auto_ecole' && user?.role !== 'admin')}
+          disabled={loading || (!isCreationWithResponsable && user?.role !== 'responsable_auto_ecole' && user?.role !== 'admin')}
           startIcon={loading && <CircularProgress size={20} />}
         >
           {loading ? 'Sauvegarde...' : (autoEcole ? 'Modifier' : 'Créer')}

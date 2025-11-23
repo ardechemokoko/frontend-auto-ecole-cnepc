@@ -182,7 +182,7 @@ const CNEPCPage: React.FC = () => {
             </Card>
           </Grid>
 
-          {/* Module Envoi au CNEPC */}
+          {/* Module Reception au CNEPC */}
           <Grid item xs={12} md={4}>
             <Card 
               sx={{ 
@@ -206,32 +206,32 @@ const CNEPCPage: React.FC = () => {
                       Reception au CNEPC
                     </Typography>
                     <Chip 
-                      label="Bientôt Disponible" 
-                      color="secondary" 
+                      label="Module Disponible" 
+                      color="success" 
                       size="small"
                       sx={{ mb: 1 }}
                     />
                   </Box>
                 </Box>
                 <Typography variant="body2" color="text.secondary" paragraph>
-                  Interface de reception  des dossiers candidats au CNEPC
-                  
+                  Interface de réception des dossiers candidats au CNEPC. 
+                  Gérez la réception, la validation et le suivi des dossiers transmis par les auto-écoles.
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                   <Chip icon={<AutoAwesome />} label="Validation" size="small" />
-                  <Chip icon={<Send />} label="Transmission" size="small" />
+                  <Chip icon={<Send />} label="Réception" size="small" />
                   <Chip icon={<Assignment />} label="Suivi" size="small" />
                 </Box>
               </CardContent>
               <CardActions sx={{ p: 2, pt: 0 }}>
                 <Button
-                  variant="outlined"
+                  variant="contained"
                   fullWidth
                   startIcon={<Send />}
-                  disabled
+                  onClick={() => navigate(ROUTES.RECEPTION)}
                   sx={{ py: 1.5 }}
                 >
-                  Module en Développement
+                  Accéder au Module
                 </Button>
               </CardActions>
             </Card>

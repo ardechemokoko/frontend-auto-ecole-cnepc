@@ -166,11 +166,6 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
           path: ROUTES.CNEPC,
           title: 'Management',
           description: 'Transmettre les dossiers validés au CNEPC'
-        },
-        {
-          path: ROUTES.RECEPTION,
-          title: 'Réception des dossiers',
-          description: 'Réceptionner les dossiers envoyés par les auto-écoles'
         }
       ]
     },
