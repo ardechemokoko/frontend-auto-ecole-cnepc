@@ -135,7 +135,8 @@ const EleveInscritDetailsPage: React.FC = () => {
           
           // Les documents sont déjà dans la réponse, pas besoin de les charger séparément
           if (dossier.documents && Array.isArray(dossier.documents)) {
-            setDocumentsFromApi(dossier.documents);
+            const enrichedDocs = await fetchDocumentDetails(dossier.documents);
+            setDocumentsFromApi(enrichedDocs);
           }
         } else {
           setSnackbar({
@@ -163,6 +164,33 @@ const EleveInscritDetailsPage: React.FC = () => {
     
     loadDossier();
   }, [id, navigate]);
+
+  const fetchDocumentDetails = async (documents: any[]) => {
+    if (!Array.isArray(documents) || documents.length === 0) return [];
+
+    const enrichedDocs = await Promise.all(
+      documents.map(async (doc: any) => {
+        if (!doc?.id) return doc;
+        try {
+          const response = await axiosClient.get(`/documents/${doc.id}`);
+          if (response.data?.success && response.data?.data) {
+            const apiDoc = response.data.data;
+            return {
+              ...doc,
+              ...apiDoc,
+              valide: apiDoc.valide,
+              valide_libelle: apiDoc.valide_libelle || (apiDoc.valide ? 'Validé' : 'Non validé'),
+            };
+          }
+        } catch (err) {
+          console.warn(`⚠️ Impossible de récupérer les détails du document ${doc.id}`, err);
+        }
+        return doc;
+      })
+    );
+
+    return enrichedDocs;
+  };
 
   // Fonction pour obtenir tous les documents
   const getAllDocuments = () => {
@@ -446,7 +474,8 @@ const EleveInscritDetailsPage: React.FC = () => {
           if (dossierResponse.data.success && dossierResponse.data.data) {
             const dossier = dossierResponse.data.data;
             if (dossier.documents && Array.isArray(dossier.documents)) {
-              setDocumentsFromApi(dossier.documents);
+              const enrichedDocs = await fetchDocumentDetails(dossier.documents);
+              setDocumentsFromApi(enrichedDocs);
             }
           }
         }
@@ -706,12 +735,27 @@ const EleveInscritDetailsPage: React.FC = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
                         <DocumentTextIcon className="w-6 h-6 text-gray-500" />
                         <Box sx={{ flex: 1 }}>
-                          <Typography variant="body1" fontWeight={500}>
-                            {doc.nom_fichier || doc.nom || 'Document sans nom'}
-                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
+                            <Typography variant="body1" fontWeight={500}>
+                              {doc.nom_fichier || doc.nom || 'Document sans nom'}
+                            </Typography>
+                            {typeof doc.valide !== 'undefined' && (
+                              <Chip
+                                label={doc.valide ? (doc.valide_libelle || 'Validé') : (doc.valide_libelle || 'Non validé')}
+                                color={doc.valide ? 'success' : 'warning'}
+                                size="small"
+                                sx={{ height: 20, fontSize: '0.7rem' }}
+                              />
+                            )}
+                          </Box>
                           <Typography variant="body2" color="text.secondary">
                             {doc.taille_fichier_formate || doc.taille || 'Taille inconnue'}
                           </Typography>
+                          {doc.commentaires && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                              {doc.commentaires}
+                            </Typography>
+                          )}
                         </Box>
                       </Box>
                       <Box sx={{ display: 'flex', gap: 0.5, ml: 2 }}>
@@ -733,14 +777,16 @@ const EleveInscritDetailsPage: React.FC = () => {
                             <ArrowDownTrayIcon className="w-5 h-5" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Supprimer">
-                          <IconButton
-                            size="small"
-                            sx={{ color: '#6b7280', '&:hover': { color: 'error.main' } }}
-                          >
-                            <TrashIcon className="w-5 h-5" />
-                          </IconButton>
-                        </Tooltip>
+                        {!doc.valide && (
+                          <Tooltip title="Supprimer">
+                            <IconButton
+                              size="small"
+                              sx={{ color: '#6b7280', '&:hover': { color: 'error.main' } }}
+                            >
+                              <TrashIcon className="w-5 h-5" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </Box>
                     </Box>
                   ))}

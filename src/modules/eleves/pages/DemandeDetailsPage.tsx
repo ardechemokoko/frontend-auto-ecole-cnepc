@@ -146,7 +146,8 @@ const DemandeDetailsPage: React.FC = () => {
           
           // Les documents sont déjà dans la réponse, pas besoin de les charger séparément
           if (dossier.documents && Array.isArray(dossier.documents)) {
-            setDocumentsFromApi(dossier.documents);
+            const enrichedDocs = await fetchDocumentDetails(dossier.documents);
+            setDocumentsFromApi(enrichedDocs);
           }
         } else {
           setSnackbar({
@@ -177,6 +178,33 @@ const DemandeDetailsPage: React.FC = () => {
 
   // Les documents sont chargés directement depuis l'endpoint dossiers/{id}
   // Plus besoin de charger séparément
+
+  const fetchDocumentDetails = async (documents: any[]) => {
+    if (!Array.isArray(documents) || documents.length === 0) return [];
+
+    const enrichedDocs = await Promise.all(
+      documents.map(async (doc: any) => {
+        if (!doc?.id) return doc;
+        try {
+          const response = await axiosClient.get(`/documents/${doc.id}`);
+          if (response.data?.success && response.data?.data) {
+            const apiDoc = response.data.data;
+            return {
+              ...doc,
+              ...apiDoc,
+              valide: apiDoc.valide,
+              valide_libelle: apiDoc.valide_libelle || (apiDoc.valide ? 'Validé' : 'Non validé'),
+            };
+          }
+        } catch (err) {
+          console.warn(`⚠️ Impossible de récupérer les détails du document ${doc.id}`, err);
+        }
+        return doc;
+      })
+    );
+
+    return enrichedDocs;
+  };
 
   // Fonction pour obtenir tous les documents
   const getAllDocuments = () => {
@@ -460,7 +488,8 @@ const DemandeDetailsPage: React.FC = () => {
           if (dossierResponse.data.success && dossierResponse.data.data) {
             const dossier = dossierResponse.data.data;
             if (dossier.documents && Array.isArray(dossier.documents)) {
-              setDocumentsFromApi(dossier.documents);
+              const enrichedDocs = await fetchDocumentDetails(dossier.documents);
+              setDocumentsFromApi(enrichedDocs);
             }
           }
         }
@@ -581,7 +610,8 @@ const DemandeDetailsPage: React.FC = () => {
           if (dossierResponse.data.success && dossierResponse.data.data) {
             const dossier = dossierResponse.data.data;
             if (dossier.documents && Array.isArray(dossier.documents)) {
-              setDocumentsFromApi(dossier.documents);
+              const enrichedDocs = await fetchDocumentDetails(dossier.documents);
+              setDocumentsFromApi(enrichedDocs);
             }
           }
         }
