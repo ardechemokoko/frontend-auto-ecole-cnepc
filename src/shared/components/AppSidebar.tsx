@@ -209,7 +209,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
   const baseMenuItems = user?.role === "ROLE_AUTO_ECOLE" ? allMenuItemsAutoEcole : allMenuItems;
   // Pour l'administrateur: n'afficher que le menu CNEPC, Workflow et Referentiel
   const roleAdjustedMenuItems = user?.role === 'ROLE_ADMIN'
-    ? allMenuItems.filter(item => item.title === 'CNEPC' || item.title === 'Workflow' || item.title === 'Referentiel')
+    ? allMenuItems.filter(item => item.title === 'CNEPC' || item.title === 'Workflow' )
     : baseMenuItems;
 
   // Filtrer les menus selon les permissions de l'utilisateur
