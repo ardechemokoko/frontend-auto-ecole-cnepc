@@ -46,6 +46,7 @@ const UserForm: React.FC<UserFormProps> = ({
       nom: '',
       prenom: '',
       contact: '',
+      telephone: '',
       adresse: '',
       role: 'ROLE_AUTO_ECOLE',
     },
@@ -168,6 +169,24 @@ const UserForm: React.FC<UserFormProps> = ({
                     fullWidth
                     error={!!errors.contact}
                     helperText={errors.contact?.message}
+                    required
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="telephone"
+                control={control}
+                rules={{ required: 'Le téléphone est requis' }}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Téléphone"
+                    fullWidth
+                    error={!!errors.telephone}
+                    helperText={errors.telephone?.message}
                     required
                   />
                 )}

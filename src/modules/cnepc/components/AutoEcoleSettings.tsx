@@ -34,7 +34,6 @@ import {
 import {
   Add,
   Edit,
-  Delete,
   School,
   Settings,
   Person,
@@ -132,6 +131,7 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
     description: '',
     statut: true,
   });
+  const [isCustomType, setIsCustomType] = useState(false);
 
   // Charger les formations
   const loadFormations = async () => {
@@ -281,6 +281,7 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
   const handleReferentielCreate = () => {
     setSelectedReferentiel(null);
     setIsCreatingReferentiel(true);
+    setIsCustomType(false);
     setReferentielFormData({
       libelle: '',
       code: '',
@@ -308,6 +309,7 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
     setReferentielDialogOpen(false);
     setSelectedReferentiel(null);
     setIsCreatingReferentiel(false);
+    setIsCustomType(false);
     setReferentielFormData({
       libelle: '',
       code: '',
@@ -781,25 +783,61 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
               required
             />
             
-            <FormControl fullWidth required>
-              <InputLabel>Type de référentiel</InputLabel>
-              <Select
-                value={referentielFormData.type_ref}
-                onChange={(e) => setReferentielFormData({ ...referentielFormData, type_ref: e.target.value })}
-                label="Type de référentiel"
-                disabled={!isCreatingReferentiel}
-              >
-                <MenuItem value="type_permis">Types de Permis</MenuItem>
-                <MenuItem value="type_document">Types de Documents</MenuItem>
-                <MenuItem value="session">Sessions</MenuItem>
-                <MenuItem value="statut">Statuts</MenuItem>
-              </Select>
-              {!isCreatingReferentiel && (
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                  Le type ne peut pas être modifié
-                </Typography>
-              )}
-            </FormControl>
+            {!isCustomType ? (
+              <FormControl fullWidth required>
+                <InputLabel>Type de référentiel</InputLabel>
+                <Select
+                  value={referentielFormData.type_ref}
+                  onChange={(e) => setReferentielFormData({ ...referentielFormData, type_ref: e.target.value })}
+                  label="Type de référentiel"
+                  disabled={!isCreatingReferentiel}
+                >
+                  <MenuItem value="type_permis">Types de Permis</MenuItem>
+                  <MenuItem value="type_document">Types de Documents</MenuItem>
+                  <MenuItem value="session">Sessions</MenuItem>
+                  <MenuItem value="statut">Statuts</MenuItem>
+                </Select>
+                {!isCreatingReferentiel && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                    Le type ne peut pas être modifié
+                  </Typography>
+                )}
+                {isCreatingReferentiel && (
+                  <Box sx={{ mt: 1 }}>
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={() => setIsCustomType(true)}
+                    >
+                      Créer un nouveau type
+                    </Button>
+                  </Box>
+                )}
+              </FormControl>
+            ) : (
+              <Box>
+                <TextField
+                  label="Nouveau type de référentiel"
+                  value={referentielFormData.type_ref}
+                  onChange={(e) => setReferentielFormData({ ...referentielFormData, type_ref: e.target.value })}
+                  fullWidth
+                  required
+                  placeholder="Ex: type_permis, type_document, session, statut"
+                  helperText="Entrez le code du nouveau type de référentiel (en minuscules, avec underscores)"
+                />
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() => {
+                    setIsCustomType(false);
+                    setReferentielFormData({ ...referentielFormData, type_ref: selectedTypeRef || '' });
+                  }}
+                  sx={{ mt: 1 }}
+                >
+                  Utiliser un type existant
+                </Button>
+              </Box>
+            )}
             
             <TextField
               label="Description"

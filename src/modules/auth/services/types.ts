@@ -26,8 +26,17 @@ export interface RefreshTokenResponse {
 }
 
 export interface LoginRequest {
-  email: string;
+  identifier: string;
   password: string;
+  captcha_id?: string;
+  captcha_code?: string;
+}
+
+export interface CaptchaResponse {
+  success: boolean;
+  captcha_id: string;
+  image: string;
+  expires_in: number;
 }
 
 export interface ApiError {
