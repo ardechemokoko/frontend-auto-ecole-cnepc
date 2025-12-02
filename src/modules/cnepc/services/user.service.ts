@@ -1,4 +1,3 @@
-import axiosAuthentifcation from '../../../shared/environment/envauth';
 import axiosClient from '../../../shared/environment/envdev';
 
 export interface UserFormData {
@@ -8,12 +7,14 @@ export interface UserFormData {
   nom: string;
   prenom: string;
   contact: string;
+  telephone: string;
   adresse?: string;
   role: 'candidat' | 'ROLE_AUTO_ECOLE' | 'ROLE_ADMIN';
 }
 
 export interface User {
   id: string;
+  telephone?: string;
   email: string;
   role: string;
   created_at: string;
@@ -48,8 +49,20 @@ export class UserService {
           await new Promise((res) => setTimeout(res, attempts[i]));
         }
         console.log('🚀 Création d\'un nouvel utilisateur (tentative', i + 1, '):', data);
+        
+        // Mapper les données pour correspondre au format attendu par le backend
+        // Le backend attend "telephone" pour l'utilisateur et "contact" pour la personne
+        const payload = {
+          ...data,
+          telephone: data.telephone || data.contact, // Utiliser telephone si présent, sinon contact
+          // Garder contact car il est nécessaire pour créer la personne
+          contact: data.contact || data.telephone, // Utiliser contact si présent, sinon telephone
+        };
+        
+        console.log('📤 Données envoyées au backend:', payload);
+        
         // Désactiver le timeout pour laisser l'API répondre si elle est lente
-        const response = await axiosAuthentifcation.post('/auth/register', data, { timeout: 0 });
+        const response = await axiosClient.post('/auth/register', payload, { timeout: 0 });
         console.log('✅ Utilisateur créé avec succès:', response.data);
 
         if (response.data.user?.id) {

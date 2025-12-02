@@ -8,9 +8,12 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'https://backend.permis.transports.gouv.ga',
+        target: 'https://pajamaed-rosa-vapouringly.ngrok-free.dev',
         changeOrigin: true,
         secure: true,
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+        },
         // Configuration pour les uploads de fichiers volumineux
         timeout: 60000, // 60 secondes
         // Pas de rewrite nécessaire, on garde /api dans le chemin
