@@ -1,0 +1,86 @@
+// Service des documents avec mocks
+import axiosClient from '../../../shared/environment/envdev';
+import { Circuit } from '../types/circuit';
+
+export class CircuitService {
+
+    constructor(
+    private axios = axiosClient, // ton instance axios avec interceptors
+        private url = '/workflow/circuits'       // base URL de la ressource
+    ) {}
+  
+    async getAll(params?: Record<string, any>): Promise<Circuit[]> {
+        try {
+            const res = await this.axios.get<Circuit[]>(this.url, { params })
+        return res.data
+        } catch (error) {
+            throw new Error(`Erreur de connexion (GET all): ${this.humanize(error)}`)
+        }
+    }
+
+  // GET /api/circuits/{id}
+    async getById(id: string): Promise<Circuit> {
+        try {
+            const res = await this.axios.get<Circuit>(`${this.url}/${id}`)
+            return res.data
+        } catch (error) {
+            throw new Error(`Erreur de connexion (GET id=${id}): ${this.humanize(error)}`)
+        }
+    }
+
+    // POST /api/circuits
+    async create(payload: Partial<Circuit>): Promise<Circuit> {
+        try {
+            const res = await this.axios.post<Circuit>(this.url, payload)
+            return res.data
+        } catch (error) {
+            throw new Error(`Erreur de connexion (POST): ${this.humanize(error)}`)
+        }
+    }
+
+    // PUT /api/circuits/{id}
+    async update(id: string, payload: Partial<Circuit>): Promise<Circuit> {
+        try {
+            const res = await this.axios.put<Circuit>(`${this.url}/${id}`, payload)
+            return res.data
+        } catch (error) {
+            throw new Error(`Erreur de connexion (PUT id=${id}): ${this.humanize(error)}`)
+        }
+    }
+
+    // PATCH /api/circuits/{id}
+    async patch(id: string, payload: Partial<Circuit>): Promise<Circuit> {
+        try {
+            const res = await this.axios.patch<Circuit>(`${this.url}/${id}`, payload)
+            return res.data
+        } catch (error) {
+            throw new Error(`Erreur de connexion (PATCH id=${id}): ${this.humanize(error)}`)
+        }
+    }
+
+  // DELETE /api/circuits/{id}
+    async remove(id: string): Promise<void> {
+        try {
+            await this.axios.delete(`${this.url}/${id}`)
+        } catch (error) {
+            throw new Error(`Erreur de connexion (DELETE id=${id}): ${this.humanize(error)}`)
+        }
+    }
+    
+    // Optionnel: petit helper pour messages d'erreur lisibles
+    private humanize(error: unknown): string {
+        if (typeof error === 'string') return error
+        if (error && typeof error === 'object') {
+            const axiosErr = error
+            if (axiosErr.response) {
+                const status = axiosErr.response.status
+                const msg = axiosErr.response.data?.message || axiosErr.message
+                return `${status} - ${msg ?? 'Erreur serveur'}`
+            }
+            return axiosErr.message ?? 'Erreur inconnue'
+        }
+        return 'Erreur inconnue'
+    }
+}
+
+export const circuitService = new CircuitService();

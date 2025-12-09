@@ -1,0 +1,22 @@
+import axiosClient from '../../../shared/environment/envdev';
+import { Etape } from '../types/etape'
+
+export class EtapeService {
+  private url = '/workflow/etapes'
+
+  async getByCircuitId(circuitId: string): Promise<Etape[]> {
+    const res = await axiosClient.get(`${this.url}?circuit_id=${circuitId}`)
+    return res.data
+  }
+
+  async create(payload: Partial<Etape>): Promise<Etape> {
+    const res = await axiosClient.post(this.url, payload)
+    return res.data
+  }
+
+  async remove(id: string): Promise<void> {
+    await axiosClient.delete(`${this.url}/${id}`)
+  }
+}
+
+export const etapeService = new EtapeService()
