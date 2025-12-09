@@ -8,7 +8,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'https://pajamaed-rosa-vapouringly.ngrok-free.dev',
+        target: 'http://172.31.11.223:8000',
         changeOrigin: true,
         secure: true,
         headers: {

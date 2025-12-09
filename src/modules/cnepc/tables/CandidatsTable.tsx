@@ -351,7 +351,7 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
       {/* Section des détails de l'auto-école */}
       {autoEcoleDetails && (
         <Box sx={{ mb: 4 }}>
-            <Card elevation={3}>
+            <Card sx={{ boxShadow: 'none', bgcolor: 'transparent' }}>
               <CardContent sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3 }}>
                   <Avatar
@@ -380,33 +380,33 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
                       </Box>
                     </Box>
                     
-                    <Grid container spacing={3}>
-                      <Grid item xs={12} md={6}>
-                        <Card variant="outlined">
-                          <CardContent>
-                            <Typography variant="overline" color="text.secondary" fontWeight="bold">
-                              Contact
-                            </Typography>
-                            <List dense disablePadding>
-                              <ListItem disablePadding sx={{ py: 0.5 }}>
-                                <Email fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                                <Typography variant="body2">{autoEcoleDetails.email}</Typography>
-                              </ListItem>
-                              <ListItem disablePadding sx={{ py: 0.5 }}>
-                                <Phone fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                                <Typography variant="body2">{autoEcoleDetails.contact}</Typography>
-                              </ListItem>
-                              <ListItem disablePadding sx={{ py: 0.5 }}>
-                                <LocationOn fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                                <Typography variant="body2">{autoEcoleDetails.adresse}</Typography>
-                              </ListItem>
-                            </List>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                      
-                      <Grid item xs={12} md={6}>
-                        <Card variant="outlined">
+                      <Grid container spacing={3}>
+                        <Grid item xs={12} md={6}>
+                          <Card variant="outlined" sx={{ boxShadow: 'none', bgcolor: 'transparent' }}>
+                            <CardContent>
+                              <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                                Contact
+                              </Typography>
+                              <List dense disablePadding>
+                                <ListItem disablePadding sx={{ py: 0.5 }}>
+                                  <Email fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                                  <Typography variant="body2">{autoEcoleDetails.email}</Typography>
+                                </ListItem>
+                                <ListItem disablePadding sx={{ py: 0.5 }}>
+                                  <Phone fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                                  <Typography variant="body2">{autoEcoleDetails.contact}</Typography>
+                                </ListItem>
+                                <ListItem disablePadding sx={{ py: 0.5 }}>
+                                  <LocationOn fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                                  <Typography variant="body2">{autoEcoleDetails.adresse}</Typography>
+                                </ListItem>
+                              </List>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                        
+                        <Grid item xs={12} md={6}>
+                          <Card variant="outlined" sx={{ boxShadow: 'none', bgcolor: 'transparent' }}>
                           <CardContent>
                             <Typography variant="overline" color="text.secondary" fontWeight="bold">
                               Responsable
@@ -449,7 +449,7 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
       {statistiques && (
         <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid item xs={12} sm={6} md={2.4}>
-            <Card variant="outlined">
+            <Card variant="outlined" sx={{ bgcolor: 'transparent' }}>
               <CardContent>
                 <Typography variant="overline" color="text.secondary">
                   Total
@@ -461,7 +461,7 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
             </Card>
           </Grid>
           <Grid item xs={12} sm={6} md={2.4}>
-            <Card variant="outlined">
+            <Card variant="outlined" sx={{ bgcolor: 'transparent' }}>
               <CardContent>
                 <Typography variant="overline" color="text.secondary">
                   En attente
@@ -473,7 +473,7 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
             </Card>
           </Grid>
           <Grid item xs={12} sm={6} md={2.4}>
-            <Card variant="outlined">
+            <Card variant="outlined" sx={{ bgcolor: 'transparent' }}>
               <CardContent>
                 <Typography variant="overline" color="text.secondary">
                   En cours
@@ -485,7 +485,7 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
             </Card>
           </Grid>
           <Grid item xs={12} sm={6} md={2.4}>
-            <Card variant="outlined">
+            <Card variant="outlined" sx={{ bgcolor: 'transparent' }}>
               <CardContent>
                 <Typography variant="overline" color="text.secondary">
                   Validés
@@ -497,7 +497,7 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
             </Card>
           </Grid>
           <Grid item xs={12} sm={6} md={2.4}>
-            <Card variant="outlined">
+            <Card variant="outlined" sx={{ bgcolor: 'transparent' }}>
               <CardContent>
                 <Typography variant="overline" color="text.secondary">
                   Rejetés
@@ -539,13 +539,7 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
           <MenuItem value="valide">Validé</MenuItem>
           <MenuItem value="rejete">Rejeté</MenuItem>
         </TextField>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => setCandidatFormOpen(true)}
-        >
-          Nouveau Candidat
-        </Button>
+       
       </Box>
 
       {/* Message d'erreur */}
@@ -556,7 +550,7 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
       )}
 
       {/* Table */}
-      <Paper>
+      <Paper sx={{ bgcolor: 'transparent' }}>
         <TableContainer>
           <Table>
             <TableHead>

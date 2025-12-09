@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // URL de base de l'API
-export const baseURL = "https://pajamaed-rosa-vapouringly.ngrok-free.dev/api/";
+export const baseURL = "http://172.31.11.223:8000/api/";
 
 console.log('🔧 Configuration axios:', { baseURL });
 
