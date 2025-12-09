@@ -22,26 +22,13 @@ export const PushNotificationPrompt = ({ onEnabled, onDismissed }: PushNotificat
       return;
     }
 
-    // Vérifier aussi le localStorage pour éviter les affichages inutiles
-    const promptDismissed = localStorage.getItem('push-notification-prompt-dismissed') === 'true';
-    const promptEnabled = localStorage.getItem('push-notification-prompt-enabled') === 'true';
-    
-    if (promptDismissed || promptEnabled) {
-      setShowPrompt(false);
-      return;
-    }
-
     // Afficher le prompt uniquement si :
     // - L'utilisateur n'est pas encore souscrit
     // - Le chargement est terminé
-    // - L'utilisateur n'a jamais interagi avec le prompt
     // Attendre que le statut soit bien vérifié
     const timer = setTimeout(() => {
       // Vérifier une dernière fois avant d'afficher
-      const stillDismissed = localStorage.getItem('push-notification-prompt-dismissed') === 'true';
-      const stillEnabled = localStorage.getItem('push-notification-prompt-enabled') === 'true';
-      
-      if (!stillDismissed && !stillEnabled && !isSubscribed && !loading && isSupported) {
+      if (!isSubscribed && !loading && isSupported) {
         setShowPrompt(true);
       }
     }, 1500); // Augmenter le délai pour laisser le temps à la vérification du statut
@@ -52,9 +39,6 @@ export const PushNotificationPrompt = ({ onEnabled, onDismissed }: PushNotificat
   const handleEnable = async () => {
     // Masquer immédiatement le prompt pour une meilleure UX
     setShowPrompt(false);
-    // Mémoriser que l'utilisateur a activé les notifications
-    localStorage.setItem('push-notification-prompt-enabled', 'true');
-    localStorage.removeItem('push-notification-prompt-dismissed');
     
     try {
       const enabled = await enableNotifications();
@@ -65,15 +49,13 @@ export const PushNotificationPrompt = ({ onEnabled, onDismissed }: PushNotificat
       // eslint-disable-next-line no-console
       console.error('Erreur activation notifications:', error);
       window.alert(`Erreur: ${(error as Error).message}`);
-      // En cas d'erreur, on peut réafficher le prompt en retirant le flag
-      localStorage.removeItem('push-notification-prompt-enabled');
+      // En cas d'erreur, on peut réafficher le prompt
+      setShowPrompt(true);
     }
   };
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    // Mémoriser que l'utilisateur a rejeté le prompt
-    localStorage.setItem('push-notification-prompt-dismissed', 'true');
     onDismissed?.();
   };
 
@@ -107,20 +89,32 @@ export const PushNotificationPrompt = ({ onEnabled, onDismissed }: PushNotificat
               : 'Recevez des notifications en temps réel sur les validations, examens et mises à jour de vos dossiers.'}
           </p>
           <div className="mt-4 flex space-x-3">
-            <button
-              type="button"
-              onClick={handleEnable}
-              className="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            >
-              Activer
-            </button>
-            <button
-              type="button"
-              onClick={handleDismiss}
-              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            >
-              Plus tard
-            </button>
+            {permission === 'denied' ? (
+              <button
+                type="button"
+                onClick={handleDismiss}
+                className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Fermer
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleEnable}
+                  className="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  Activer
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDismiss}
+                  className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  Plus tard
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

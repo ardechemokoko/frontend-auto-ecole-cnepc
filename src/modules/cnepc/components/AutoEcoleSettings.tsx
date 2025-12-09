@@ -75,24 +75,13 @@ function TabPanel(props: TabPanelProps) {
 interface AutoEcoleSettingsProps {
   autoEcole: AutoEcole;
   refreshTrigger?: number;
-  defaultTab?: number;
-  hideTabs?: boolean;
 }
 
 const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({ 
   autoEcole, 
-  refreshTrigger,
-  defaultTab = 0,
-  hideTabs = false,
+  refreshTrigger 
 }) => {
-  const [tabValue, setTabValue] = useState(defaultTab);
-  
-  // Synchroniser avec defaultTab si fourni
-  useEffect(() => {
-    if (defaultTab !== undefined) {
-      setTabValue(defaultTab);
-    }
-  }, [defaultTab]);
+  const [tabValue, setTabValue] = useState(0);
   
   // États pour les formations
   const [formations, setFormations] = useState<Formation[]>([]);
@@ -371,23 +360,23 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
 
   return (
     <Box>
-      {/* Sous-onglets - masqués si hideTabs est true */}
-      {!hideTabs && (
-        <Paper sx={{ mb: 3 }}>
-          <Tabs value={tabValue} onChange={handleTabChange} aria-label="settings tabs">
-            <Tab icon={<Person />} label="Candidats Inscrits" iconPosition="start" />
-            <Tab icon={<School />} label="Formations" iconPosition="start" />
-            <Tab icon={<Settings />} label="Paramètres (Référentiels)" iconPosition="start" />
-          </Tabs>
-        </Paper>
-      )}
+      {/* Sous-onglets */}
+      <Paper sx={{ mb: 3 }}>
+        <Tabs value={tabValue} onChange={handleTabChange} aria-label="settings tabs">
+          <Tab icon={<Person />} label="Candidats Inscrits" iconPosition="start" />
+          <Tab icon={<School />} label="Formations" iconPosition="start" />
+          <Tab icon={<Settings />} label="Paramètres (Référentiels)" iconPosition="start" />
+        </Tabs>
+      </Paper>
 
       {/* Onglet 1: Candidats Inscrits */}
       <TabPanel value={tabValue} index={0}>
         <Box>
           {/* Bouton d'inscription */}
           <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-             
+            <Typography variant="h5" fontWeight="bold">
+              Candidats Inscrits
+            </Typography>
             <Button
               variant="contained"
               startIcon={<Add />}

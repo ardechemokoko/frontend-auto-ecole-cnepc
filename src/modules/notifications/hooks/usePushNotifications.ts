@@ -131,6 +131,11 @@ export const usePushNotifications = () => {
       throw new Error('Push notifications non supportées');
     }
 
+    // Vérifier d'abord si la permission est déjà refusée
+    if (permission === 'denied') {
+      throw new Error('Les notifications sont bloquées dans les paramètres de votre navigateur. Veuillez les autoriser dans les paramètres pour activer les notifications push.');
+    }
+
     const key = vapidPublicKey ?? (await fetchVapidKey());
     if (!key) {
       throw new Error('Clé VAPID non disponible');
@@ -139,6 +144,9 @@ export const usePushNotifications = () => {
     if (permission !== 'granted') {
       const newPermission = await requestPermission();
       if (newPermission !== 'granted') {
+        if (newPermission === 'denied') {
+          throw new Error('Les notifications sont bloquées. Veuillez les autoriser dans les paramètres de votre navigateur.');
+        }
         throw new Error('Permission refusée');
       }
     }

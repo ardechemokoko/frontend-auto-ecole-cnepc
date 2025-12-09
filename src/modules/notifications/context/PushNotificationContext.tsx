@@ -33,13 +33,6 @@ export const PushNotificationProvider = ({ children }: { children: ReactNode }) 
       if (mounted) {
         const subscribed = Boolean(status.subscribed);
         setIsSubscribed(subscribed);
-        
-        // Synchroniser le localStorage avec le statut réel
-        // Si l'utilisateur est souscrit, marquer comme activé
-        if (subscribed) {
-          localStorage.setItem('push-notification-prompt-enabled', 'true');
-          localStorage.removeItem('push-notification-prompt-dismissed');
-        }
       }
     });
 
@@ -55,12 +48,6 @@ export const PushNotificationProvider = ({ children }: { children: ReactNode }) 
       const status = await checkSubscriptionStatus();
       const subscribed = Boolean(status.subscribed);
       setIsSubscribed(subscribed);
-      
-      // Mettre à jour le localStorage
-      if (subscribed) {
-        localStorage.setItem('push-notification-prompt-enabled', 'true');
-        localStorage.removeItem('push-notification-prompt-dismissed');
-      }
       
       return true;
     } catch (error) {
