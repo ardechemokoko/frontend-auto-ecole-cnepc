@@ -1,0 +1,261 @@
+// Définition des routes par module
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { ROUTES } from '../shared/constants';
+import { useAppStore } from '../store';
+import AppLayout from '../shared/components/AppLayout';
+import AuthLoader from '../shared/components/AuthLoader';
+
+// Import des composants de pages
+import LoginPage from '../modules/auth/forms/LoginForm';
+import DashboardPage from './DashboardPage';
+import ValidationPage from './ValidationPage';
+import ElevesPage from './ElevesPage';
+import CNEPCPage from './CNEPCPage';
+
+
+import PageUpdateAutoecole from '../modules/cnepc/forms/updateinfoAutoEcole'
+import PageReferenciel from '../modules/cnepc/forms/referentiel';
+
+
+// import { SettingsPage, UserManagementPage } from '../modules/settings';
+import CircuitPage from '../modules/circuit/pages/CircuitPage';
+import CircuitDetailPage from '../modules/circuit/pages/CircuitDetailPage';
+import StatutPage from '../modules/statut/pages/StatutPage';
+
+import { CandidateDetailsPage } from '../modules/cnepc/pages';
+import SettingsPage from '../modules/settings/pages/SettingsPage';
+import UserManagementPage from '../modules/settings/pages/UserManagementPage';
+import AutoEcolePage from './AutoEcolePage';
+import ResetPasswordForm from '../modules/auth/forms/resetpassword';
+import PageChangePassWord from '../modules/cnepc/forms/changePassword';
+
+// Import des pages du module candidat_examen
+import { 
+  CandidatExamenListPage,
+  SessionExamenListPage,
+  PlanificationPage,
+  TestPage
+} from '../modules/candidat_examen/pages';
+import { ReceptionDossiersPage } from '../modules/reception';
+import ReceptionDossierDetailsPage from '../modules/reception/pages/ReceptionDossierDetailsPage';
+import DemandeDetailsPage from '../modules/eleves/pages/DemandeDetailsPage';
+import EleveInscritDetailsPage from '../modules/eleves/pages/EleveInscritDetailsPage';
+import ProfilePage from '../modules/auth/pages/ProfilePage';
+import FormationsPage from '../modules/cnepc/pages/FormationsPage';
+
+
+// Composant de protection des routes
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading } = useAppStore();
+  
+  // Attendre que le chargement soit terminé avant de rediriger
+  if (isLoading) {
+    return React.createElement(AuthLoader);
+  }
+  
+  return isAuthenticated ? React.createElement(React.Fragment, null, children) : React.createElement(Navigate, { to: ROUTES.LOGIN, replace: true });
+};
+
+const AppRoutes: React.FC = () => {
+  return React.createElement(Routes, null,
+    // Route par défaut - redirige vers le dashboard ou login
+    React.createElement(Route, { 
+      path: "/", 
+      element: React.createElement(Navigate, { to: ROUTES.DASHBOARD, replace: true }) 
+    }),
+    // Route de connexion
+    React.createElement(Route, { path: ROUTES.LOGIN, element: React.createElement(LoginPage) }),
+
+       // reset password 
+    React.createElement(Route, { path: ROUTES.RPW, element: React.createElement(ResetPasswordForm) }),
+
+     //   React.createElement(Route, { path: ROUTES.UPDATE, element: React.createElement(PageUpdateAutoecole) }),
+    // Routes protégées avec layout
+    React.createElement(Route, { 
+      path: ROUTES.DASHBOARD, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(DashboardPage))
+      ) 
+    }),
+     React.createElement(Route, { 
+      path: ROUTES.UPDATE, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(PageUpdateAutoecole))
+      ) 
+    }),
+      React.createElement(Route, { 
+      path: ROUTES.REF, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(PageReferenciel))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.VALIDATION, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(ValidationPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.ELEVES + "/*", 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(ElevesPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.FORMATIONS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(FormationsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.CNEPC, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CNEPCPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.RECEPTION, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(ReceptionDossiersPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.RECEPTION_DETAILS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(ReceptionDossierDetailsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.AUTO_ECOLES, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(AutoEcolePage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.CANDIDAT_DETAILS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CandidateDetailsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.DEMANDE_DETAILS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(DemandeDetailsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.ELEVE_INSCRIT_DETAILS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(EleveInscritDetailsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.PROFILE, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(ProfilePage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.UPDATE, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(PageUpdateAutoecole))
+      ) 
+    }),
+        // Routes changement de mot de passe
+    React.createElement(Route, { 
+      path: ROUTES.CPW, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(PageChangePassWord))
+      ) 
+    }),
+    // Routes Settings
+
+
+
+    // React.createElement(Route, { 
+    //   path: ROUTES.SETTINGS, 
+    //   element: React.createElement(ProtectedRoute, null, 
+    //     React.createElement(AppLayout, null, React.createElement(SettingsPage))
+    //   ) 
+    // }),
+    // React.createElement(Route, { 
+    //   path: ROUTES.USER_MANAGEMENT, 
+    //   element: React.createElement(ProtectedRoute, null, 
+    //     React.createElement(AppLayout, null, React.createElement(UserManagementPage))
+    //   ) 
+    // }),
+
+    React.createElement(Route, { 
+      path: ROUTES.WORKFLOW_CIRCUIT, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CircuitPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.WORKFLOW_CIRCUIT_DETAIL, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CircuitDetailPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.WORKFLOW_STATUT, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(StatutPage))
+  )}),
+    React.createElement(Route, { 
+      path: ROUTES.SETTINGS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(SettingsPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.USER_MANAGEMENT, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(UserManagementPage))
+
+      ) 
+    }),
+
+    // Routes du module candidat_examen
+    React.createElement(Route, { 
+      path: ROUTES.CANDIDATS_EXAMEN, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CandidatExamenListPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.CANDIDATS_EXAMEN_CANDIDATS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(CandidatExamenListPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.CANDIDATS_EXAMEN_SESSIONS, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(SessionExamenListPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.CANDIDATS_EXAMEN_PLANIFICATION, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(PlanificationPage))
+      ) 
+    }),
+    // Route de test temporaire
+    React.createElement(Route, { 
+      path: "/test-candidats-examen", 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(TestPage))
+      ) 
+    }),
+
+    // Route 404
+    React.createElement(Route, { 
+      path: "*", 
+      element: React.createElement('div', null, 'Page non trouvée - 404') 
+    })
+  );
+};
+
+export default AppRoutes;
