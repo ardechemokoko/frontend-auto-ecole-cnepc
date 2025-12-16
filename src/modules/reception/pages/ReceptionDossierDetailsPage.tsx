@@ -27,6 +27,8 @@ import {
 import { ROUTES } from '../../../shared/constants';
 import axiosClient from '../../../shared/environment/envdev';
 import { autoEcoleService } from '../../cnepc/services/auto-ecole.service';
+import { typeDemandeService } from '../../cnepc/services';
+import { TypeDemande } from '../../cnepc/types/type-demande';
 
 const ReceptionDossierDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -41,6 +43,7 @@ const ReceptionDossierDetailsPage: React.FC = () => {
   });
   const [documentsFromApi, setDocumentsFromApi] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [typeDemandeCache, setTypeDemandeCache] = useState<Map<string, TypeDemande>>(new Map());
 
   // Charger les données du dossier depuis l'API
   useEffect(() => {
@@ -115,6 +118,23 @@ const ReceptionDossierDetailsPage: React.FC = () => {
               }
             } catch (error) {
               console.warn('⚠️ Impossible de charger la session:', error);
+            }
+          }
+
+          // Enrichir le type de demande si nécessaire
+          if (dossierData.type_demande_id && !dossierData.type_demande) {
+            try {
+              // Vérifier d'abord le cache
+              if (typeDemandeCache.has(dossierData.type_demande_id)) {
+                dossierData.type_demande = typeDemandeCache.get(dossierData.type_demande_id);
+              } else {
+                const typeDemande = await typeDemandeService.getTypeDemandeById(dossierData.type_demande_id);
+                dossierData.type_demande = typeDemande;
+                // Mettre à jour le cache
+                setTypeDemandeCache(prev => new Map(prev).set(typeDemande.id, typeDemande));
+              }
+            } catch (error) {
+              console.warn('⚠️ Impossible de charger le type de demande:', error);
             }
           }
 
@@ -805,6 +825,43 @@ const ReceptionDossierDetailsPage: React.FC = () => {
                       return montant ? `${montant}${formation?.montant_formate ? '' : ' FCFA'}` : 'Non spécifié';
                     })()}
                   </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 0.5 }}>
+                    Type de demande
+                  </Typography>
+                  {(() => {
+                    const dossier = candidat.dossierData;
+                    if (dossier?.type_demande) {
+                      return (
+                        <Chip
+                          label={dossier.type_demande.name}
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                        />
+                      );
+                    }
+                    if (dossier?.type_demande_id) {
+                      const cachedTypeDemande = typeDemandeCache.get(dossier.type_demande_id);
+                      if (cachedTypeDemande) {
+                        return (
+                          <Chip
+                            label={cachedTypeDemande.name}
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                          />
+                        );
+                      }
+                    }
+                    return (
+                      <Typography variant="body2" color="text.secondary">
+                        Non spécifié
+                      </Typography>
+                    );
+                  })()}
                 </Box>
 
                 {(() => {

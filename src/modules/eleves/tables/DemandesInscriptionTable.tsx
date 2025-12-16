@@ -35,6 +35,8 @@ import { DemandeInscription, FiltresDemandes, StatistiquesDemandes } from '../ty
 // Import des utilitaires pour récupérer l'ID de l'auto-école
 import { getAutoEcoleId } from '../../../shared/utils/autoEcoleUtils';
 import { autoEcoleService } from '../../cnepc/services/auto-ecole.service';
+import { typeDemandeService } from '../../cnepc/services';
+import { TypeDemande } from '../../cnepc/types/type-demande';
 import ValidationService from '../services/validationService';
 
 interface DemandesInscriptionTableProps {
@@ -71,11 +73,50 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [typeDemandeCache, setTypeDemandeCache] = useState<Map<string, TypeDemande>>(new Map());
 
   useEffect(() => {
     chargerDemandes();
     chargerStatistiques();
   }, [filtres, refreshTrigger, autoEcoleId, formationId, currentAutoEcoleId]);
+
+  // Fonction pour enrichir les données de type de demande
+  const enrichTypeDemandeData = async (dossiers: any[]): Promise<Map<string, TypeDemande>> => {
+    const typeDemandesToFetch = new Set<string>();
+    
+    // Identifier les types de demande qui ont besoin d'être enrichis
+    dossiers.forEach(dossier => {
+      if (dossier.type_demande_id && !dossier.type_demande && !typeDemandeCache.has(dossier.type_demande_id)) {
+        typeDemandesToFetch.add(dossier.type_demande_id);
+      }
+    });
+    
+    // Récupérer les détails des types de demande manquants
+    if (typeDemandesToFetch.size > 0) {
+      try {
+        const typeDemandePromises = Array.from(typeDemandesToFetch).map(id => 
+          typeDemandeService.getTypeDemandeById(id).catch(err => {
+            console.error(`❌ Erreur lors du chargement du type de demande ${id}:`, err);
+            return null;
+          })
+        );
+        
+        const typeDemandes = (await Promise.all(typeDemandePromises)).filter(td => td !== null) as TypeDemande[];
+        
+        // Mettre à jour le cache
+        const newCache = new Map(typeDemandeCache);
+        typeDemandes.forEach(typeDemande => {
+          newCache.set(typeDemande.id, typeDemande);
+        });
+        setTypeDemandeCache(newCache);
+        return newCache;
+      } catch (error) {
+        console.error('❌ Erreur lors de l\'enrichissement des types de demande:', error);
+        return typeDemandeCache;
+      }
+    }
+    return typeDemandeCache;
+  };
 
   // Fonction pour traiter les dossiers (même structure que CandidatsTable)
   const processDossiers = async (dossiers: any[]) => {
@@ -105,6 +146,9 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
     
     console.log('📊 Dossiers avec vraies données récupérés:', dossiersComplets.length);
     setLoadingDetails(false);
+    
+    // Enrichir les types de demande
+    const updatedCache = await enrichTypeDemandeData(dossiersComplets);
     
     // Convertir les dossiers en format DemandeInscription et filtrer les demandes validées
     const demandesData: DemandeInscription[] = dossiersComplets
@@ -218,7 +262,9 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
           libelle: dossier.etape.libelle,
           ordre: dossier.etape.ordre,
           statut: dossier.etape.statut_systeme
-        } : undefined
+        } : undefined,
+        type_demande_id: dossier.type_demande_id,
+        type_demande: dossier.type_demande || (dossier.type_demande_id ? updatedCache.get(dossier.type_demande_id) : undefined)
       };
     });
     
@@ -627,6 +673,7 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
                 <TableCell sx={{ py: 1, fontWeight: 600, color: 'black' }}>Numéro</TableCell>
                 <TableCell sx={{ py: 1, fontWeight: 600, color: 'black' }}>Nom & Prenom</TableCell>
                 <TableCell sx={{ py: 1, fontWeight: 600, color: 'black' }}>Formation</TableCell>
+                <TableCell sx={{ py: 1, fontWeight: 600, color: 'black' }}>Type de demande</TableCell>
                 <TableCell sx={{ py: 1, fontWeight: 600, color: 'black' }}>Étape</TableCell>
                 <TableCell sx={{ py: 1, fontWeight: 600, color: 'black' }}>Date demande</TableCell>
                 <TableCell sx={{ py: 1, fontWeight: 600, color: 'black' }}>Statut</TableCell>
@@ -665,7 +712,45 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
                     <Typography variant="caption" color="text.secondary" display="flex" alignItems="center" gap={0.5} sx={{ lineHeight: 1.2 }}>
                       <CurrencyDollarIcon className="w-3 h-3" /> {(demande as any).formation?.montant || 'N/A'}
                     </Typography>
-                  </Box>
+                    </Box>
+                </TableCell>
+                <TableCell sx={{ py: 0.75 }}>
+                  {(() => {
+                    const demandeData = demande as any;
+                    if (demandeData.type_demande) {
+                      return (
+                        <Chip
+                          label={demandeData.type_demande.name}
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                        />
+                      );
+                    }
+                    if (demandeData.type_demande_id) {
+                      const cachedTypeDemande = typeDemandeCache.get(demandeData.type_demande_id);
+                      if (cachedTypeDemande) {
+                        return (
+                          <Chip
+                            label={cachedTypeDemande.name}
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                          />
+                        );
+                      }
+                      return (
+                        <Typography variant="body2" color="text.secondary">
+                          Chargement...
+                        </Typography>
+                      );
+                    }
+                    return (
+                      <Typography variant="body2" color="text.secondary">
+                        Non spécifié
+                      </Typography>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell sx={{ py: 0.75 }}>
                   <Box>

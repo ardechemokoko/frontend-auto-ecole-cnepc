@@ -1,9 +1,9 @@
 import axios from "axios";
 
 // URL de base de l'API
-export const baseURL = "https://pajamaed-rosa-vapouringly.ngrok-free.dev/api";
+export const baseURL = "http://172.31.11.120:8000/api";
 
-console.log('🔧 Configuration axios:', { baseURL });
+console.log('Configuration axios:', { baseURL });
 
 const axiosClient = axios.create({
   baseURL: baseURL,

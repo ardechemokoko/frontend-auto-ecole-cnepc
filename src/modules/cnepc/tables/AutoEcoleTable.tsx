@@ -50,17 +50,20 @@ import {
   Badge,
   MenuBook,
   FolderOpen,
+  Settings,
 } from '@mui/icons-material';
 import { AutoEcole, AutoEcoleListResponse, autoEcoleService } from '../services';
 import { AutoEcoleForm } from '../forms';
 
 interface AutoEcoleTableProps {
   onAutoEcoleSelect?: (autoEcole: AutoEcole) => void;
+  onAutoEcoleSettings?: (autoEcole: AutoEcole) => void;
   refreshTrigger?: number;
 }
 
 const AutoEcoleTable: React.FC<AutoEcoleTableProps> = ({
   onAutoEcoleSelect,
+  onAutoEcoleSettings,
   refreshTrigger,
 }) => {
   const [autoEcoles, setAutoEcoles] = useState<AutoEcole[]>([]);
@@ -364,12 +367,22 @@ const AutoEcoleTable: React.FC<AutoEcoleTableProps> = ({
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton
-                        onClick={(e) => handleMenuOpen(e, autoEcole.id)}
-                        size="small"
-                      >
-                        <MoreVert />
-                      </IconButton>
+                      <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                        <IconButton
+                          onClick={() => onAutoEcoleSettings?.(autoEcole)}
+                          size="small"
+                          color="primary"
+                          title="Paramètres"
+                        >
+                          <Settings />
+                        </IconButton>
+                        <IconButton
+                          onClick={(e) => handleMenuOpen(e, autoEcole.id)}
+                          size="small"
+                        >
+                          <MoreVert />
+                        </IconButton>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))

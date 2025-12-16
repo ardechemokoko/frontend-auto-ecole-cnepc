@@ -1,14 +1,17 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ReceptionDossier, EpreuveStatut, EpreuveAttempt } from '../types';
 import { Box, Button, Table, TableBody, TableCell, TableHead, TableRow, Typography, Chip, Snackbar, Alert, TableContainer, Paper } from '@mui/material';
 import EpreuveSheet from '../components/EpreuveSheet';
-import CandidatDetailsSheet from '../components/CandidatDetailsSheet';
 import { EyeIcon } from '@heroicons/react/24/outline';
+import { ROUTES } from '../../../shared/constants';
+import { Description } from '@mui/icons-material';
 import axiosClient from '../../../shared/environment/envdev';
 
 interface ReceptionDossiersTableProps {
   dossiers: ReceptionDossier[];
   onReceive: (id: string) => void;
+  onOpenDocuments?: (dossier: ReceptionDossier) => void;
 }
 
 // Fonctions de calcul du statut (copiées depuis EpreuveSheet)
@@ -36,7 +39,8 @@ function computeGeneral(
   return 'non_saisi';
 }
 
-const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossiers, onReceive }) => {
+const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossiers, onReceive, onOpenDocuments }) => {
+  const navigate = useNavigate();
   // État pour stocker les épreuves de chaque dossier
   const [epreuvesMap, setEpreuvesMap] = React.useState<Map<string, EpreuveStatut>>(new Map());
 
@@ -180,9 +184,7 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
     } catch {}
   }, [onReceive]);
   const [openEpreuve, setOpenEpreuve] = React.useState(false);
-  const [openDetails, setOpenDetails] = React.useState(false);
   const [selected, setSelected] = React.useState<ReceptionDossier | null>(null);
-  const [selectedForDetails, setSelectedForDetails] = React.useState<ReceptionDossier | null>(null);
   const [snackbar, setSnackbar] = React.useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
@@ -195,8 +197,9 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
   };
 
   const handleOpenDetails = (d: ReceptionDossier) => {
-    setSelectedForDetails(d);
-    setOpenDetails(true);
+    // Naviguer vers la page de détails du candidat
+    // Naviguer vers la page de détails du candidat en utilisant l'ID du dossier (pas la référence)
+    navigate(ROUTES.RECEPTION_CANDIDAT_DETAILS.replace(':id', d.id));
   };
 
   const handleSaved = (results: any) => {
@@ -349,7 +352,7 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
                 </TableCell>
               </TableRow>
             )}
-            {dossiers.map((dossier, index) => {
+            {dossiers.map((dossier) => {
               // Récupérer les informations de formation depuis details
               const formationDetails = dossier.details?.formation_complete || dossier.details?.dossier?.formation;
               const formationNom = formationDetails?.type_permis?.libelle || formationDetails?.nom || 'Formation';
@@ -499,7 +502,7 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
                       backgroundColor: 'transparent'
                     }
                   }}>
-                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                       <Button
                         variant="outlined"
                         size="small"
@@ -521,6 +524,29 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
                       >
                         Détails
                       </Button>
+                      {onOpenDocuments && (
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<Description />}
+                          onClick={() => onOpenDocuments(dossier)}
+                          sx={{
+                            textTransform: 'none',
+                            borderColor: 'rgba(0, 0, 0, 0.23)',
+                            color: '#333',
+                            fontWeight: 500,
+                            px: 2,
+                            py: 0.75,
+                            '&:hover': {
+                              borderColor: '#9c27b0',
+                              backgroundColor: 'rgba(156, 39, 176, 0.04)',
+                              color: '#9c27b0'
+                            }
+                          }}
+                        >
+                          Documents
+                        </Button>
+                      )}
                       <Button
                         variant="contained"
                         size="small"
@@ -553,14 +579,6 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
         onClose={() => setOpenEpreuve(false)}
         dossier={selected}
         onSaved={handleSaved}
-      />
-      <CandidatDetailsSheet
-        open={openDetails}
-        onClose={() => {
-          setOpenDetails(false);
-          setSelectedForDetails(null);
-        }}
-        dossier={selectedForDetails}
       />
       <Snackbar
         open={snackbar.open}

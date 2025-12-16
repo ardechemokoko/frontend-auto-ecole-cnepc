@@ -40,4 +40,7 @@ export interface ReceptionActionResponse {
   message?: string;
 }
 
+// Types pour CircuitEtapesCard
+export * from './circuit-etapes.types';
+
 

@@ -17,6 +17,11 @@ export class EtapeService {
   async remove(id: string): Promise<void> {
     await axiosClient.delete(`${this.url}/${id}`)
   }
+
+  async update(id: string, payload: Partial<Etape>): Promise<Etape> {
+    const res = await axiosClient.put(`${this.url}/${id}`, payload)
+    return res.data
+  }
 }
 
 export const etapeService = new EtapeService()

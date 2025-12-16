@@ -1,307 +1,33 @@
 import React, { useState } from 'react';
-import { 
-  Typography, 
-  Container, 
-  Box, 
-  AppBar, 
-  Toolbar,
-  Grid,
-  Card,
-  CardContent,
-  CardActions,
-  Button,
-  Avatar,
-  Chip
-} from '@mui/material';
-import { 
-  Send, 
-  School, 
-  People, 
-  Assignment, 
-  TrendingUp,
-  AutoAwesome,
-  PersonAdd,
-  Quiz,
-  Schedule
-} from '@mui/icons-material';
+import { Typography, Container, Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../shared/constants';
 import { CompleteSetup } from '../modules/cnepc';
+import { CNEPCHeader, ModulesGrid, useCNEPCStats, getModulesConfig } from '../modules/gestionnaire';
 
 const CNEPCPage: React.FC = () => {
   const navigate = useNavigate();
   const [showCompleteSetup, setShowCompleteSetup] = useState(false);
+  const { stats, loading } = useCNEPCStats();
+
+  const modules = getModulesConfig(
+    navigate,
+    () => setShowCompleteSetup(true)
+  );
 
   return (
     <Box sx={{ flexGrow: 1 }}>
-      <AppBar position="static" sx={{ backgroundColor: '#f57c00' }}>
-        <Toolbar>
-          
-          
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            CENTRE NATIONAL D'EXAMEN DU PERMIS DE CONDUIRE
-          </Typography>
-        </Toolbar>
-      </AppBar>
+      <CNEPCHeader stats={stats} loading={loading} />
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom>
-        service examen et Validation
+          service examen et Validation
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
           Interface de gestion des auto-écoles et des candidats au permis de conduire
         </Typography>
-        
-        {/* Menu des modules CNEPC */}
-        <Grid container spacing={3}>
-          {/* Module Gestion des Auto-Écoles */}
-          <Grid item xs={12} md={4}>
-            <Card 
-              sx={{ 
-                height: '100%', 
-                display: 'flex', 
-                flexDirection: 'column',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: 4
-                }
-              }}
-            >
-              <CardContent sx={{ flexGrow: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
-                    <School />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Gestion des Auto-Écoles
-                    </Typography>
-                    <Chip 
-                      label="Module Principal" 
-                      color="primary" 
-                      size="small"
-                      sx={{ mb: 1 }}
-                    />
-                  </Box>
-                </Box>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Gérez vos auto-écoles, consultez les candidats inscrits, 
-                  suivez l'avancement des dossiers et analysez les statistiques.
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  <Chip icon={<People />} label="Candidats" size="small" />
-                  <Chip icon={<Assignment />} label="Dossiers" size="small" />
-                  <Chip icon={<TrendingUp />} label="Statistiques" size="small" />
-                </Box>
-              </CardContent>
-              <CardActions sx={{ p: 2, pt: 0 }}>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  startIcon={<School />}
-                  onClick={() => navigate(ROUTES.AUTO_ECOLES)}
-                  sx={{ py: 1.5, mb: 1 }}
-                >
-                  Accéder au Module
-                </Button>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<PersonAdd />}
-                  onClick={() => setShowCompleteSetup(true)}
-                  sx={{ py: 1.5 }}
-                >
-                  Configuration Complète
-                </Button>
-              </CardActions>
-            </Card>
-          </Grid>
 
-          {/* Module Candidats aux Examens */}
-          <Grid item xs={12} md={4}>
-            <Card 
-              sx={{ 
-                height: '100%', 
-                display: 'flex', 
-                flexDirection: 'column',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: 4
-                }
-              }}
-            >
-              <CardContent sx={{ flexGrow: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Avatar sx={{ bgcolor: 'success.main', mr: 2 }}>
-                    <Quiz />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Candidats aux Examens
-                    </Typography>
-                    <Chip 
-                      label="Nouveau Module" 
-                      color="success" 
-                      size="small"
-                      sx={{ mb: 1 }}
-                    />
-                  </Box>
-                </Box>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Gérez les candidats aux examens, organisez les sessions d'examen 
-                  et planifiez les créneaux pour les 3 épreuves du permis de conduire.
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  <Chip icon={<People />} label="Candidats" size="small" />
-                  <Chip icon={<Schedule />} label="Sessions" size="small" />
-                  <Chip icon={<Quiz />} label="Épreuves" size="small" />
-                </Box>
-              </CardContent>
-              <CardActions sx={{ p: 2, pt: 0 }}>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  startIcon={<Quiz />}
-                  onClick={() => navigate(ROUTES.CANDIDATS_EXAMEN)}
-                  sx={{ py: 1.5, mb: 1 }}
-                >
-                  Accéder au Module
-                </Button>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<Schedule />}
-                  onClick={() => navigate(ROUTES.CANDIDATS_EXAMEN_SESSIONS)}
-                  sx={{ py: 1.5 }}
-                >
-                  Sessions d'Examen
-                </Button>
-              </CardActions>
-            </Card>
-          </Grid>
-
-          {/* Module Reception au CNEPC */}
-          <Grid item xs={12} md={4}>
-            <Card 
-              sx={{ 
-                height: '100%', 
-                display: 'flex', 
-                flexDirection: 'column',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: 4
-                }
-              }}
-            >
-              <CardContent sx={{ flexGrow: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Avatar sx={{ bgcolor: 'secondary.main', mr: 2 }}>
-                    <Send />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Reception au CNEPC
-                    </Typography>
-                    <Chip 
-                      label="Module Disponible" 
-                      color="success" 
-                      size="small"
-                      sx={{ mb: 1 }}
-                    />
-                  </Box>
-                </Box>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Interface de réception des dossiers candidats au CNEPC. 
-                  Gérez la réception, la validation et le suivi des dossiers transmis par les auto-écoles.
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  <Chip icon={<AutoAwesome />} label="Validation" size="small" />
-                  <Chip icon={<Send />} label="Réception" size="small" />
-                  <Chip icon={<Assignment />} label="Suivi" size="small" />
-                </Box>
-              </CardContent>
-              <CardActions sx={{ p: 2, pt: 0 }}>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  startIcon={<Send />}
-                  onClick={() => navigate(ROUTES.RECEPTION)}
-                  sx={{ py: 1.5 }}
-                >
-                  Accéder au Module
-                </Button>
-              </CardActions>
-            </Card>
-          </Grid>
-
-          {/* Statistiques rapides */}
-          <Grid item xs={12}>
-            <Card sx={{ mt: 2 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Vue d'ensemble du système
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={3}>
-                    <Box sx={{ textAlign: 'center', p: 2 }}>
-                      <Avatar sx={{ bgcolor: 'primary.main', mx: 'auto', mb: 1 }}>
-                        <School />
-                      </Avatar>
-                      <Typography variant="h4" color="primary">
-                        0
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Auto-Écoles
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} sm={3}>
-                    <Box sx={{ textAlign: 'center', p: 2 }}>
-                      <Avatar sx={{ bgcolor: 'info.main', mx: 'auto', mb: 1 }}>
-                        <People />
-                      </Avatar>
-                      <Typography variant="h4" color="info.main">
-                        0
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Candidats Inscrits
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} sm={3}>
-                    <Box sx={{ textAlign: 'center', p: 2 }}>
-                      <Avatar sx={{ bgcolor: 'warning.main', mx: 'auto', mb: 1 }}>
-                        <Schedule />
-                      </Avatar>
-                      <Typography variant="h4" color="warning.main">
-                        0
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Sessions d'Examen
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} sm={3}>
-                    <Box sx={{ textAlign: 'center', p: 2 }}>
-                      <Avatar sx={{ bgcolor: 'success.main', mx: 'auto', mb: 1 }}>
-                        <Quiz />
-                      </Avatar>
-                      <Typography variant="h4" color="success.main">
-                        0
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Examens Réussis
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+        <ModulesGrid modules={modules} />
       </Container>
 
       {/* Configuration Complète */}
