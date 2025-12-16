@@ -267,6 +267,7 @@ export class AutoEcoleService {
     candidat_id: string;
     auto_ecole_id: string;
     formation_id: string;
+    type_demande_id: string;
     statut?: string;
     date_creation?: string;
     commentaires?: string;

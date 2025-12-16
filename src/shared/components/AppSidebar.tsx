@@ -46,7 +46,6 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
   const { user, logout } = useAppStore();
   const [candidatsOpen, setCandidatsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [cnepcOpen, setCnepcOpen] = useState(false);
   const [workflowOpen, setWorkflowOpen] = useState(false);
 
   // Définition de tous les menus possibles avec leurs clés
@@ -155,19 +154,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       icon: PaperAirplaneIcon,
       path: ROUTES.CNEPC,
       description: 'Gestion CNEPC et Auto-Écoles',
-      hasSubmenu: true,
-      submenu: [
-        {
-          path: ROUTES.AUTO_ECOLES,
-          title: 'Gestion des Auto-Écoles',
-          description: 'Gérer les auto-écoles et leurs candidats inscrits'
-        },
-        {
-          path: ROUTES.CNEPC,
-          title: 'Management',
-          description: 'Transmettre les dossiers validés au CNEPC'
-        }
-      ]
+      key: 'cnepc'
     },
     {
       title: 'Paramètres',
@@ -185,7 +172,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
       ]
     },
     {
-      title: 'Workflow',
+      title: 'Workflows',
       icon: UserGroupIcon,
       path: ROUTES.WORKFLOW,
       description: 'Gestion du workflow',
@@ -207,9 +194,12 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
 
   // Préparer la liste des menus selon le rôle
   const baseMenuItems = user?.role === "ROLE_AUTO_ECOLE" ? allMenuItemsAutoEcole : allMenuItems;
-  // Pour l'administrateur: n'afficher que le menu CNEPC, Workflow et Referentiel
-  const roleAdjustedMenuItems = user?.role === 'ROLE_ADMIN'
-    ? allMenuItems.filter(item => item.title === 'CNEPC' || item.title === 'Workflow' )
+  // Pour l'administrateur: n'afficher que le menu CNEPC, Workflows et Referentiel
+  // Gérer les deux formats possibles: 'ROLE_ADMIN' ou 'Admin'
+  const userRole = user?.role as string;
+  const isAdmin = userRole === 'ROLE_ADMIN' || userRole === 'Admin' || userRole === 'admin';
+  const roleAdjustedMenuItems = isAdmin
+    ? allMenuItems.filter(item => item.title === 'CNEPC' || item.title === 'Workflows' )
     : baseMenuItems;
 
   // Filtrer les menus selon les permissions de l'utilisateur
@@ -220,6 +210,11 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
   });
   
   const menuItems = roleAdjustedMenuItems.filter(item => {
+    // Pour les admins, les items déjà filtrés (CNEPC, Workflows) sont toujours autorisés
+    if (isAdmin && (item.title === 'CNEPC' || item.title === 'Workflows')) {
+      console.log('🎭 AppSidebar: Menu', item.title, '-> AUTORISÉ (Admin)');
+      return true;
+    }
     const hasAccess = item.key ? canAccessMenu(user, item.key) : true;
     console.log('🎭 AppSidebar: Menu', item.title, '->', hasAccess ? 'AUTORISÉ' : 'REFUSÉ');
     return hasAccess;
@@ -348,8 +343,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
               const IconComponent = item.icon;
               const isCandidatsItem = item.title === 'Gestion des Candidats';
               const isSettingsItem = item.title === 'Paramètres';
-              const isCnepcItem = item.title === 'CNEPC';
-              const isWorkflowItem = item.title === 'Workflow';
+              const isWorkflowItem = item.title === 'Workflows';
               return (
                 <React.Fragment key={item.path}>
                   <ListItem disablePadding>
@@ -359,9 +353,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                           setCandidatsOpen(!candidatsOpen);
                         } else if (isSettingsItem && item.hasSubmenu) {
                           setSettingsOpen(!settingsOpen);
-                        } else if (isCnepcItem && item.hasSubmenu) {
-                          setCnepcOpen(!cnepcOpen);
-                        }else if (isWorkflowItem && item.hasSubmenu) {
+                        } else if (isWorkflowItem && item.hasSubmenu) {
                           setWorkflowOpen(!workflowOpen);
                         } else {
                           handleNavigation(item.path);
@@ -409,11 +401,11 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                               fontSize: '0.875rem',
                             }}
                           />
-                          {(isCandidatsItem || isSettingsItem || isCnepcItem || isWorkflowItem) && item.hasSubmenu && (
+                          {(isCandidatsItem || isSettingsItem || isWorkflowItem) && item.hasSubmenu && (
                             <ChevronDownIcon
                               className="w-5 h-5"
                               style={{
-                                transform: (isCandidatsItem ? candidatsOpen : (isSettingsItem ? settingsOpen : (isCnepcItem ? cnepcOpen : workflowOpen))) ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transform: (isCandidatsItem ? candidatsOpen : (isSettingsItem ? settingsOpen : workflowOpen)) ? 'rotate(180deg)' : 'rotate(0deg)',
                                 transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                 color: 'rgba(255, 255, 255, 0.7)',
                               }}
@@ -525,50 +517,6 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                     </Collapse>
                   )}
 
-                  {/* Submenu for CNEPC */}
-                  {open && isCnepcItem && item.hasSubmenu && (
-                    <Collapse in={cnepcOpen} timeout="auto" unmountOnExit>
-                      <List component="div" disablePadding>
-                        {item.submenu?.map((subItem) => {
-                          const subActive = isActive(subItem.path);
-                          return (
-                            <ListItem key={subItem.path} disablePadding>
-                              <ListItemButton
-                                onClick={() => handleNavigation(subItem.path)}
-                                sx={{
-                                  ml: 4.5,
-                                  mr: 1.5,
-                                  px: 1.5,
-                                  py: 0.75,
-                                  mb: 0.5,
-                                  borderRadius: 0,
-                                  backgroundColor: subActive 
-                                    ? 'rgba(255, 255, 255, 0.12)'
-                                    : 'transparent',
-                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.7)',
-                                  minHeight: 40,
-                                  '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                    color: 'white',
-                                  },
-                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                }}
-                              >
-                                <ListItemText
-                                  primary={subItem.title}
-                                  primaryTypographyProps={{
-                                    variant: 'body2',
-                                    fontSize: '0.8125rem',
-                                    fontWeight: subActive ? 500 : 400,
-                                  }}
-                                />
-                              </ListItemButton>
-                            </ListItem>
-                          );
-                        })}
-                      </List>
-                    </Collapse>
-                  )}
 
                   {/* Submenu for settings */}
                   {open && isWorkflowItem && item.hasSubmenu && (
@@ -621,8 +569,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
               const IconComponent = item.icon;
               const isCandidatsItem = item.title === 'Gestion des Candidats';
               const isSettingsItem = item.title === 'Paramètres';
-              const isCnepcItem = item.title === 'CNEPC';
-              const isWorkflowItem = item.title === 'Workflow';
+              const isWorkflowItem = item.title === 'Workflows';
               return (
                 <React.Fragment key={item.path}>
                   <ListItem disablePadding>
@@ -632,9 +579,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                           setCandidatsOpen(!candidatsOpen);
                         } else if (isSettingsItem && item.hasSubmenu) {
                           setSettingsOpen(!settingsOpen);
-                        } else if (isCnepcItem && item.hasSubmenu) {
-                          setCnepcOpen(!cnepcOpen);
-                        }else if (isWorkflowItem && item.hasSubmenu) {
+                        } else if (isWorkflowItem && item.hasSubmenu) {
                           setWorkflowOpen(!workflowOpen);
                         } else {
                           handleNavigation(item.path);
@@ -682,11 +627,11 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                               fontSize: '0.875rem',
                             }}
                           />
-                          {(isCandidatsItem || isSettingsItem || isCnepcItem || isWorkflowItem) && item.hasSubmenu && (
+                          {(isCandidatsItem || isSettingsItem || isWorkflowItem) && item.hasSubmenu && (
                             <ChevronDownIcon
                               className="w-5 h-5"
                               style={{
-                                transform: (isCandidatsItem ? candidatsOpen : (isSettingsItem ? settingsOpen : (isCnepcItem ? cnepcOpen : workflowOpen))) ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transform: (isCandidatsItem ? candidatsOpen : (isSettingsItem ? settingsOpen : workflowOpen)) ? 'rotate(180deg)' : 'rotate(0deg)',
                                 transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                 color: 'rgba(255, 255, 255, 0.7)',
                               }}
@@ -798,50 +743,6 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ open, onToggle }) => {
                     </Collapse>
                   )}
 
-                  {/* Submenu for CNEPC */}
-                  {open && isCnepcItem && item.hasSubmenu && (
-                    <Collapse in={cnepcOpen} timeout="auto" unmountOnExit>
-                      <List component="div" disablePadding>
-                        {item.submenu?.map((subItem) => {
-                          const subActive = isActive(subItem.path);
-                          return (
-                            <ListItem key={subItem.path} disablePadding>
-                              <ListItemButton
-                                onClick={() => handleNavigation(subItem.path)}
-                                sx={{
-                                  ml: 4.5,
-                                  mr: 1.5,
-                                  px: 1.5,
-                                  py: 0.75,
-                                  mb: 0.5,
-                                  borderRadius: 0,
-                                  backgroundColor: subActive 
-                                    ? 'rgba(255, 255, 255, 0.12)'
-                                    : 'transparent',
-                                  color: subActive ? 'white' : 'rgba(255, 255, 255, 0.7)',
-                                  minHeight: 40,
-                                  '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                    color: 'white',
-                                  },
-                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                }}
-                              >
-                                <ListItemText
-                                  primary={subItem.title}
-                                  primaryTypographyProps={{
-                                    variant: 'body2',
-                                    fontSize: '0.8125rem',
-                                    fontWeight: subActive ? 500 : 400,
-                                  }}
-                                />
-                              </ListItemButton>
-                            </ListItem>
-                          );
-                        })}
-                      </List>
-                    </Collapse>
-                  )}
 
                   {/* Submenu for settings */}
                   {open && isWorkflowItem && item.hasSubmenu && (

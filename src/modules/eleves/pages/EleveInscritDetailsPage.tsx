@@ -33,6 +33,8 @@ import { ROUTES } from '../../../shared/constants';
 import axiosClient from '../../../shared/environment/envdev';
 import ValidationService from '../services/validationService';
 import { autoEcoleService } from '../../cnepc/services/auto-ecole.service';
+import { typeDemandeService } from '../../cnepc/services';
+import { TypeDemande } from '../../cnepc/types/type-demande';
 
 const EleveInscritDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -51,6 +53,7 @@ const EleveInscritDetailsPage: React.FC = () => {
   const [sendDate, setSendDate] = useState<string>('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [typeDemandeCache, setTypeDemandeCache] = useState<Map<string, TypeDemande>>(new Map());
 
   // Charger les données du dossier depuis l'API
   useEffect(() => {
@@ -125,6 +128,23 @@ const EleveInscritDetailsPage: React.FC = () => {
               }
             } catch (error) {
               console.warn('⚠️ Impossible de charger la session:', error);
+            }
+          }
+
+          // Enrichir le type de demande si nécessaire
+          if (dossier.type_demande_id && !dossier.type_demande) {
+            try {
+              // Vérifier d'abord le cache
+              if (typeDemandeCache.has(dossier.type_demande_id)) {
+                dossier.type_demande = typeDemandeCache.get(dossier.type_demande_id);
+              } else {
+                const typeDemande = await typeDemandeService.getTypeDemandeById(dossier.type_demande_id);
+                dossier.type_demande = typeDemande;
+                // Mettre à jour le cache
+                setTypeDemandeCache(prev => new Map(prev).set(typeDemande.id, typeDemande));
+              }
+            } catch (error) {
+              console.warn('⚠️ Impossible de charger le type de demande:', error);
             }
           }
 
@@ -885,6 +905,43 @@ const EleveInscritDetailsPage: React.FC = () => {
                       return montant ? `${montant}${formation?.montant_formate ? '' : ' FCFA'}` : 'Non spécifié';
                     })()}
                   </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 0.5 }}>
+                    Type de demande
+                  </Typography>
+                  {(() => {
+                    const dossier = candidat.dossierData;
+                    if (dossier?.type_demande) {
+                      return (
+                        <Chip
+                          label={dossier.type_demande.name}
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                        />
+                      );
+                    }
+                    if (dossier?.type_demande_id) {
+                      const cachedTypeDemande = typeDemandeCache.get(dossier.type_demande_id);
+                      if (cachedTypeDemande) {
+                        return (
+                          <Chip
+                            label={cachedTypeDemande.name}
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                          />
+                        );
+                      }
+                    }
+                    return (
+                      <Typography variant="body2" color="text.secondary">
+                        Non spécifié
+                      </Typography>
+                    );
+                  })()}
                 </Box>
 
                 {(() => {

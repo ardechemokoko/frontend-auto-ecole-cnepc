@@ -72,12 +72,12 @@ export class CircuitService {
         if (typeof error === 'string') return error
         if (error && typeof error === 'object') {
             const axiosErr = error
-            if (axiosErr.response) {
-                const status = axiosErr.response.status
-                const msg = axiosErr.response.data?.message || axiosErr.message
+            if (axiosErr.hasOwnProperty('response')) {
+                const status = (axiosErr as any).response.status
+                const msg = (axiosErr as any).response.data?.message || (axiosErr as any).message
                 return `${status} - ${msg ?? 'Erreur serveur'}`
             }
-            return axiosErr.message ?? 'Erreur inconnue'
+            return (axiosErr as any).message ?? 'Erreur inconnue'
         }
         return 'Erreur inconnue'
     }

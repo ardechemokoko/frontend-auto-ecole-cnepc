@@ -2,6 +2,8 @@
 import { Document } from '../types/student';
 import { UploadDocumentResponse } from './types';
 import { uploadDocumentMock, getStudentDocumentsMock } from './eleve.service';
+import axiosClient from '../../../shared/environment/envdev';
+import axiosClient from '../../../shared/environment/envdev';
 
 class DocumentService {
   async uploadDocument(
@@ -35,12 +37,58 @@ class DocumentService {
     }
   }
 
-  async deleteDocument(documentId: string): Promise<void> {
+  async deleteDocument(documentId: string): Promise<{ success: boolean; message?: string }> {
     try {
-      // Utilisation du mock pour le développement
-      console.log(`Document supprimé (mock)`);
+      console.log(`🗑️ Suppression du document ID: ${documentId}...`);
+      
+      // Appel API réel
+      await axiosClient.delete(`/documents/${documentId}`);
+      
+      console.log('✅ Document supprimé avec succès');
+      return { success: true };
     } catch (error: any) {
-      throw new Error(`Erreur lors de la suppression: ${error.message}`);
+      console.error('❌ Erreur lors de la suppression du document:', error);
+      console.error('🔴 Status HTTP:', error.response?.status);
+      console.error('🔴 Message:', error.message);
+      
+      // Cas spécial : Si le backend retourne 500, vérifier si le document existe encore
+      // Parfois le backend supprime le document mais retourne quand même une erreur 500
+      if (error.response?.status === 500) {
+        console.log('⚠️ Erreur 500 détectée, vérification si le document existe encore...');
+        try {
+          // Vérifier si le document existe encore
+          await axiosClient.get(`/documents/${documentId}`);
+          // Si on arrive ici, le document existe encore, donc l'erreur est réelle
+          const errorMessage = error.response?.data?.message || 
+                             error.response?.data?.error || 
+                             'Erreur serveur lors de la suppression du document';
+          return { success: false, message: `Erreur serveur (500): ${errorMessage}` };
+        } catch (checkError: any) {
+          // Si le document n'existe plus (404), considérer la suppression comme réussie
+          if (checkError.response?.status === 404) {
+            console.log('✅ Document supprimé avec succès (vérifié après erreur 500)');
+            return { success: true }; // Succès même avec erreur 500
+          }
+          // Sinon, retourner l'erreur
+          const errorMessage = error.response?.data?.message || 
+                             error.response?.data?.error || 
+                             'Erreur serveur lors de la suppression du document';
+          return { success: false, message: `Erreur serveur (500): ${errorMessage}` };
+        }
+      }
+      
+      // Gérer les autres types d'erreurs
+      if (error.response?.status === 404) {
+        // Document déjà supprimé, considérer comme succès
+        console.log('✅ Document déjà supprimé (404)');
+        return { success: true };
+      } else if (error.response?.status === 403) {
+        return { success: false, message: 'Vous n\'avez pas la permission de supprimer ce document' };
+      } else if (error.response?.data?.message) {
+        return { success: false, message: error.response.data.message };
+      } else {
+        return { success: false, message: `Erreur lors de la suppression du document: ${error.message || 'Erreur inconnue'}` };
+      }
     }
   }
 

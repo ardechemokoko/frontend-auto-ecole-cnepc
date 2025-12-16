@@ -447,7 +447,12 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
                     <CardContent>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
                         <Typography variant="h6" fontWeight="bold">
-                          {formation.nom || `Formation ${formation.typePermis?.libelle || formation.type_permis?.libelle || ''}`}
+                          {formation.nom || `Formation ${(() => {
+                            const typePermis = formation.typePermis || formation.type_permis;
+                            if (!typePermis) return '';
+                            // Vérifier si c'est un Referentiel (a libelle) ou TypePermis (a nom)
+                            return 'libelle' in typePermis ? typePermis.libelle : typePermis.nom;
+                          })()}`}
                         </Typography>
                         <Chip
                           label={formation.statut_libelle || (formation.statut ? 'Active' : 'Inactive')}
@@ -470,7 +475,12 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
                             Type de permis:
                           </Typography>
                           <Typography variant="body2" fontWeight="medium">
-                            {formation.typePermis?.libelle || formation.type_permis?.libelle || 'N/A'}
+                            {(() => {
+                              const typePermis = formation.typePermis || formation.type_permis;
+                              if (!typePermis) return 'N/A';
+                              // Vérifier si c'est un Referentiel (a libelle) ou TypePermis (a nom)
+                              return 'libelle' in typePermis ? typePermis.libelle : typePermis.nom;
+                            })()}
                           </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>

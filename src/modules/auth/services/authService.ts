@@ -113,6 +113,7 @@ export class AuthService {
     nom: string;
     prenom: string;
     contact: string;
+    telephone?: string;
     adresse?: string;
     role: string;
   }): Promise<any> {

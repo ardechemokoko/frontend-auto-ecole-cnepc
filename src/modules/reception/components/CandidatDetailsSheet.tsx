@@ -32,6 +32,8 @@ import {
 import { ReceptionDossier, EpreuveStatut, EpreuveAttempt } from '../types';
 import axiosClient from '../../../shared/environment/envdev';
 import { autoEcoleService } from '../../cnepc/services/auto-ecole.service';
+import { circuitSuiviService, CircuitSuivi, EtapeCircuit, PieceEtape } from '../services/circuit-suivi.service';
+import { typeDemandeService } from '../../cnepc/services';
 
 // Fonctions de calcul du statut (copiées depuis EpreuveSheet)
 const MAX_ATTEMPTS = 3;
@@ -77,6 +79,10 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
   const [dossierComplet, setDossierComplet] = useState<any>(null);
   const [epreuvesStatus, setEpreuvesStatus] = useState<EpreuveStatut | null>(null);
   const [loadingEpreuves, setLoadingEpreuves] = useState(false);
+  const [circuit, setCircuit] = useState<CircuitSuivi | null>(null);
+  const [loadingCircuit, setLoadingCircuit] = useState(false);
+  const [typeDocuments, setTypeDocuments] = useState<any[]>([]);
+  const [loadingTypeDocuments, setLoadingTypeDocuments] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
@@ -101,6 +107,8 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
       });
       // Charger le statut des épreuves
       chargerEpreuvesStatus();
+      // Charger le circuit et les types de documents
+      chargerCircuitEtTypesDocuments();
     } else if (!open) {
       // Réinitialiser le statut quand le drawer se ferme
       setEpreuvesStatus(null);
@@ -442,6 +450,81 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
     } finally {
       setLoadingDocuments(false);
     }
+  };
+
+  // Fonction pour charger le circuit et les types de documents
+  const chargerCircuitEtTypesDocuments = async () => {
+    if (!dossier?.details?.dossier_complet?.type_demande_id) {
+      console.warn('⚠️ Pas de type_demande_id dans le dossier');
+      return;
+    }
+
+    try {
+      setLoadingCircuit(true);
+      setLoadingTypeDocuments(true);
+
+      const dossierComplet = dossier.details?.dossier_complet || dossier.details?.dossier;
+      const typeDemandeId = dossierComplet?.type_demande_id;
+
+      if (!typeDemandeId) {
+        console.warn('⚠️ Pas de type_demande_id disponible');
+        return;
+      }
+
+      // 1. Récupérer le type de demande pour obtenir son name
+      const typeDemande = await typeDemandeService.getTypeDemandeById(typeDemandeId);
+      const nomEntite = typeDemande.name;
+
+      // 2. Récupérer le circuit via nom_entite
+      const circuitData = await circuitSuiviService.getCircuitByNomEntite(nomEntite);
+      if (circuitData) {
+        setCircuit(circuitData);
+        console.log('✅ Circuit chargé:', circuitData.libelle, 'avec', circuitData.etapes?.length || 0, 'étapes');
+      } else {
+        console.warn('⚠️ Circuit non trouvé pour nom_entite:', nomEntite);
+      }
+
+      // 3. Charger tous les types de documents depuis /referentiels
+      let page = 1;
+      let allTypes: any[] = [];
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await axiosClient.get('/referentiels', {
+          params: {
+            page,
+            per_page: 100,
+            type_ref: 'type_piece'
+          }
+        });
+
+        const data = response.data?.data || response.data || [];
+        const types = Array.isArray(data) ? data : [];
+        allTypes = [...allTypes, ...types];
+
+        hasMore = types.length === 100;
+        page++;
+      }
+
+      setTypeDocuments(allTypes);
+      console.log('✅ Types de documents chargés:', allTypes.length);
+    } catch (err: any) {
+      console.error('❌ Erreur lors du chargement du circuit et des types de documents:', err);
+    } finally {
+      setLoadingCircuit(false);
+      setLoadingTypeDocuments(false);
+    }
+  };
+
+  // Fonction pour obtenir les documents d'un type spécifique
+  const getDocumentsByType = (typeDocumentId: string) => {
+    return documentsFromApi.filter(doc => doc.type_document_id === typeDocumentId);
+  };
+
+  // Fonction pour vérifier si un document est validé
+  const isDocumentValidated = (typeDocumentId: string) => {
+    const docs = getDocumentsByType(typeDocumentId);
+    return docs.some(doc => doc.valide === true);
   };
 
   if (!dossier) return null;
@@ -866,7 +949,7 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
         {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
           <Typography variant="h5" component="h2" fontWeight="bold" className="font-display">
-            Détails du candidat
+            Détails du candidatss
           </Typography>
           <IconButton onClick={onClose} size="small">
             <XMarkIcon className="w-5 h-5" />
@@ -1018,6 +1101,132 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
                   </Stack>
                 </CardContent>
               </Card>
+
+              {/* Circuit et Étapes avec Documents Requis */}
+              {(loadingCircuit || loadingTypeDocuments) && (
+                <Card sx={{ mb: 3 }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2 }}>
+                      <CircularProgress size={24} sx={{ mr: 2 }} />
+                      <Typography variant="body2" color="text.secondary" className="font-primary">
+                        Chargement du circuit et des types de documents...
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              )}
+              
+              {!loadingCircuit && !loadingTypeDocuments && circuit && circuit.etapes && circuit.etapes.length > 0 && (
+                <Card sx={{ mb: 3 }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                      <AcademicCapIcon className="w-5 h-5 mr-2 text-blue-600" />
+                      <Typography variant="h6" fontWeight="bold" className="font-display">
+                        Circuit: {circuit.libelle}
+                      </Typography>
+                    </Box>
+                    
+                    <Stack spacing={3}>
+                      {circuit.etapes.map((etape: EtapeCircuit, index: number) => (
+                        <Box
+                          key={etape.id}
+                          sx={{
+                            p: 2,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 1,
+                            backgroundColor: 'background.paper'
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <Typography variant="subtitle1" fontWeight="bold" className="font-display">
+                              Étape {index + 1}: {etape.libelle}
+                            </Typography>
+                            {etape.code && (
+                              <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                                ({etape.code})
+                              </Typography>
+                            )}
+                          </Box>
+                          
+                          {etape.pieces && etape.pieces.length > 0 ? (
+                            <Stack spacing={1} sx={{ mt: 2 }}>
+                              <Typography variant="body2" color="text.secondary" className="font-primary">
+                                Pièces justificatives requises:
+                              </Typography>
+                              {etape.pieces.map((piece: PieceEtape, pieceIndex: number) => {
+                                // Trouver le type de document correspondant
+                                const typeDoc = typeDocuments.find(td => 
+                                  td.id === piece.type_document || td.name === piece.type_document
+                                );
+                                const typeDocName = typeDoc?.name || typeDoc?.libelle || piece.libelle || piece.type_document;
+                                
+                                // Récupérer les documents de ce type
+                                const docsForType = getDocumentsByType(piece.type_document);
+                                const isValidated = isDocumentValidated(piece.type_document);
+                                
+                                return (
+                                  <Box
+                                    key={pieceIndex}
+                                    sx={{
+                                      p: 1.5,
+                                      border: '1px solid',
+                                      borderColor: isValidated ? 'success.main' : 'warning.main',
+                                      borderRadius: 1,
+                                      backgroundColor: isValidated ? 'success.50' : 'warning.50'
+                                    }}
+                                  >
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                      <Box sx={{ flex: 1 }}>
+                                        <Typography variant="body2" fontWeight="medium" className="font-primary">
+                                          {typeDocName}
+                                          {piece.obligatoire && (
+                                            <Typography component="span" variant="caption" color="error" sx={{ ml: 1 }}>
+                                              (Obligatoire)
+                                            </Typography>
+                                          )}
+                                        </Typography>
+                                        {docsForType.length > 0 ? (
+                                          <Stack spacing={0.5} sx={{ mt: 1 }}>
+                                            {docsForType.map((doc: any) => (
+                                              <Box key={doc.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Typography variant="caption" className="font-primary">
+                                                  • {doc.nom || doc.nom_fichier}
+                                                </Typography>
+                                                {doc.valide ? (
+                                                  <Typography variant="caption" color="success.main" className="font-primary">
+                                                    ✓ Validé
+                                                  </Typography>
+                                                ) : (
+                                                  <Typography variant="caption" color="warning.main" className="font-primary">
+                                                    ⏳ En attente
+                                                  </Typography>
+                                                )}
+                                              </Box>
+                                            ))}
+                                          </Stack>
+                                        ) : (
+                                          <Typography variant="caption" color="text.secondary" className="font-primary">
+                                            Aucun document fourni
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                    </Box>
+                                  </Box>
+                                );
+                              })}
+                            </Stack>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary" className="font-primary">
+                              Aucune pièce justificative requise pour cette étape
+                            </Typography>
+                          )}
+                        </Box>
+                      ))}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Documents */}
               <Card>
