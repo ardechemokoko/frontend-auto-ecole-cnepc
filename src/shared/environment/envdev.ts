@@ -1,12 +1,9 @@
 import axios from "axios";
 
-// Utiliser le proxy en développement, l'URL directe en production
-const isDevelopment = import.meta.env.DEV;
-const baseURL = isDevelopment 
-  ? "/api/" // Proxy Vite en développement
-  : "https://backend.permis.transports.gouv.ga/api/"; // URL directe en production
+// URL de base de l'API
+export const baseURL = "http://172.31.11.120:8000/api";
 
-console.log('🔧 Configuration axios:', { isDevelopment, baseURL });
+console.log('Configuration axios:', { baseURL });
 
 const axiosClient = axios.create({
   baseURL: baseURL,
@@ -21,6 +18,9 @@ axiosClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Ajouter le header pour contourner l'avertissement ngrok
+    config.headers['ngrok-skip-browser-warning'] = 'true';
     
     // Pour les FormData, supprimer le Content-Type par défaut
     // pour laisser axios définir automatiquement multipart/form-data avec la boundary

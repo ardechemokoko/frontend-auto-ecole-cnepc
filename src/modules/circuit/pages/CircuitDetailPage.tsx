@@ -27,6 +27,7 @@ import {
 import AddIcon from '@mui/icons-material/Add'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import DeleteIcon from '@mui/icons-material/Delete'
+import EditIcon from '@mui/icons-material/Edit'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Circuit } from '../types/circuit'
 import { Etape } from '../types/etape'
@@ -75,7 +76,7 @@ const CircuitDetailPage: React.FC = () => {
   const navigate = useNavigate()
   const [value, setValue] = React.useState(0);
 
-  const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
   };
 
@@ -89,6 +90,8 @@ const CircuitDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [errorForm, setErrorForm] = useState<string | null>(null)
   const [openAddEtape, setOpenAddEtape] = useState(false)
+  const [openEditEtape, setOpenEditEtape] = useState(false)
+  const [editingEtapeId, setEditingEtapeId] = useState<string | null>(null)
   const [formEtape, setFormEtape] = useState<Partial<Etape>>({
     code: '',
     libelle: '',
@@ -130,9 +133,19 @@ const CircuitDetailPage: React.FC = () => {
       ])
       setCircuit(circuitData)
       setEtapes(etapesData)
-      setStatuts(statutsData?.data || statutsData)
-      setTypeDocuments(typeDocuments?.data);
-      setRoles(rolesData.roles);
+      const statutsArray = Array.isArray(statutsData) 
+        ? statutsData 
+        : (statutsData && typeof statutsData === 'object' && 'data' in statutsData 
+          ? (statutsData as { data: Statut[] }).data 
+          : [])
+      setStatuts(statutsArray)
+      const typeDocumentsArray = Array.isArray(typeDocuments) 
+        ? typeDocuments 
+        : (typeDocuments && typeof typeDocuments === 'object' && 'data' in typeDocuments 
+          ? (typeDocuments as { data: TypeDocument[] }).data 
+          : [])
+      setTypeDocuments(typeDocumentsArray);
+      setRoles(Array.isArray(rolesData) ? rolesData : ((rolesData as any)?.roles || []));
       setTransitions(transitionsData);
     } catch (err: any) {
       setError(err.message ?? 'Erreur lors du chargement des données')
@@ -173,6 +186,93 @@ const CircuitDetailPage: React.FC = () => {
       await fetchData()
     } catch (err: any) {
       setError(err.message ?? 'Erreur lors de la suppression')
+    }
+  }
+
+  // === Ouvrir le dialog de modification ===
+  const handleOpenEditEtape = (etape: Etape) => {
+    setEditingEtapeId(etape.id!)
+    setFormEtape({
+      code: etape.code || '',
+      libelle: etape.libelle || '',
+      ordre: etape.ordre || 0,
+      auto_advance: etape.auto_advance || false,
+      statut_id: etape.statut_id || '',
+      pieces: etape.pieces || [],
+      roles: etape.roles || []
+    })
+    setErrorForm(null)
+    setOpenEditEtape(true)
+  }
+
+  // === Fermer le dialog de modification ===
+  const handleCloseEditEtape = () => {
+    setOpenEditEtape(false)
+    setEditingEtapeId(null)
+    setFormEtape({
+      code: '',
+      libelle: '',
+      ordre: 0,
+      auto_advance: false,
+      statut_id: '',
+      pieces: [],
+      roles: []
+    })
+    setErrorForm(null)
+  }
+
+  // === Modifier une étape ===
+  const handleUpdateEtape = async () => {
+    if (!editingEtapeId || !id) {
+      setErrorForm('Identifiant manquant')
+      return
+    }
+    
+    // Validation des champs requis
+    if (!formEtape.code || !formEtape.libelle) {
+      setErrorForm('Le code et le libellé sont requis')
+      return
+    }
+    
+    if (!formEtape.statut_id) {
+      setErrorForm('Le statut est requis')
+      return
+    }
+    
+    try {
+      setErrorForm(null)
+      // Préparer le payload selon les paramètres de l'API
+      // Filtrer les pièces pour ne garder que celles avec un type_document valide
+      const piecesValides = (formEtape.pieces || [])
+        .filter(piece => piece.type_document && piece.type_document.trim() !== '')
+        .map(piece => ({
+          type_document: piece.type_document!,
+          libelle: piece.libelle || '',
+          obligatoire: piece.obligatoire || false
+        }))
+      
+      const payload = {
+        circuit_id: id,
+        code: formEtape.code.trim(),
+        libelle: formEtape.libelle.trim(),
+        statut_id: formEtape.statut_id || '',
+        roles: (formEtape.roles || []).filter((role): role is string => Boolean(role)),
+        pieces: piecesValides
+      }
+      
+      console.log('📤 Payload de modification d\'étape:', payload)
+      console.log('📤 ID de l\'étape à modifier:', editingEtapeId)
+      
+      await etapeService.update(editingEtapeId, payload)
+      handleCloseEditEtape()
+      await fetchData()
+    } catch (err: any) {
+      console.error('❌ Erreur lors de la modification de l\'étape:', err)
+      const errorMessage = err.response?.data?.message 
+        || err.response?.data?.error 
+        || err.message 
+        || 'Erreur lors de la modification de l\'étape'
+      setErrorForm(errorMessage)
     }
   }
 
@@ -365,7 +465,12 @@ const CircuitDetailPage: React.FC = () => {
                     )}
                   </Box>
 
-                  <Box alignSelf="flex-end">
+                  <Box alignSelf="flex-end" display="flex" gap={1}>
+                    <Tooltip title="Modifier">
+                      <IconButton color="primary" onClick={() => handleOpenEditEtape(etape)}>
+                        <EditIcon />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="Supprimer">
                       <IconButton color="error" onClick={() => handleDeleteEtape(etape.id!)}>
                         <DeleteIcon />
@@ -673,10 +778,9 @@ const CircuitDetailPage: React.FC = () => {
                 size="small"
                 onClick={() => {
                   const newEx = {
-                    piece_code: '',
+                    type_document: '',
+                    libelle: '',
                     obligatoire: false,
-                    nombre_min: 0,
-                    origine: '',
                   }
                   setFormEtape({
                     ...formEtape,
@@ -788,6 +892,228 @@ const CircuitDetailPage: React.FC = () => {
           <Button onClick={() => setOpenAddTransition(false)}>Annuler</Button>
           <Button variant="contained" onClick={handleAddTransition}>
             Ajouter
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* === DIALOG MODIFICATION ÉTAPE === */}
+      <Dialog open={openEditEtape} onClose={handleCloseEditEtape} maxWidth="md" fullWidth>
+        <DialogTitle>Modifier une étape</DialogTitle>
+        <DialogContent>
+          {errorForm && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {errorForm}
+            </Alert>
+          )}
+          
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Code"
+                value={formEtape.code ?? ''}
+                onChange={(e) =>
+                  setFormEtape({ ...formEtape, code: e.target.value.toUpperCase() })
+                }
+                margin="normal"
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Libellé"
+                value={formEtape.libelle ?? ''}
+                onChange={(e) => {
+                  let v = e.target.value
+                  v = v.charAt(0).toUpperCase() + v.slice(1)
+                  setFormEtape({ ...formEtape, libelle: v })
+                }}
+                margin="normal"
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                type="number"
+                label="Ordre"
+                value={formEtape.ordre ?? 0}
+                onChange={(e) =>
+                  setFormEtape({ ...formEtape, ordre: Number(e.target.value) })
+                }
+                margin="normal"
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Statut associé</InputLabel>
+                <Select
+                  value={formEtape.statut_id ?? ''}
+                  label="Statut associé"
+                  onChange={(e) =>
+                    setFormEtape({ ...formEtape, statut_id: e.target.value as string })
+                  }
+                >
+                  {Array.isArray(statuts) && statuts.length > 0 ? (
+                    statuts.map((statut) => (
+                      <MenuItem key={statut.id} value={statut.id}>
+                        {statut.libelle}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled>Aucun statut disponible</MenuItem>
+                  )}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Rôles</InputLabel>
+                <Select
+                  multiple
+                  value={formEtape.roles ?? []}
+                  label="Rôles"
+                  onChange={(e) =>
+                    setFormEtape({ ...formEtape, roles: e.target.value as string[] })
+                  }
+                  renderValue={(selected) => (selected as string[]).join(', ')}
+                >
+                  {Array.isArray(roles) && roles.length > 0 ? (
+                    roles.map((role) => (
+                      <MenuItem key={role} value={role}>
+                        <Checkbox checked={formEtape.roles?.includes(role) ?? false} />
+                        <Typography>{role}</Typography>
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled>Aucun rôle disponible</MenuItem>
+                  )}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={formEtape.auto_advance ?? false}
+                    onChange={(e) =>
+                      setFormEtape({ ...formEtape, auto_advance: e.target.checked })
+                    }
+                  />
+                }
+                label="Passage automatique ?"
+              />
+            </Grid>
+
+            {/* === Section Exigences === */}
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
+                Pièces justificatives
+              </Typography>
+
+              {(formEtape.pieces ?? []).map((piece, index) => (
+                <Grid
+                  container
+                  key={index}
+                  spacing={2}
+                  sx={{
+                    border: '1px solid #e0e0e0',
+                    borderRadius: 2,
+                    p: 2,
+                    mb: 1,
+                    backgroundColor: '#fafafa',
+                  }}
+                >
+                  {/* === Sélecteur de type de document === */}
+                  <Grid item xs={12} md={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Type de document</InputLabel>
+                      <Select
+                        value={piece.type_document ?? ''}
+                        label="Type de document"
+                        onChange={(e) => {
+                          const newEx = [...(formEtape.pieces ?? [])]
+                          newEx[index].type_document = e.target.value
+                          newEx[index].libelle = typeDocuments.find(td => td.id === e.target.value)?.libelle || ''  
+                          setFormEtape({ ...formEtape, pieces: newEx })
+                        }}
+                      >
+                        {Array.isArray(typeDocuments) && typeDocuments.length > 0 ? (
+                          typeDocuments.map((doc) => (
+                            <MenuItem key={doc.id} value={doc.id}>
+                              {doc.libelle} ({doc.code})
+                            </MenuItem>
+                          ))
+                        ) : (
+                          <MenuItem disabled>Aucun type de document</MenuItem>
+                        )}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  {/* === Checkbox obligatoire === */}
+                  <Grid item xs={12} md={5} display="flex" alignItems="center">
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={piece.obligatoire ?? false}
+                          onChange={(e) => {
+                            const newEx = [...(formEtape.pieces ?? [])]
+                            newEx[index].obligatoire = e.target.checked
+                            setFormEtape({ ...formEtape, pieces: newEx })
+                          }}
+                        />
+                      }
+                      label="Obligatoire"
+                    />
+                  </Grid>
+
+                  {/* === Bouton suppression === */}
+                  <Grid item xs={12} md={1} display="flex" alignItems="center">
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      onClick={() => {
+                        const newEx = (formEtape.pieces ?? []).filter((_, i) => i !== index)
+                        setFormEtape({ ...formEtape, pieces: newEx })
+                      }}
+                    >
+                      Suppr.
+                    </Button>
+                  </Grid>
+                </Grid>
+              ))}
+
+              {/* === Bouton d'ajout === */}
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  const newEx = {
+                    type_document: '',
+                    libelle: '',
+                    obligatoire: false,
+                  }
+                  setFormEtape({
+                    ...formEtape,
+                    pieces: [...(formEtape.pieces ?? []), newEx],
+                  })
+                }}
+              >
+                + Ajouter une piece
+              </Button>
+            </Grid>
+          </Grid>
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={handleCloseEditEtape}>Annuler</Button>
+          <Button variant="contained" onClick={handleUpdateEtape}>
+            Modifier
           </Button>
         </DialogActions>
       </Dialog>

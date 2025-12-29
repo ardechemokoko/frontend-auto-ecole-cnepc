@@ -32,6 +32,8 @@ import {
   AutoEcole,
   Formation,
   autoEcoleService,
+  typeDemandeService,
+  TypeDemande,
 } from '../services';
 import { authService } from '../../auth/services/authService';
 
@@ -56,6 +58,8 @@ const InscriptionFormationForm: React.FC<InscriptionFormationFormProps> = ({
   // États pour les données
   const [formations, setFormations] = useState<Formation[]>([]);
   const [loadingFormations, setLoadingFormations] = useState(false);
+  const [typeDemandes, setTypeDemandes] = useState<TypeDemande[]>([]);
+  const [loadingTypeDemandes, setLoadingTypeDemandes] = useState(false);
   const [candidatId, setCandidatId] = useState<string | null>(null);
   const [personneId, setPersonneId] = useState<string | null>(null);
   
@@ -65,6 +69,7 @@ const InscriptionFormationForm: React.FC<InscriptionFormationFormProps> = ({
     prenom: '',
     email: '',
     contact: '',
+    telephone: '',
     adresse: '',
     password: '',
     password_confirmation: '',
@@ -84,6 +89,7 @@ const InscriptionFormationForm: React.FC<InscriptionFormationFormProps> = ({
   // États du formulaire - Étape 3 : Formation
   const [formationData, setFormationData] = useState({
     formation_id: '',
+    type_demande_id: '',
     commentaires: '',
   });
 
@@ -103,10 +109,25 @@ const InscriptionFormationForm: React.FC<InscriptionFormationFormProps> = ({
     }
   };
 
+  // Charger les types de demande
+  const loadTypeDemandes = async () => {
+    setLoadingTypeDemandes(true);
+    try {
+      const response = await typeDemandeService.getTypeDemandes(1, 100);
+      setTypeDemandes(response.data || []);
+    } catch (err: any) {
+      console.error('Erreur lors du chargement des types de demande:', err);
+      // Ne pas bloquer le formulaire si les types de demande ne peuvent pas être chargés
+    } finally {
+      setLoadingTypeDemandes(false);
+    }
+  };
+
   // Charger les formations au montage du composant
   useEffect(() => {
     if (open) {
       loadFormations();
+      loadTypeDemandes();
       // Réinitialiser le formulaire
       setActiveStep(0);
       setCandidatId(null);
@@ -116,6 +137,7 @@ const InscriptionFormationForm: React.FC<InscriptionFormationFormProps> = ({
         prenom: '',
         email: '',
         contact: '',
+        telephone: '',
         adresse: '',
         password: '',
         password_confirmation: '',
@@ -131,6 +153,7 @@ const InscriptionFormationForm: React.FC<InscriptionFormationFormProps> = ({
       });
       setFormationData({
         formation_id: '',
+        type_demande_id: '',
         commentaires: '',
       });
       setError(null);
@@ -175,6 +198,10 @@ const InscriptionFormationForm: React.FC<InscriptionFormationFormProps> = ({
       setError('Veuillez sélectionner une formation');
       return false;
     }
+    if (!formationData.type_demande_id) {
+      setError('Veuillez sélectionner un type de demande');
+      return false;
+    }
     return true;
   };
 
@@ -197,6 +224,7 @@ const InscriptionFormationForm: React.FC<InscriptionFormationFormProps> = ({
           nom: personneData.nom,
           prenom: personneData.prenom,
           contact: personneData.contact,
+          telephone: personneData.telephone,
           adresse: personneData.adresse,
           role: 'candidat',
         });
@@ -210,6 +238,7 @@ const InscriptionFormationForm: React.FC<InscriptionFormationFormProps> = ({
           nom: personneData.nom,
           prenom: personneData.prenom,
           contact: personneData.contact,
+          telephone: personneData.telephone,
           adresse: personneData.adresse,
           role: 'candidat',
         });
@@ -376,6 +405,7 @@ const InscriptionFormationForm: React.FC<InscriptionFormationFormProps> = ({
       console.log('📋 Candidat ID:', candidatId);
       console.log('📋 Auto-École ID:', autoEcole.id);
       console.log('📋 Formation ID:', formationData.formation_id);
+      console.log('📋 Type de demande ID:', formationData.type_demande_id);
       console.log('📋 Commentaires:', formationData.commentaires || 'Aucun');
       console.log('═══════════════════════════════════════════════════════════════');
       
@@ -383,6 +413,7 @@ const InscriptionFormationForm: React.FC<InscriptionFormationFormProps> = ({
         candidat_id: candidatId,
         auto_ecole_id: autoEcole.id,
         formation_id: formationData.formation_id,
+        type_demande_id: formationData.type_demande_id,
         statut: 'en_attente',
         date_creation: today,
         commentaires: formationData.commentaires || undefined,
@@ -484,13 +515,23 @@ const InscriptionFormationForm: React.FC<InscriptionFormationFormProps> = ({
                 disabled={loading}
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid item xs={12} sm={6}>
               <TextField
-                label="Téléphone"
+                label="Contact"
                 value={personneData.contact}
                 onChange={(e) => setPersonneData({ ...personneData, contact: e.target.value })}
                 fullWidth
                 required
+                disabled={loading}
+                placeholder="Ex: 0612345678"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Téléphone"
+                value={personneData.telephone}
+                onChange={(e) => setPersonneData({ ...personneData, telephone: e.target.value })}
+                fullWidth
                 disabled={loading}
                 placeholder="Ex: 0612345678"
               />
@@ -707,6 +748,33 @@ const InscriptionFormationForm: React.FC<InscriptionFormationFormProps> = ({
               </Select>
             </FormControl>
 
+            <FormControl fullWidth required sx={{ mb: 3 }}>
+              <InputLabel>Type de demande</InputLabel>
+              <Select
+                value={formationData.type_demande_id}
+                onChange={(e) => setFormationData({ ...formationData, type_demande_id: e.target.value })}
+                label="Type de demande"
+                disabled={loadingTypeDemandes || loading}
+              >
+                {loadingTypeDemandes ? (
+                  <MenuItem disabled>
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                    Chargement des types de demande...
+                  </MenuItem>
+                ) : typeDemandes.length === 0 ? (
+                  <MenuItem disabled>
+                    Aucun type de demande disponible
+                  </MenuItem>
+                ) : (
+                  typeDemandes.map((typeDemande) => (
+                    <MenuItem key={typeDemande.id} value={typeDemande.id}>
+                      {typeDemande.name}
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+            </FormControl>
+
             {selectedFormation && (() => {
               // Récupérer le libellé du type de permis de manière sûre
               let typePermisLabel = 'N/A';
@@ -868,7 +936,7 @@ const InscriptionFormationForm: React.FC<InscriptionFormationFormProps> = ({
           <Button
             onClick={handleSubmit}
             variant="contained"
-            disabled={loading || loadingFormations}
+            disabled={loading || loadingFormations || loadingTypeDemandes}
             startIcon={loading ? <CircularProgress size={20} /> : <CheckCircle />}
           >
             {loading ? 'Inscription en cours...' : 'Finaliser l\'inscription'}

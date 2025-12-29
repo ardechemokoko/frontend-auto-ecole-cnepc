@@ -45,7 +45,8 @@ import {
   School,
   Assignment,
 } from '@mui/icons-material';
-import { Dossier, MesDossiersResponse, AutoEcole, Formation, autoEcoleService } from '../services';
+import { Dossier, MesDossiersResponse, AutoEcole, Formation, autoEcoleService, typeDemandeService } from '../services';
+import { TypeDemande } from '../types/type-demande';
 import { CandidatForm, DossierForm } from '../forms';
 
 interface CandidatsTableProps {
@@ -69,6 +70,9 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
   
   // Cache pour les détails de formation
   const [formationsCache, setFormationsCache] = useState<Map<string, Formation>>(new Map());
+  
+  // Cache pour les types de demande
+  const [typeDemandeCache, setTypeDemandeCache] = useState<Map<string, TypeDemande>>(new Map());
   
   // États pour les statistiques
   const [statistiques, setStatistiques] = useState<{
@@ -124,6 +128,72 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
     }
   };
 
+  // Fonction pour enrichir les données de type de demande
+  const enrichTypeDemandeData = async (dossiers: Dossier[]) => {
+    const typeDemandesToFetch = new Set<string>();
+    
+    // Identifier les types de demande qui ont besoin d'être enrichis
+    dossiers.forEach(dossier => {
+      if (dossier.type_demande_id && !dossier.type_demande && !typeDemandeCache.has(dossier.type_demande_id)) {
+        typeDemandesToFetch.add(dossier.type_demande_id);
+      }
+    });
+    
+    console.log('🔍 [ENRICH TYPE DEMANDE] Dossiers analysés:', dossiers.length);
+    console.log('🔍 [ENRICH TYPE DEMANDE] Types de demande à charger:', Array.from(typeDemandesToFetch));
+    console.log('🔍 [ENRICH TYPE DEMANDE] Cache actuel:', typeDemandeCache.size, 'éléments');
+    
+    // Récupérer les détails des types de demande manquants
+    if (typeDemandesToFetch.size > 0) {
+      try {
+        console.log('🔄 Enrichissement des types de demande pour:', Array.from(typeDemandesToFetch));
+        
+        // Récupérer tous les types de demande manquants
+        const typeDemandePromises = Array.from(typeDemandesToFetch).map(id => 
+          typeDemandeService.getTypeDemandeById(id).catch(err => {
+            console.error(`❌ Erreur lors du chargement du type de demande ${id}:`, err);
+            return null;
+          })
+        );
+        
+        const typeDemandes = (await Promise.all(typeDemandePromises)).filter(td => td !== null) as TypeDemande[];
+        
+        console.log('✅ Types de demande chargés:', typeDemandes.length, typeDemandes);
+        
+        // Mettre à jour le cache
+        const newCache = new Map(typeDemandeCache);
+        typeDemandes.forEach(typeDemande => {
+          newCache.set(typeDemande.id, typeDemande);
+          console.log(`📦 Type de demande ajouté au cache: ${typeDemande.id} - ${typeDemande.name}`);
+        });
+        setTypeDemandeCache(newCache);
+        
+        // Mettre à jour les dossiers avec les types de demande chargés
+        setDossiers(prevDossiers => {
+          const updatedDossiers = prevDossiers.map(dossier => {
+            if (dossier.type_demande_id && newCache.has(dossier.type_demande_id)) {
+              const updatedDossier = {
+                ...dossier,
+                type_demande: newCache.get(dossier.type_demande_id)!
+              };
+              console.log(`✅ Dossier ${dossier.id} mis à jour avec type de demande:`, updatedDossier.type_demande?.name);
+              return updatedDossier;
+            }
+            return dossier;
+          });
+          console.log('📋 Dossiers mis à jour:', updatedDossiers.length);
+          return updatedDossiers;
+        });
+        
+        console.log('✅ Cache de types de demande mis à jour:', newCache.size, 'types de demande');
+      } catch (error) {
+        console.error('❌ Erreur lors de l\'enrichissement des types de demande:', error);
+      }
+    } else {
+      console.log('ℹ️ Aucun type de demande à charger');
+    }
+  };
+
   // Charger les dossiers (candidats inscrits)
   const loadDossiers = async () => {
     setLoading(true);
@@ -147,9 +217,11 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
 
         console.log('📋 Réponse complète:', response);
         console.log('📊 Nombre de dossiers:', response.dossiers?.length || 0);
+        console.log('📋 Dossiers avec type_demande_id:', response.dossiers?.filter(d => d.type_demande_id).map(d => ({ id: d.id, type_demande_id: d.type_demande_id, has_type_demande: !!d.type_demande })));
         console.log('═══════════════════════════════════════════════════════════════');
 
-        setDossiers(response.dossiers || []);
+        const dossiersToSet = response.dossiers || [];
+        setDossiers(dossiersToSet);
         
         // Si on a un autoEcoleId, charger les détails de l'auto-école séparément
         if (autoEcoleId && !autoEcoleDetails) {
@@ -161,8 +233,9 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
           }
         }
         
-        // Enrichir les données de formation
-        await enrichFormationData(response.dossiers || []);
+        // Enrichir les données de formation et types de demande
+        await enrichFormationData(dossiersToSet);
+        await enrichTypeDemandeData(dossiersToSet);
         
         // Pas de statistiques avec /dossiers, on les calcule localement
         const dossiers = response.dossiers || [];
@@ -184,16 +257,19 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
         console.log('📋 Réponse complète:', response);
         console.log('📊 Auto-école:', response.auto_ecole?.nom_auto_ecole);
         console.log('📊 Nombre de dossiers:', response.dossiers?.length || 0);
+        console.log('📋 Dossiers avec type_demande_id:', response.dossiers?.filter(d => d.type_demande_id).map(d => ({ id: d.id, type_demande_id: d.type_demande_id, has_type_demande: !!d.type_demande })));
         console.log('📊 Statistiques:', response.statistiques);
         console.log('═══════════════════════════════════════════════════════════════');
 
         // Utiliser directement les données de la réponse
-        setDossiers(response.dossiers || []);
+        const dossiersToSet = response.dossiers || [];
+        setDossiers(dossiersToSet);
         setAutoEcoleDetails(response.auto_ecole || null);
         setStatistiques(response.statistiques || null);
         
-        // Enrichir les données de formation
-        await enrichFormationData(response.dossiers || []);
+        // Enrichir les données de formation et types de demande
+        await enrichFormationData(dossiersToSet);
+        await enrichTypeDemandeData(dossiersToSet);
       }
     } catch (err: any) {
       console.error('❌ Erreur lors du chargement des dossiers:', err);
@@ -563,6 +639,7 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
               <TableRow>
                 <TableCell>Candidat</TableCell>
                 <TableCell>Formation</TableCell>
+                <TableCell>Type de demande</TableCell>
                 <TableCell>Statut</TableCell>
                 <TableCell>Documents</TableCell>
                 <TableCell>Date d'inscription</TableCell>
@@ -572,13 +649,13 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                     <CircularProgress />
                   </TableCell>
                 </TableRow>
               ) : filteredDossiers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                     <Typography variant="body2" color="text.secondary">
                       Aucun candidat trouvé
                     </Typography>
@@ -681,6 +758,47 @@ const CandidatsTable: React.FC<CandidatsTableProps> = ({
                           </Typography>
                         </Box>
                       </Box>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        // Vérifier d'abord si le type de demande est directement dans le dossier
+                        if (dossier.type_demande) {
+                          return (
+                            <Chip
+                              label={dossier.type_demande.name}
+                              size="small"
+                              variant="outlined"
+                              color="primary"
+                            />
+                          );
+                        }
+                        
+                        // Sinon, vérifier si on a l'ID et si c'est dans le cache
+                        if (dossier.type_demande_id) {
+                          const cachedTypeDemande = typeDemandeCache.get(dossier.type_demande_id);
+                          if (cachedTypeDemande) {
+                            return (
+                              <Chip
+                                label={cachedTypeDemande.name}
+                                size="small"
+                                variant="outlined"
+                                color="primary"
+                              />
+                            );
+                          }
+                          return (
+                            <Typography variant="body2" color="text.secondary">
+                              Chargement...
+                            </Typography>
+                          );
+                        }
+                        
+                        return (
+                          <Typography variant="body2" color="text.secondary">
+                            Non spécifié
+                          </Typography>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <Chip

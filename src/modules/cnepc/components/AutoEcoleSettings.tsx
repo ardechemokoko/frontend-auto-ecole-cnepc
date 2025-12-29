@@ -34,7 +34,6 @@ import {
 import {
   Add,
   Edit,
-  Delete,
   School,
   Settings,
   Person,
@@ -114,6 +113,25 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
   
   // État pour le formulaire d'inscription
   const [inscriptionDialogOpen, setInscriptionDialogOpen] = useState(false);
+  
+  // États pour le dialogue de création/modification de référentiel
+  const [referentielDialogOpen, setReferentielDialogOpen] = useState(false);
+  const [selectedReferentiel, setSelectedReferentiel] = useState<Referentiel | null>(null);
+  const [isCreatingReferentiel, setIsCreatingReferentiel] = useState(false);
+  const [referentielFormData, setReferentielFormData] = useState<{
+    libelle: string;
+    code: string;
+    type_ref: string;
+    description: string;
+    statut: boolean;
+  }>({
+    libelle: '',
+    code: '',
+    type_ref: '',
+    description: '',
+    statut: true,
+  });
+  const [isCustomType, setIsCustomType] = useState(false);
 
   // Charger les formations
   const loadFormations = async () => {
@@ -259,6 +277,87 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
     );
   });
 
+  // Gestion du dialogue de création/modification de référentiel
+  const handleReferentielCreate = () => {
+    setSelectedReferentiel(null);
+    setIsCreatingReferentiel(true);
+    setIsCustomType(false);
+    setReferentielFormData({
+      libelle: '',
+      code: '',
+      type_ref: selectedTypeRef || '',
+      description: '',
+      statut: true,
+    });
+    setReferentielDialogOpen(true);
+  };
+
+  const handleReferentielEdit = (referentiel: Referentiel) => {
+    setSelectedReferentiel(referentiel);
+    setIsCreatingReferentiel(false);
+    setReferentielFormData({
+      libelle: referentiel.libelle || '',
+      code: referentiel.code || '',
+      type_ref: referentiel.type_ref || '',
+      description: referentiel.description || '',
+      statut: referentiel.statut ?? true,
+    });
+    setReferentielDialogOpen(true);
+  };
+
+  const handleReferentielDialogClose = () => {
+    setReferentielDialogOpen(false);
+    setSelectedReferentiel(null);
+    setIsCreatingReferentiel(false);
+    setIsCustomType(false);
+    setReferentielFormData({
+      libelle: '',
+      code: '',
+      type_ref: '',
+      description: '',
+      statut: true,
+    });
+  };
+
+  const handleReferentielSubmit = async () => {
+    try {
+      const submitData = {
+        libelle: referentielFormData.libelle,
+        code: referentielFormData.code,
+        type_ref: referentielFormData.type_ref,
+        description: referentielFormData.description,
+        statut: referentielFormData.statut,
+      };
+
+      if (isCreatingReferentiel) {
+        // Créer un nouveau référentiel
+        const response = await referentielService.createReferentiel(submitData);
+        
+        if (response.success) {
+          loadReferentiels(selectedTypeRef);
+          handleReferentielDialogClose();
+        } else {
+          alert(response.message || 'Erreur lors de la création');
+        }
+      } else {
+        // Modifier un référentiel existant
+        if (!selectedReferentiel) return;
+        
+        const response = await referentielService.updateReferentiel(selectedReferentiel.id.toString(), submitData);
+        
+        if (response.success) {
+          loadReferentiels(selectedTypeRef);
+          handleReferentielDialogClose();
+        } else {
+          alert(response.message || 'Erreur lors de la mise à jour');
+        }
+      }
+    } catch (err: any) {
+      console.error(`Erreur lors de la ${isCreatingReferentiel ? 'création' : 'mise à jour'} du référentiel:`, err);
+      alert(err.response?.data?.message || err.message || `Erreur lors de la ${isCreatingReferentiel ? 'création' : 'mise à jour'}`);
+    }
+  };
+
   return (
     <Box>
       {/* Sous-onglets */}
@@ -348,7 +447,12 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
                     <CardContent>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
                         <Typography variant="h6" fontWeight="bold">
-                          {formation.nom || `Formation ${formation.typePermis?.libelle || formation.type_permis?.libelle || ''}`}
+                          {formation.nom || `Formation ${(() => {
+                            const typePermis = formation.typePermis || formation.type_permis;
+                            if (!typePermis) return '';
+                            // Vérifier si c'est un Referentiel (a libelle) ou TypePermis (a nom)
+                            return 'libelle' in typePermis ? typePermis.libelle : typePermis.nom;
+                          })()}`}
                         </Typography>
                         <Chip
                           label={formation.statut_libelle || (formation.statut ? 'Active' : 'Inactive')}
@@ -371,7 +475,12 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
                             Type de permis:
                           </Typography>
                           <Typography variant="body2" fontWeight="medium">
-                            {formation.typePermis?.libelle || formation.type_permis?.libelle || 'N/A'}
+                            {(() => {
+                              const typePermis = formation.typePermis || formation.type_permis;
+                              if (!typePermis) return 'N/A';
+                              // Vérifier si c'est un Referentiel (a libelle) ou TypePermis (a nom)
+                              return 'libelle' in typePermis ? typePermis.libelle : typePermis.nom;
+                            })()}
                           </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -435,41 +544,51 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
             </Typography>
           </Box>
 
-          {/* Filtres */}
-          <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <TextField
-              placeholder="Rechercher un référentiel..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{ minWidth: 300 }}
-            />
-            <FormControl sx={{ minWidth: 200 }}>
-              <InputLabel>Type de référentiel</InputLabel>
-              <Select
-                value={selectedTypeRef}
-                onChange={(e) => setSelectedTypeRef(e.target.value)}
-                label="Type de référentiel"
+          {/* En-tête avec bouton d'ajout */}
+          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', flex: 1 }}>
+              <TextField
+                placeholder="Rechercher un référentiel..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ minWidth: 300 }}
+              />
+              <FormControl sx={{ minWidth: 200 }}>
+                <InputLabel>Type de référentiel</InputLabel>
+                <Select
+                  value={selectedTypeRef}
+                  onChange={(e) => setSelectedTypeRef(e.target.value)}
+                  label="Type de référentiel"
+                >
+                  <MenuItem value="">Tous les types</MenuItem>
+                  <MenuItem value="type_permis">Types de Permis</MenuItem>
+                  <MenuItem value="type_document">Types de Documents</MenuItem>
+                  <MenuItem value="session">Sessions</MenuItem>
+                  <MenuItem value="statut">Statuts</MenuItem>
+                </Select>
+              </FormControl>
+              <Button
+                variant="outlined"
+                startIcon={<Refresh />}
+                onClick={() => loadReferentiels(selectedTypeRef)}
               >
-                <MenuItem value="">Tous les types</MenuItem>
-                <MenuItem value="type_permis">Types de Permis</MenuItem>
-                <MenuItem value="type_document">Types de Documents</MenuItem>
-                <MenuItem value="session">Sessions</MenuItem>
-                <MenuItem value="statut">Statuts</MenuItem>
-              </Select>
-            </FormControl>
+                Actualiser
+              </Button>
+            </Box>
             <Button
-              variant="outlined"
-              startIcon={<Refresh />}
-              onClick={() => loadReferentiels(selectedTypeRef)}
+              variant="contained"
+              startIcon={<Add />}
+              onClick={handleReferentielCreate}
+              sx={{ ml: 2 }}
             >
-              Actualiser
+              Ajouter un référentiel
             </Button>
           </Box>
 
@@ -496,12 +615,13 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
                       <TableCell>Type</TableCell>
                       <TableCell>Description</TableCell>
                       <TableCell>Statut</TableCell>
+                      <TableCell align="right">Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {filteredReferentiels.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                           <Typography variant="body2" color="text.secondary">
                             Aucun référentiel trouvé
                           </Typography>
@@ -534,6 +654,15 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
                               color={ref.statut ? 'success' : 'default'}
                               size="small"
                             />
+                          </TableCell>
+                          <TableCell align="right">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleReferentielEdit(ref)}
+                              color="primary"
+                            >
+                              <Edit fontSize="small" />
+                            </IconButton>
                           </TableCell>
                         </TableRow>
                       ))
@@ -635,6 +764,121 @@ const AutoEcoleSettings: React.FC<AutoEcoleSettingsProps> = ({
         onSuccess={handleInscriptionSuccess}
         onCancel={() => setInscriptionDialogOpen(false)}
       />
+
+      {/* Dialogue de création/modification de référentiel */}
+      <Dialog 
+        open={referentielDialogOpen} 
+        onClose={handleReferentielDialogClose}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          {isCreatingReferentiel ? 'Créer un nouveau référentiel' : 'Modifier le référentiel'}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+            <TextField
+              label="Libellé"
+              value={referentielFormData.libelle}
+              onChange={(e) => setReferentielFormData({ ...referentielFormData, libelle: e.target.value })}
+              fullWidth
+              required
+            />
+            
+            <TextField
+              label="Code"
+              value={referentielFormData.code}
+              onChange={(e) => setReferentielFormData({ ...referentielFormData, code: e.target.value })}
+              fullWidth
+              required
+            />
+            
+            {!isCustomType ? (
+              <FormControl fullWidth required>
+                <InputLabel>Type de référentiel</InputLabel>
+                <Select
+                  value={referentielFormData.type_ref}
+                  onChange={(e) => setReferentielFormData({ ...referentielFormData, type_ref: e.target.value })}
+                  label="Type de référentiel"
+                  disabled={!isCreatingReferentiel}
+                >
+                  <MenuItem value="type_permis">Types de Permis</MenuItem>
+                  <MenuItem value="type_document">Types de Documents</MenuItem>
+                  <MenuItem value="session">Sessions</MenuItem>
+                  <MenuItem value="statut">Statuts</MenuItem>
+                </Select>
+                {!isCreatingReferentiel && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                    Le type ne peut pas être modifié
+                  </Typography>
+                )}
+                {isCreatingReferentiel && (
+                  <Box sx={{ mt: 1 }}>
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={() => setIsCustomType(true)}
+                    >
+                      Créer un nouveau type
+                    </Button>
+                  </Box>
+                )}
+              </FormControl>
+            ) : (
+              <Box>
+                <TextField
+                  label="Nouveau type de référentiel"
+                  value={referentielFormData.type_ref}
+                  onChange={(e) => setReferentielFormData({ ...referentielFormData, type_ref: e.target.value })}
+                  fullWidth
+                  required
+                  placeholder="Ex: type_permis, type_document, session, statut"
+                  helperText="Entrez le code du nouveau type de référentiel (en minuscules, avec underscores)"
+                />
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() => {
+                    setIsCustomType(false);
+                    setReferentielFormData({ ...referentielFormData, type_ref: selectedTypeRef || '' });
+                  }}
+                  sx={{ mt: 1 }}
+                >
+                  Utiliser un type existant
+                </Button>
+              </Box>
+            )}
+            
+            <TextField
+              label="Description"
+              value={referentielFormData.description}
+              onChange={(e) => setReferentielFormData({ ...referentielFormData, description: e.target.value })}
+              multiline
+              rows={3}
+              fullWidth
+              placeholder="Description du référentiel (optionnel)"
+            />
+            
+            <FormControl fullWidth>
+              <InputLabel>Statut</InputLabel>
+              <Select
+                value={referentielFormData.statut ? 'true' : 'false'}
+                onChange={(e) => setReferentielFormData({ ...referentielFormData, statut: e.target.value === 'true' })}
+                label="Statut"
+              >
+                <MenuItem value="true">Actif</MenuItem>
+                <MenuItem value="false">Inactif</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleReferentielDialogClose}>Annuler</Button>
+          <Button onClick={handleReferentielSubmit} variant="contained">
+            {isCreatingReferentiel ? 'Créer' : 'Modifier'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

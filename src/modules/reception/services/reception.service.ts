@@ -30,7 +30,8 @@ class ReceptionService extends BaseService {
         }
       }
       
-      const isAdmin = userRole === 'admin';
+      // Vérifier si l'utilisateur est admin (peut être 'admin', 'ROLE_ADMIN', etc.)
+      const isAdmin = userRole === 'ROLE_ADMIN' || userRole === 'admin' || userRole?.toLowerCase() === 'admin';
       
       console.log('🏫 Auto-école ID:', autoEcoleId || 'Aucun');
       console.log('👤 Rôle utilisateur:', userRole || 'Non défini');
@@ -46,12 +47,9 @@ class ReceptionService extends BaseService {
       // Si c'est un admin et qu'il n'y a pas d'autoEcoleId, récupérer tous les dossiers
       if (isAdmin && !autoEcoleId) {
         console.log('👑 Admin détecté: récupération de tous les dossiers validés...');
-        // Utiliser l'endpoint /dossiers sans auto_ecole_id pour récupérer tous les dossiers
-        const params = new URLSearchParams();
-        params.append('statut', 'valide');
-        const endpoint = `/dossiers?${params.toString()}`;
-        
-        const axiosResponse = await axiosClient.get(endpoint);
+        // Utiliser la même méthode d'appel API que circuit.service.ts
+        const params = { statut: 'valide' };
+        const axiosResponse = await axiosClient.get('/dossiers', { params });
         response = {
           success: true,
           dossiers: axiosResponse.data?.data || axiosResponse.data || [],

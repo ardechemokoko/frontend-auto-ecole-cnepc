@@ -33,6 +33,8 @@ import { ROUTES } from '../../../shared/constants';
 import axiosClient from '../../../shared/environment/envdev';
 import ValidationService from '../services/validationService';
 import { autoEcoleService } from '../../cnepc/services/auto-ecole.service';
+import { typeDemandeService } from '../../cnepc/services';
+import { TypeDemande } from '../../cnepc/types/type-demande';
 
 const EleveInscritDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -51,6 +53,7 @@ const EleveInscritDetailsPage: React.FC = () => {
   const [sendDate, setSendDate] = useState<string>('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [typeDemandeCache, setTypeDemandeCache] = useState<Map<string, TypeDemande>>(new Map());
 
   // Charger les données du dossier depuis l'API
   useEffect(() => {
@@ -128,6 +131,23 @@ const EleveInscritDetailsPage: React.FC = () => {
             }
           }
 
+          // Enrichir le type de demande si nécessaire
+          if (dossier.type_demande_id && !dossier.type_demande) {
+            try {
+              // Vérifier d'abord le cache
+              if (typeDemandeCache.has(dossier.type_demande_id)) {
+                dossier.type_demande = typeDemandeCache.get(dossier.type_demande_id);
+              } else {
+                const typeDemande = await typeDemandeService.getTypeDemandeById(dossier.type_demande_id);
+                dossier.type_demande = typeDemande;
+                // Mettre à jour le cache
+                setTypeDemandeCache(prev => new Map(prev).set(typeDemande.id, typeDemande));
+              }
+            } catch (error) {
+              console.warn('⚠️ Impossible de charger le type de demande:', error);
+            }
+          }
+
           // Mettre à jour la formation dans candidatMapped avec les données enrichies
           candidatMapped.formation = dossier.formation || null;
           
@@ -135,7 +155,8 @@ const EleveInscritDetailsPage: React.FC = () => {
           
           // Les documents sont déjà dans la réponse, pas besoin de les charger séparément
           if (dossier.documents && Array.isArray(dossier.documents)) {
-            setDocumentsFromApi(dossier.documents);
+            const enrichedDocs = await fetchDocumentDetails(dossier.documents);
+            setDocumentsFromApi(enrichedDocs);
           }
         } else {
           setSnackbar({
@@ -163,6 +184,33 @@ const EleveInscritDetailsPage: React.FC = () => {
     
     loadDossier();
   }, [id, navigate]);
+
+  const fetchDocumentDetails = async (documents: any[]) => {
+    if (!Array.isArray(documents) || documents.length === 0) return [];
+
+    const enrichedDocs = await Promise.all(
+      documents.map(async (doc: any) => {
+        if (!doc?.id) return doc;
+        try {
+          const response = await axiosClient.get(`/documents/${doc.id}`);
+          if (response.data?.success && response.data?.data) {
+            const apiDoc = response.data.data;
+            return {
+              ...doc,
+              ...apiDoc,
+              valide: apiDoc.valide,
+              valide_libelle: apiDoc.valide_libelle || (apiDoc.valide ? 'Validé' : 'Non validé'),
+            };
+          }
+        } catch (err) {
+          console.warn(`⚠️ Impossible de récupérer les détails du document ${doc.id}`, err);
+        }
+        return doc;
+      })
+    );
+
+    return enrichedDocs;
+  };
 
   // Fonction pour obtenir tous les documents
   const getAllDocuments = () => {
@@ -446,7 +494,8 @@ const EleveInscritDetailsPage: React.FC = () => {
           if (dossierResponse.data.success && dossierResponse.data.data) {
             const dossier = dossierResponse.data.data;
             if (dossier.documents && Array.isArray(dossier.documents)) {
-              setDocumentsFromApi(dossier.documents);
+              const enrichedDocs = await fetchDocumentDetails(dossier.documents);
+              setDocumentsFromApi(enrichedDocs);
             }
           }
         }
@@ -706,12 +755,27 @@ const EleveInscritDetailsPage: React.FC = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
                         <DocumentTextIcon className="w-6 h-6 text-gray-500" />
                         <Box sx={{ flex: 1 }}>
-                          <Typography variant="body1" fontWeight={500}>
-                            {doc.nom_fichier || doc.nom || 'Document sans nom'}
-                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
+                            <Typography variant="body1" fontWeight={500}>
+                              {doc.nom_fichier || doc.nom || 'Document sans nom'}
+                            </Typography>
+                            {typeof doc.valide !== 'undefined' && (
+                              <Chip
+                                label={doc.valide ? (doc.valide_libelle || 'Validé') : (doc.valide_libelle || 'Non validé')}
+                                color={doc.valide ? 'success' : 'warning'}
+                                size="small"
+                                sx={{ height: 20, fontSize: '0.7rem' }}
+                              />
+                            )}
+                          </Box>
                           <Typography variant="body2" color="text.secondary">
                             {doc.taille_fichier_formate || doc.taille || 'Taille inconnue'}
                           </Typography>
+                          {doc.commentaires && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                              {doc.commentaires}
+                            </Typography>
+                          )}
                         </Box>
                       </Box>
                       <Box sx={{ display: 'flex', gap: 0.5, ml: 2 }}>
@@ -733,14 +797,16 @@ const EleveInscritDetailsPage: React.FC = () => {
                             <ArrowDownTrayIcon className="w-5 h-5" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Supprimer">
-                          <IconButton
-                            size="small"
-                            sx={{ color: '#6b7280', '&:hover': { color: 'error.main' } }}
-                          >
-                            <TrashIcon className="w-5 h-5" />
-                          </IconButton>
-                        </Tooltip>
+                        {!doc.valide && (
+                          <Tooltip title="Supprimer">
+                            <IconButton
+                              size="small"
+                              sx={{ color: '#6b7280', '&:hover': { color: 'error.main' } }}
+                            >
+                              <TrashIcon className="w-5 h-5" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </Box>
                     </Box>
                   ))}
@@ -839,6 +905,43 @@ const EleveInscritDetailsPage: React.FC = () => {
                       return montant ? `${montant}${formation?.montant_formate ? '' : ' FCFA'}` : 'Non spécifié';
                     })()}
                   </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 0.5 }}>
+                    Type de demande
+                  </Typography>
+                  {(() => {
+                    const dossier = candidat.dossierData;
+                    if (dossier?.type_demande) {
+                      return (
+                        <Chip
+                          label={dossier.type_demande.name}
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                        />
+                      );
+                    }
+                    if (dossier?.type_demande_id) {
+                      const cachedTypeDemande = typeDemandeCache.get(dossier.type_demande_id);
+                      if (cachedTypeDemande) {
+                        return (
+                          <Chip
+                            label={cachedTypeDemande.name}
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                          />
+                        );
+                      }
+                    }
+                    return (
+                      <Typography variant="body2" color="text.secondary">
+                        Non spécifié
+                      </Typography>
+                    );
+                  })()}
                 </Box>
 
                 {(() => {

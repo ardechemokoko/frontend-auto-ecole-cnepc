@@ -10,7 +10,10 @@ export const ROUTES = {
   CNEPC: '/cnepc',
   RECEPTION: '/reception',
   RECEPTION_DETAILS: '/reception/:id',
+  RECEPTION_CANDIDAT_DETAILS: '/reception/candidat/:id',
   AUTO_ECOLES: '/auto-ecoles',
+  TYPE_DEMANDES: '/type-demandes',
+  PIECES_JUSTIFICATIVES: '/pieces-justificatives',
   CANDIDAT_DETAILS: '/candidat/:id',
   SETTINGS: '/settings',
   USER_MANAGEMENT: '/user-management',
@@ -56,7 +59,7 @@ export const DOCUMENT_TYPES = {
 } as const;
 
 export const USER_ROLES = {
-  ADMIN: 'admin',
+  ADMIN: 'ROLE_ADMIN',
   INSTRUCTOR: 'instructor',
   STUDENT: 'student',
 } as const;

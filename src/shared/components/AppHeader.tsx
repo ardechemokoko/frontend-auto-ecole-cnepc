@@ -1,4 +1,4 @@
-import { BellIcon, UserIcon } from '@heroicons/react/24/outline';
+import { UserIcon } from '@heroicons/react/24/outline';
 import { Menu, MenuItem, IconButton } from '@mui/material';
 import React from 'react';
 import { useAppStore } from '../../store';
@@ -57,16 +57,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({ sidebarOpen }) => {
       >
         <div className="px-4 py-3">
         <div className="flex items-center justify-end">
-          {/* Notifications et utilisateur */}
+          {/* Informations utilisateur */}
           <div className="flex items-center space-x-4">
-            {/* Notifications */}
-            <div className="relative">
-              <button className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
-                <BellIcon className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Informations utilisateur */}
             <div className="flex items-center space-x-3">
               <div className="text-right">
                 <div className="text-sm font-medium text-gray-800">

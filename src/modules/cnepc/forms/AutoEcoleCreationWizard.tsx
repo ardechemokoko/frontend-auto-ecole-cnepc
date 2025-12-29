@@ -149,7 +149,7 @@ const AutoEcoleCreationWizard: React.FC<AutoEcoleCreationWizardProps> = ({
             {activeStep === 0 ? (
               <>
                 <strong>Étape 1/2 :</strong> Créez d'abord le compte du responsable de l'auto-école.
-                Ce compte aura le rôle <code>responsable_auto_ecole</code>.
+                Ce compte aura le rôle <code>ROLE_AUTO_ECOLE</code>.
               </>
             ) : (
               <>

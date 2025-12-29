@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
-  Paper,
   Typography,
   Grid,
   Card,
@@ -46,9 +45,11 @@ import {
   CheckCircle,
   Error,
   Warning,
+  Category,
 } from '@mui/icons-material';
-import { autoEcoleService } from '../services';
+import { autoEcoleService, typeDemandeService } from '../services';
 import { Dossier, Formation } from '../types/auto-ecole';
+import { TypeDemande } from '../types/type-demande';
 
 const CandidateDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -59,6 +60,7 @@ const CandidateDetailsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formationsCache, setFormationsCache] = useState<Map<string, Formation>>(new Map());
+  const [typeDemandeCache, setTypeDemandeCache] = useState<Map<string, TypeDemande>>(new Map());
   const [documentPreviewOpen, setDocumentPreviewOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
 
@@ -146,6 +148,49 @@ const CandidateDetailsPage: React.FC = () => {
     }
   };
 
+  // Fonction pour enrichir les données du type de demande
+  const enrichTypeDemandeData = async (dossier: Dossier) => {
+    if (!dossier.type_demande_id) {
+      return;
+    }
+
+    // Si le type de demande est déjà chargé, ne rien faire
+    if (dossier.type_demande) {
+      return;
+    }
+
+    // Si le type de demande est dans le cache, l'utiliser
+    if (typeDemandeCache.has(dossier.type_demande_id)) {
+      const cachedTypeDemande = typeDemandeCache.get(dossier.type_demande_id)!;
+      setDossier(prevDossier => ({
+        ...prevDossier!,
+        type_demande: cachedTypeDemande
+      }));
+      return;
+    }
+
+    try {
+      console.log('🔄 Enrichissement du type de demande pour:', dossier.type_demande_id);
+      
+      const typeDemande = await typeDemandeService.getTypeDemandeById(dossier.type_demande_id);
+      
+      console.log('✅ Type de demande chargé:', typeDemande);
+      
+      // Mettre à jour le dossier avec le type de demande
+      setDossier(prevDossier => ({
+        ...prevDossier!,
+        type_demande: typeDemande
+      }));
+      
+      // Mettre à jour le cache
+      const newCache = new Map(typeDemandeCache);
+      newCache.set(typeDemande.id, typeDemande);
+      setTypeDemandeCache(newCache);
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'enrichissement du type de demande:', error);
+    }
+  };
+
 
   // Charger les détails du dossier
   useEffect(() => {
@@ -168,8 +213,9 @@ const CandidateDetailsPage: React.FC = () => {
           console.log('✅ Utilisation des données passées en paramètre:', stateDossier);
           setDossier(stateDossier);
           
-          // Enrichir les données de formation en arrière-plan
+          // Enrichir les données de formation et type de demande en arrière-plan
           enrichFormationData(stateDossier);
+          enrichTypeDemandeData(stateDossier);
           
           setLoading(false);
           return;
@@ -206,8 +252,9 @@ const CandidateDetailsPage: React.FC = () => {
           console.log('✅ Dossier chargé via API:', dossier);
           console.log('📄 Documents dans le dossier:', dossier.documents?.length || 0);
           
-          // Enrichir les données de formation en arrière-plan
+          // Enrichir les données de formation et type de demande en arrière-plan
           enrichFormationData(dossier);
+          enrichTypeDemandeData(dossier);
         } catch (apiError: any) {
           console.warn('⚠️ API non disponible, utilisation des données de base:', apiError);
           
@@ -344,7 +391,7 @@ const CandidateDetailsPage: React.FC = () => {
   };
 
   // Obtenir l'icône du statut de document
-  const getDocumentStatusIcon = (valide: boolean, statut: string) => {
+  const getDocumentStatusIcon = (valide: boolean | undefined, statut: string | undefined) => {
     if (valide) return <CheckCircle color="success" />;
     if (statut === 'rejete') return <Error color="error" />;
     return <Warning color="warning" />;
@@ -627,6 +674,33 @@ const CandidateDetailsPage: React.FC = () => {
                     size="small"
                   />
                 </Grid>
+                <Grid item xs={12}>
+                  <Divider sx={{ my: 1 }} />
+                </Grid>
+                <Grid item xs={12}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Category color="action" />
+                    <Typography variant="body2" color="text.secondary">
+                      Type de demande:
+                    </Typography>
+                    {dossier.type_demande ? (
+                      <Chip
+                        label={dossier.type_demande.name}
+                        size="small"
+                        variant="outlined"
+                        color="primary"
+                      />
+                    ) : dossier.type_demande_id ? (
+                      <Typography variant="body2" color="text.secondary">
+                        Chargement...
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        Non spécifié
+                      </Typography>
+                    )}
+                  </Box>
+                </Grid>
               </Grid>
             </CardContent>
           </Card>
@@ -667,9 +741,9 @@ const CandidateDetailsPage: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            {getDocumentStatusIcon(document.valide, document.statut)}
+                            {getDocumentStatusIcon(document.valide, document.statut || 'en_attente')}
                             <Typography variant="body2" sx={{ ml: 1 }}>
-                              {document.valide_libelle}
+                              {document.valide_libelle || 'Non validé'}
                             </Typography>
                           </Box>
                         </TableCell>
@@ -680,7 +754,7 @@ const CandidateDetailsPage: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {formatDate(document.date_upload)}
+                            {document.date_upload ? formatDate(document.date_upload) : 'Non disponible'}
                           </Typography>
                         </TableCell>
                         <TableCell align="right">

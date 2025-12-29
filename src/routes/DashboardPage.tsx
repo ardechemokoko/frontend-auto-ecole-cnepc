@@ -39,7 +39,7 @@ const DashboardPage: React.FC = () => {
 
   // Charger les statistiques pour les admins
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (user?.role === 'ROLE_ADMIN') {
       const chargerStatistiquesAdmin = async () => {
         try {
           setAdminLoading(true);
@@ -146,7 +146,7 @@ const DashboardPage: React.FC = () => {
 
   // Charger les statistiques pour les responsables auto-école
   useEffect(() => {
-    if (user?.role !== 'admin') {
+    if (user?.role !== 'ROLE_ADMIN') {
       const chargerStatistiques = async () => {
         try {
           setLoading(true);
@@ -249,7 +249,7 @@ const DashboardPage: React.FC = () => {
   }, [user]);
 
   // Dashboard pour les admins
-  if (user?.role === 'admin') {
+  if (user?.role === 'ROLE_ADMIN') {
     console.log('👤 Utilisateur admin détecté, affichage du dashboard admin');
     console.log('📊 État actuel des statistiques admin:', adminStats);
     console.log('⏳ État du chargement:', adminLoading);

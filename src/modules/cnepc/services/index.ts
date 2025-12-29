@@ -9,6 +9,7 @@ export { default as CNEPCServiceExample } from './CNEPCServiceExample';
 export { autoEcoleService, AutoEcoleService } from './auto-ecole.service';
 export { userService, UserService } from './user.service';
 export { referentielService, ReferentielService } from './referentiel.service';
+export { typeDemandeService, TypeDemandeService } from './type-demande.service';
 
 // Types
 export * from '../types';

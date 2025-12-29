@@ -5,14 +5,17 @@ import { ROUTES } from '../../../shared/constants';
 import { useAppStore } from '../../../store';
 import { tokenService } from '../services';
 import { authService } from '../services/authService';
+import { CaptchaInput } from '../components';
 
 import { User, MeResponse } from '../types';
 import { AutoEcoleDetailResponse } from '../../cnepc/types/auto-ecole';
 
 
 interface LoginFormData {
-  email: string;
+  identifier: string;
   password: string;
+  captcha_id?: string;
+  captcha_code?: string;
 }
 export interface FormDataEmail {
   email: string;
@@ -22,9 +25,12 @@ const LoginForm: React.FC = () => {
   const { login, setLoading, isLoading, isAuthenticated } = useAppStore();
   const [isLoadingSendEmail,] = useState<boolean>(false);
   const navigate = useNavigate();
-  const [formData, setFormData] = useState<LoginFormData>({ email: '', password: '' });
+  const [formData, setFormData] = useState<LoginFormData>({ identifier: '', password: '' });
   const [errors, setErrors] = useState<Partial<LoginFormData>>({});
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [captchaId, setCaptchaId] = useState<string>('');
+  const [captchaValue, setCaptchaValue] = useState<string>('');
+  const [captchaError, setCaptchaError] = useState<string | undefined>(undefined);
   
   
 
@@ -104,16 +110,21 @@ const LoginForm: React.FC = () => {
   const validateForm = (): boolean => {
     const newErrors: Partial<LoginFormData> = {};
 
-    if (!formData.email) {
-      newErrors.email = 'L\'email est requis';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email invalide';
+    if (!formData.identifier) {
+      newErrors.identifier = 'L\'identifiant (email ou numéro de téléphone) est requis';
+    } else if (formData.identifier.includes('@') && !/\S+@\S+\.\S+/.test(formData.identifier)) {
+      newErrors.identifier = 'Email invalide';
     }
 
     if (!formData.password) {
       newErrors.password = 'Le mot de passe est requis';
     } else if (formData.password.length < 6) {
       newErrors.password = 'Le mot de passe doit contenir au moins 6 caractères';
+    }
+
+    if (!captchaValue) {
+      setCaptchaError('Le code captcha est requis');
+      return false;
     }
 
     setErrors(newErrors);
@@ -132,13 +143,14 @@ const LoginForm: React.FC = () => {
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    setCaptchaError(undefined); // Clear captcha error on new submission
 
     if (!validateForm()) {
       return;
     }
 
     try {
-      if (formData.email != "" && formData.password != "") {
+      if (formData.identifier != "" && formData.password != "") {
         setLoading(true);
       }
 
@@ -146,8 +158,10 @@ const LoginForm: React.FC = () => {
 
       // Utilisation du service mocké
       const authResponse = await authService.login({
-        email: formData.email,
+        identifier: formData.identifier,
         password: formData.password,
+        captcha_id: captchaId,
+        captcha_code: captchaValue,
       });
 
       //console.log(authResponse);
@@ -175,7 +189,7 @@ const LoginForm: React.FC = () => {
         id: meResponse.user.id,
         email: meResponse.user.email,
         name: meResponse.user.personne.nom_complet,
-        role: meResponse.user.role as 'admin' | 'instructor' | 'student' | 'candidat' | 'responsable_auto_ecole',
+        role: meResponse.user.role as User['role'],
         createdAt: new Date(meResponse.user.created_at),
         created_at: meResponse.user.created_at,
         personne: meResponse.user.personne
@@ -183,7 +197,7 @@ const LoginForm: React.FC = () => {
 
       // Si l'utilisateur est responsable d'auto-école, récupérer les informations de l'auto-école
       let autoEcoleInfo: AutoEcoleDetailResponse | null = null;
-      if (user.role === 'responsable_auto_ecole') {
+      if (user.role === 'ROLE_AUTO_ECOLE') {
         console.log('🏫 Récupération des informations de l\'auto-école...');
         try {
           // Trouver l'ID du responsable dans les données utilisateur
@@ -393,10 +407,10 @@ const LoginForm: React.FC = () => {
                   label="Email"
                   type="email"
                   fullWidth
-                  value={formData.email}
-                  onChange={handleInputChange('email')}
-                  error={!!errors.email}
-                  helperText={errors.email}
+                  value={formData.identifier}
+                  onChange={handleInputChange('identifier')}
+                  error={!!errors.identifier}
+                  helperText={errors.identifier}
                   size={window.innerWidth < 600 ? 'small' : 'medium'}
                 />
 
@@ -411,6 +425,13 @@ const LoginForm: React.FC = () => {
                   size={window.innerWidth < 600 ? 'small' : 'medium'}
                 />
 
+                <CaptchaInput
+                  value={captchaValue}
+                  onChange={setCaptchaValue}
+                  onCaptchaIdChange={setCaptchaId}
+                  error={!!captchaError}
+                  helperText={captchaError}
+                />
 
                 <Button
                   type="submit"

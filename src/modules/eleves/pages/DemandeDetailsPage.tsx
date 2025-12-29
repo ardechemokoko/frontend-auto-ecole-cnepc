@@ -32,6 +32,8 @@ import {
 import { ROUTES } from '../../../shared/constants';
 import ValidationService from '../services/validationService';
 import axiosClient from '../../../shared/environment/envdev';
+import { typeDemandeService } from '../../cnepc/services';
+import { TypeDemande } from '../../cnepc/types/type-demande';
 
 const DemandeDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -57,6 +59,7 @@ const DemandeDetailsPage: React.FC = () => {
     document: null,
     commentaires: ''
   });
+  const [typeDemandeCache, setTypeDemandeCache] = useState<Map<string, TypeDemande>>(new Map());
 
   // Charger les données du dossier depuis l'API
   useEffect(() => {
@@ -134,6 +137,23 @@ const DemandeDetailsPage: React.FC = () => {
             }
           }
 
+          // Enrichir le type de demande si nécessaire
+          if (dossier.type_demande_id && !dossier.type_demande) {
+            try {
+              // Vérifier d'abord le cache
+              if (typeDemandeCache.has(dossier.type_demande_id)) {
+                dossier.type_demande = typeDemandeCache.get(dossier.type_demande_id);
+              } else {
+                const typeDemande = await typeDemandeService.getTypeDemandeById(dossier.type_demande_id);
+                dossier.type_demande = typeDemande;
+                // Mettre à jour le cache
+                setTypeDemandeCache(prev => new Map(prev).set(typeDemande.id, typeDemande));
+              }
+            } catch (error) {
+              console.warn('⚠️ Impossible de charger le type de demande:', error);
+            }
+          }
+
           // Mettre à jour la formation dans candidatMapped avec les données enrichies
           candidatMapped.formation = dossier.formation || null;
           
@@ -146,7 +166,8 @@ const DemandeDetailsPage: React.FC = () => {
           
           // Les documents sont déjà dans la réponse, pas besoin de les charger séparément
           if (dossier.documents && Array.isArray(dossier.documents)) {
-            setDocumentsFromApi(dossier.documents);
+            const enrichedDocs = await fetchDocumentDetails(dossier.documents);
+            setDocumentsFromApi(enrichedDocs);
           }
         } else {
           setSnackbar({
@@ -177,6 +198,33 @@ const DemandeDetailsPage: React.FC = () => {
 
   // Les documents sont chargés directement depuis l'endpoint dossiers/{id}
   // Plus besoin de charger séparément
+
+  const fetchDocumentDetails = async (documents: any[]) => {
+    if (!Array.isArray(documents) || documents.length === 0) return [];
+
+    const enrichedDocs = await Promise.all(
+      documents.map(async (doc: any) => {
+        if (!doc?.id) return doc;
+        try {
+          const response = await axiosClient.get(`/documents/${doc.id}`);
+          if (response.data?.success && response.data?.data) {
+            const apiDoc = response.data.data;
+            return {
+              ...doc,
+              ...apiDoc,
+              valide: apiDoc.valide,
+              valide_libelle: apiDoc.valide_libelle || (apiDoc.valide ? 'Validé' : 'Non validé'),
+            };
+          }
+        } catch (err) {
+          console.warn(`⚠️ Impossible de récupérer les détails du document ${doc.id}`, err);
+        }
+        return doc;
+      })
+    );
+
+    return enrichedDocs;
+  };
 
   // Fonction pour obtenir tous les documents
   const getAllDocuments = () => {
@@ -385,6 +433,44 @@ const DemandeDetailsPage: React.FC = () => {
     setUploading(true);
 
     try {
+      // Vérifier que nous avons un ID de dossier valide
+      const dossierId = candidat.dossierData?.id || candidat.id;
+      if (!dossierId) {
+        setSnackbar({
+          open: true,
+          message: 'Erreur: ID du dossier introuvable',
+          severity: 'error'
+        });
+        setUploading(false);
+        return;
+      }
+
+      // Vérifier que le dossier existe et a les relations nécessaires
+      try {
+        const dossierCheck = await axiosClient.get(`/dossiers/${dossierId}`);
+        if (!dossierCheck.data.success || !dossierCheck.data.data) {
+          throw new Error('Dossier non trouvé');
+        }
+        const dossier = dossierCheck.data.data;
+        
+        // Vérifier que les relations essentielles existent
+        if (!dossier.candidat || !dossier.formation) {
+          console.warn('⚠️ Dossier chargé mais relations manquantes:', {
+            has_candidat: !!dossier.candidat,
+            has_formation: !!dossier.formation
+          });
+        }
+      } catch (checkError: any) {
+        console.error('❌ Erreur lors de la vérification du dossier:', checkError);
+        setSnackbar({
+          open: true,
+          message: 'Erreur: Impossible de vérifier le dossier. Veuillez réessayer.',
+          severity: 'error'
+        });
+        setUploading(false);
+        return;
+      }
+
       const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         setSnackbar({
@@ -408,15 +494,17 @@ const DemandeDetailsPage: React.FC = () => {
       }
 
       const formData = new FormData();
-      formData.append('documentable_id', candidat.id);
+      formData.append('documentable_id', dossierId);
       formData.append('documentable_type', 'App\\Models\\Dossier');
       formData.append('valide', '0');
       formData.append('commentaires', '');
       formData.append('fichier', file, file.name.trim());
 
       console.log('📤 Upload document pour dossier:', {
-        documentable_id: candidat.id,
+        documentable_id: dossierId,
         documentable_type: 'App\\Models\\Dossier',
+        candidat_id: candidat.id,
+        dossier_data_id: candidat.dossierData?.id,
         fichier: `[File: ${file.name.trim()}, ${file.size} bytes, ${file.type}]`
       });
 
@@ -455,22 +543,40 @@ const DemandeDetailsPage: React.FC = () => {
         });
         
         // Recharger le dossier pour avoir les données à jour
-        if (candidat?.id) {
-          const dossierResponse = await axiosClient.get(`/dossiers/${candidat.id}`);
+        const dossierId = candidat.dossierData?.id || candidat.id;
+        if (dossierId) {
+          const dossierResponse = await axiosClient.get(`/dossiers/${dossierId}`);
           if (dossierResponse.data.success && dossierResponse.data.data) {
             const dossier = dossierResponse.data.data;
             if (dossier.documents && Array.isArray(dossier.documents)) {
-              setDocumentsFromApi(dossier.documents);
+              const enrichedDocs = await fetchDocumentDetails(dossier.documents);
+              setDocumentsFromApi(enrichedDocs);
             }
           }
         }
       }
     } catch (error: any) {
       console.error('Erreur lors de l\'upload:', error);
+      console.error('Détails de l\'erreur:', {
+        status: error.response?.status,
+        message: error.response?.data?.message,
+        error: error.response?.data?.error,
+        fullResponse: error.response?.data
+      });
+      
       let errorMessage = 'Erreur lors de l\'upload du document';
       
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
+      } else if (error.response?.data?.error) {
+        errorMessage = `Erreur: ${error.response.data.error}`;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Message plus détaillé pour les erreurs 500
+      if (error.response?.status === 500) {
+        errorMessage = 'Erreur serveur lors de l\'upload. Le dossier pourrait être incomplet. Veuillez vérifier que toutes les informations du dossier sont correctement renseignées.';
       }
       
       setSnackbar({
@@ -581,7 +687,8 @@ const DemandeDetailsPage: React.FC = () => {
           if (dossierResponse.data.success && dossierResponse.data.data) {
             const dossier = dossierResponse.data.data;
             if (dossier.documents && Array.isArray(dossier.documents)) {
-              setDocumentsFromApi(dossier.documents);
+              const enrichedDocs = await fetchDocumentDetails(dossier.documents);
+              setDocumentsFromApi(enrichedDocs);
             }
           }
         }
@@ -993,6 +1100,43 @@ const DemandeDetailsPage: React.FC = () => {
                       return montant ? `${montant}${formation?.montant_formate ? '' : ' FCFA'}` : 'Non spécifié';
                     })()}
                   </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 0.5 }}>
+                    Type de demande
+                  </Typography>
+                  {(() => {
+                    const dossier = candidat.dossierData;
+                    if (dossier?.type_demande) {
+                      return (
+                        <Chip
+                          label={dossier.type_demande.name}
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                        />
+                      );
+                    }
+                    if (dossier?.type_demande_id) {
+                      const cachedTypeDemande = typeDemandeCache.get(dossier.type_demande_id);
+                      if (cachedTypeDemande) {
+                        return (
+                          <Chip
+                            label={cachedTypeDemande.name}
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                          />
+                        );
+                      }
+                    }
+                    return (
+                      <Typography variant="body2" color="text.secondary">
+                        Non spécifié
+                      </Typography>
+                    );
+                  })()}
                 </Box>
 
                 {(() => {

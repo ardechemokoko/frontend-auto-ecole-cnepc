@@ -1,7 +1,6 @@
 // Service d'authentification
-import { LoginRequest } from './types';
+import { LoginRequest, CaptchaResponse } from './types';
 
-import axiosAuthentifcation from '../../../shared/environment/envauth';
 import axiosClient from '../../../shared/environment/envdev';
 import { Person } from '../../cnepc/forms/updateinfoAutoEcole';
 import { ChangePasswordForm } from '../../eleves/types/changepassword';
@@ -10,12 +9,25 @@ import { ResetPasswordFormData } from '../forms/resetpassword';
 import { AutoEcoleListApiResponse, AutoEcoleDetailResponse } from '../../cnepc/types/auto-ecole';
 
 export class AuthService {
+  /**
+   * Récupère un nouveau captcha
+   */
+  async getCaptcha(): Promise<CaptchaResponse> {
+    try {
+      const response = await axiosClient.get('/auth/captcha');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Erreur récupération captcha:', error);
+      throw new Error(`Erreur récupération captcha: ${error.message}`);
+    }
+  }
+
   async login(credentials: LoginRequest): Promise<any> {
     try {
-      console.log('🔐 Tentative de connexion:', { email: credentials.email });
+      console.log('🔐 Tentative de connexion:', { identifier: credentials.identifier });
 
       // Utilisation de l'API d'authentification
-      const response = await axiosAuthentifcation.post("/auth/login-direct", credentials);
+      const response = await axiosClient.post("/auth/login-direct", credentials);
 
       // Logs détaillés de l'utilisateur authentifié
       console.log('✅ Connexion réussie !');
@@ -53,7 +65,7 @@ export class AuthService {
         console.log('\n🎭 RÔLE DÉTECTÉ:', user.role.toUpperCase());
 
         switch (user.role) {
-          case 'responsable_auto_ecole':
+          case 'ROLE_AUTO_ECOLE':
             console.log('  ➜ Type: Responsable d\'Auto-École');
             console.log('  ➜ Permissions: Gestion des candidats, dossiers, formations');
             console.log('  ➜ Action suivante: Récupération de l\'auto-école...');
@@ -62,7 +74,7 @@ export class AuthService {
             console.log('  ➜ Type: Candidat');
             console.log('  ➜ Permissions: Consultation de ses dossiers');
             break;
-          case 'admin':
+          case 'ROLE_ADMIN':
             console.log('  ➜ Type: Administrateur');
             console.log('  ➜ Permissions: Accès complet au système');
             break;
@@ -101,6 +113,7 @@ export class AuthService {
     nom: string;
     prenom: string;
     contact: string;
+    telephone?: string;
     adresse?: string;
     role: string;
   }): Promise<any> {
@@ -112,7 +125,7 @@ export class AuthService {
         role: data.role 
       });
       
-      const response = await axiosAuthentifcation.post("/auth/register", data);
+      const response = await axiosClient.post("/auth/register", data);
       
       console.log('✅ Enregistrement réussi !');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -227,7 +240,7 @@ export class AuthService {
   async refreshToken(): Promise<{ token: string; refreshToken: string }> {
     try {
       console.log('🔄 Rafraîchissement du token...');
-      const response = await axiosAuthentifcation.post("/auth/refresh");
+      const response = await axiosClient.post("/auth/refresh");
       console.log('✅ Token rafraîchi avec succès');
       return response.data;
     } catch (error: any) {
