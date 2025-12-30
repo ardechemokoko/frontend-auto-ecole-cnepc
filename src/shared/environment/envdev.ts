@@ -19,9 +19,6 @@ axiosClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // Ajouter le header pour contourner l'avertissement ngrok
-    config.headers['ngrok-skip-browser-warning'] = 'true';
-    
     // Pour les FormData, supprimer le Content-Type par défaut
     // pour laisser axios définir automatiquement multipart/form-data avec la boundary
     if (config.data instanceof FormData) {
