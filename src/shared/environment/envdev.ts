@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // URL de base de l'API
-export const baseURL = "http://172.31.11.120:8000/api";
+export const baseURL = "https://backend.permis.transports.gouv.ga/api";
 
 console.log('Configuration axios:', { baseURL });
 
