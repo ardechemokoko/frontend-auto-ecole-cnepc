@@ -3,6 +3,7 @@ import { Refresh } from '@mui/icons-material';
 import { useEffect, useState } from 'react';
 import { authService } from '../services/authService';
 import { CaptchaResponse } from '../services/types';
+import { logger } from '../../../shared/utils/logger';
 
 interface CaptchaInputProps {
   value: string;
@@ -32,7 +33,7 @@ export const CaptchaInput = ({
       onCaptchaIdChange(captchaData.captcha_id);
       onChange(''); // Réinitialiser la valeur du champ
     } catch (error) {
-      console.error('Erreur lors de la récupération du captcha:', error);
+      logger.error('Erreur lors de la récupération du captcha:', error);
       setImageError(true);
     } finally {
       setLoading(false);

@@ -493,14 +493,13 @@ class CircuitSuiviService {
     commentaires?: string
   ): Promise<Document> {
     try {
+      // Note: typeDocumentId est ignoré car l'API n'accepte pas type_document_id
+      // L'API accepte uniquement: documentable_id, documentable_type, valide, commentaires, fichier, piece_justification_id
       const formData = new FormData();
       formData.append('documentable_id', dossierId);
       formData.append('documentable_type', 'App\\Models\\Dossier');
       formData.append('valide', '0');
       formData.append('commentaires', commentaires || '');
-      if (typeDocumentId) {
-        formData.append('type_document_id', typeDocumentId);
-      }
       formData.append('fichier', file, file.name.trim());
 
       // Utiliser la même méthode que circuit.service.ts

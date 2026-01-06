@@ -23,7 +23,7 @@ import CircuitPage from '../modules/circuit/pages/CircuitPage';
 import CircuitDetailPage from '../modules/circuit/pages/CircuitDetailPage';
 import StatutPage from '../modules/statut/pages/StatutPage';
 
-import { CandidateDetailsPage, TypeDemandePage } from '../modules/cnepc/pages';
+import { CandidateDetailsPage, TypeDemandePage, GestionDossierPage } from '../modules/cnepc/pages';
 import { PieceJustificativePage } from '../modules/pieces-justificatives/pages';
 import SettingsPage from '../modules/settings/pages/SettingsPage';
 import UserManagementPage from '../modules/settings/pages/UserManagementPage';
@@ -144,6 +144,12 @@ const AppRoutes: React.FC = () => {
       path: ROUTES.TYPE_DEMANDES, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(TypeDemandePage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.GESTION_DOSSIER, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(GestionDossierPage))
       ) 
     }),
     React.createElement(Route, { 

@@ -1,9 +1,9 @@
 import axios from "axios";
 
 // URL de base de l'API
-export const baseURL = "http://172.31.11.120:8000/api";
+export const baseURL = "https://backend.permis.transports.gouv.ga/api";
 
-console.log('Configuration axios:', { baseURL });
+// Configuration silencieuse - les logs sont gérés par le logger utilitaire
 
 const axiosClient = axios.create({
   baseURL: baseURL,
@@ -19,8 +19,9 @@ axiosClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // Ajouter le header pour contourner l'avertissement ngrok
-    config.headers['ngrok-skip-browser-warning'] = 'true';
+    // Note: Le header 'ngrok-skip-browser-warning' a été retiré car il n'est pas autorisé
+    // par le backend dans Access-Control-Allow-Headers. Si vous utilisez ngrok,
+    // configurez le backend pour autoriser ce header dans CORS.
     
     // Pour les FormData, supprimer le Content-Type par défaut
     // pour laisser axios définir automatiquement multipart/form-data avec la boundary

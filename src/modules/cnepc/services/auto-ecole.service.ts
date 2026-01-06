@@ -265,9 +265,10 @@ export class AutoEcoleService {
    */
   async createDossier(data: {
     candidat_id: string;
-    auto_ecole_id: string;
-    formation_id: string;
     type_demande_id: string;
+    auto_ecole_id?: string;
+    formation_id?: string;
+    referenciel_id?: string;
     statut?: string;
     date_creation?: string;
     commentaires?: string;

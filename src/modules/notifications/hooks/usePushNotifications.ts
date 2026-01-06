@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { baseURL } from '../../../shared/environment/envdev';
+import { logger } from '../../../shared/utils/logger';
 
 // Utiliser la configuration d'environnement existante
 const API_BASE_URL = baseURL.replace(/\/$/, ''); // Retirer le slash final si présent
@@ -19,12 +20,10 @@ const getStoredToken = () => {
                 localStorage.getItem('token') ||
                 sessionStorage.getItem('access_token');
 
-  // Log pour déboguer
+  // Log uniquement en développement
   if (!token) {
-    // eslint-disable-next-line no-console
-    console.warn('⚠️ Aucun token trouvé dans le localStorage');
-    // eslint-disable-next-line no-console
-    console.log('Clés disponibles:', Object.keys(localStorage));
+    logger.warn('⚠️ Aucun token trouvé dans le localStorage');
+    logger.log('Clés disponibles:', Object.keys(localStorage));
   }
 
   return token;
@@ -65,8 +64,7 @@ export const usePushNotifications = () => {
     try {
       await navigator.serviceWorker.register('/sw.js');
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Erreur enregistrement Service Worker:', error);
+      logger.error('Erreur enregistrement Service Worker:', error);
     }
   }, []);
 
@@ -75,7 +73,8 @@ export const usePushNotifications = () => {
       const response = await fetch(`${API_BASE_URL}/push/vapid-public-key`, {
         headers: {
           Accept: 'application/json',
-          'ngrok-skip-browser-warning': 'true',
+          // Note: Le header 'ngrok-skip-browser-warning' a été retiré car il n'est pas autorisé
+          // par le backend dans Access-Control-Allow-Headers
         },
       });
       if (!response.ok) {
@@ -92,9 +91,17 @@ export const usePushNotifications = () => {
         setVapidPublicKey(key);
         return key;
       }
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Erreur récupération clé VAPID:', error);
+    } catch (error: any) {
+      // Détecter les erreurs CORS spécifiquement
+      const isCorsError = error?.message?.includes('CORS') || 
+                         error?.message?.includes('Failed to fetch') ||
+                         error?.name === 'TypeError';
+      
+      if (isCorsError) {
+        logger.warn('⚠️ Erreur CORS lors de la récupération de la clé VAPID. Vérifiez la configuration CORS du serveur.');
+      } else {
+        logger.error('Erreur récupération clé VAPID:', error);
+      }
     }
 
     return null;
@@ -160,10 +167,8 @@ export const usePushNotifications = () => {
 
       const token = getStoredToken();
       if (!token) {
-        // eslint-disable-next-line no-console
-        console.error('❌ Token manquant pour la souscription push');
-        // eslint-disable-next-line no-console
-        console.log('Vérification localStorage:', {
+        logger.error('❌ Token manquant pour la souscription push');
+        logger.log('Vérification localStorage:', {
           access_token: localStorage.getItem('access_token'),
           token: localStorage.getItem('token'),
           auth_token: localStorage.getItem('auth_token'),
@@ -173,13 +178,11 @@ export const usePushNotifications = () => {
 
       // Vérifier si le token est valide
       if (!isTokenValid(token)) {
-        // eslint-disable-next-line no-console
-        console.warn('⚠️ Token invalide ou expiré');
+        logger.warn('⚠️ Token invalide ou expiré');
         throw new Error('Token invalide ou expiré. Veuillez vous reconnecter.');
       }
 
-      // eslint-disable-next-line no-console
-      console.log('🔐 Token récupéré pour push subscription:', token.substring(0, 20) + '...');
+      logger.log('🔐 Token récupéré pour push subscription:', token.substring(0, 20) + '...');
 
       const response = await fetch(`${API_BASE_URL}/push/subscribe`, {
         method: 'POST',
@@ -187,7 +190,8 @@ export const usePushNotifications = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
-          'ngrok-skip-browser-warning': 'true',
+          // Note: Le header 'ngrok-skip-browser-warning' a été retiré car il n'est pas autorisé
+          // par le backend dans Access-Control-Allow-Headers
         },
         body: JSON.stringify({
           endpoint: pushSubscription.endpoint,
@@ -201,18 +205,15 @@ export const usePushNotifications = () => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        // eslint-disable-next-line no-console
-        console.error('❌ Erreur souscription push:', {
+        logger.error('❌ Erreur souscription push:', {
           status: response.status,
           statusText: response.statusText,
           error: errorData,
         });
         
         if (response.status === 401) {
-          // eslint-disable-next-line no-console
-          console.error('🔐 Erreur d\'authentification - Token peut-être invalide ou expiré');
-          // eslint-disable-next-line no-console
-          console.log('Token utilisé:', token ? `${token.substring(0, 30)}...` : 'null');
+          logger.error('🔐 Erreur d\'authentification - Token peut-être invalide ou expiré');
+          logger.log('Token utilisé:', token ? `${token.substring(0, 30)}...` : 'null');
         }
         
         throw new Error(errorData.message || "Erreur lors de l'enregistrement");
@@ -221,8 +222,7 @@ export const usePushNotifications = () => {
       setSubscription(pushSubscription);
       return pushSubscription;
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Erreur souscription:', error);
+      logger.error('Erreur souscription:', error);
       throw error;
     }
   }, [isSupported, permission, vapidPublicKey, requestPermission, fetchVapidKey]);
@@ -240,15 +240,15 @@ export const usePushNotifications = () => {
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: 'application/json',
-            'ngrok-skip-browser-warning': 'true',
+            // Note: Le header 'ngrok-skip-browser-warning' a été retiré car il n'est pas autorisé
+            // par le backend dans Access-Control-Allow-Headers
           },
         });
       }
 
       setSubscription(null);
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Erreur désinscription:', error);
+      logger.error('Erreur désinscription:', error);
       throw error;
     }
   }, [subscription]);
@@ -264,7 +264,8 @@ export const usePushNotifications = () => {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
-          'ngrok-skip-browser-warning': 'true',
+          // Note: Le header 'ngrok-skip-browser-warning' a été retiré car il n'est pas autorisé
+          // par le backend dans Access-Control-Allow-Headers
         },
       });
 
@@ -272,8 +273,7 @@ export const usePushNotifications = () => {
         return response.json();
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Erreur vérification statut:', error);
+      logger.error('Erreur vérification statut:', error);
     }
 
     return { subscribed: false, count: 0 };

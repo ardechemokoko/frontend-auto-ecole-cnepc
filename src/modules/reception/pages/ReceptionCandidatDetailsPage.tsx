@@ -141,7 +141,7 @@ const ReceptionCandidatDetailsPage: React.FC = () => {
             onClick={() => navigate(ROUTES.RECEPTION || '/reception')}
             sx={{ textDecoration: 'none', cursor: 'pointer' }}
           >
-            Réception des dossiers
+            Réception des dossiersss
           </Link>
           <Typography color="text.primary">
             Détails du candidat

@@ -124,21 +124,23 @@ export interface Document {
 export interface Dossier {
   id: string;
   candidat_id: string;
-  auto_ecole_id: string;
-  formation_id: string;
+  auto_ecole_id?: string;
+  formation_id?: string;
   type_demande_id?: string;
+  referenciel_id?: string;
   type_demande?: {
     id: string;
     name: string;
     created_at: string;
     updated_at: string;
   };
+  referentiel?: Referentiel;
   statut: 'en_attente' | 'en_cours' | 'valide' | 'rejete' | 'transmis' | 'Cnepc';
   date_creation: string;
   date_modification: string;
   commentaires?: string;
   candidat: Candidat;
-  formation: Formation;
+  formation?: Formation;
   documents: Document[];
   created_at: string;
   updated_at: string;
@@ -217,8 +219,10 @@ export interface FormationFormData {
 
 export interface DossierFormData {
   candidat_id: string;
-  auto_ecole_id: string;
-  formation_id: string;
+  auto_ecole_id?: string;
+  formation_id?: string;
+  type_demande_id: string;
+  referenciel_id?: string;
   numero_dossier?: string;
   statut: 'en_attente' | 'en_cours' | 'valide' | 'rejete' | 'transmis' | 'Cnepc';
   date_creation: string;
