@@ -13,6 +13,7 @@ export const ROUTES = {
   RECEPTION_CANDIDAT_DETAILS: '/reception/candidat/:id',
   AUTO_ECOLES: '/auto-ecoles',
   TYPE_DEMANDES: '/type-demandes',
+  GESTION_DOSSIER: '/gestion-dossier',
   PIECES_JUSTIFICATIVES: '/pieces-justificatives',
   CANDIDAT_DETAILS: '/candidat/:id',
   SETTINGS: '/settings',

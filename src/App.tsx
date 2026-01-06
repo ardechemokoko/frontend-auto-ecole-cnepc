@@ -7,7 +7,12 @@ import { PushNotificationPrompt } from './modules/notifications';
 function App() {
   return (
     <AppProvider>
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <div className="min-h-screen bg-gray-50">
           <AppRoutes />
           <PushNotificationPrompt />

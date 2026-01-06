@@ -9,6 +9,7 @@ export { default as CandidatForm } from './CandidatForm';
 export { default as DossierForm } from './DossierForm';
 export { default as UserForm } from './UserForm';
 export { default as InscriptionFormationForm } from './InscriptionFormationForm';
+export { default as CreateDossierForm } from './CreateDossierForm';
 
 // 🧙‍♂️ Assistant de création en 2 étapes (Responsable + Auto-école)
 export { default as AutoEcoleCreationWizard } from './AutoEcoleCreationWizard';

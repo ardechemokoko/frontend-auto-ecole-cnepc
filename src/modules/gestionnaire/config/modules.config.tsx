@@ -12,6 +12,9 @@ import {
   Description,
   Settings,
   PersonAdd,
+  FolderOpen,
+  Search,
+  FilterList,
 } from '@mui/icons-material';
 import { ROUTES } from '../../../shared/constants';
 import { ModuleCardProps } from '../types';
@@ -113,6 +116,28 @@ export const getModulesConfig = (
       onClick: () => navigate(ROUTES.TYPE_DEMANDES),
     },
     avatarColor: 'info',
+  },
+  {
+    title: 'Gestion de Dossier',
+    description:
+      'Gérez tous les dossiers des candidats, consultez leur statut, effectuez des recherches avancées et suivez l\'avancement des dossiers dans le système.',
+    icon: <FolderOpen />,
+    badge: {
+      label: 'Module Disponible',
+      color: 'primary',
+    },
+    chips: [
+      { icon: <Assignment />, label: 'Dossiers' },
+      { icon: <Search />, label: 'Recherche' },
+      { icon: <FilterList />, label: 'Filtres' },
+      { icon: <TrendingUp />, label: 'Suivi' },
+    ],
+    primaryAction: {
+      label: 'Accéder au Module',
+      icon: <FolderOpen />,
+      onClick: () => navigate(ROUTES.GESTION_DOSSIER),
+    },
+    avatarColor: 'primary',
   },
   {
     title: 'Pièces Justificatives et Referentiels',

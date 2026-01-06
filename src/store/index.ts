@@ -3,6 +3,7 @@ import React, { createContext, useContext, useReducer, ReactNode, useEffect } fr
 import { User } from '../modules/auth/types';
 import tokenService from '../modules/auth/services/tokenService';
 import { authService } from '../modules/auth/services/authService';
+import { logger } from '../shared/utils/logger';
 
 // Interface pour l'état d'authentification
 interface AuthState {
@@ -94,46 +95,46 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         userData = localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data')!) : null;
       }
       
-      console.log('🔄 Restauration de l\'authentification...');
-      console.log('  • Token trouvé:', !!token);
-      console.log('  • User data trouvé:', !!userData);
-      console.log('  • Token clé utilisée:', token ? (localStorage.getItem('access_token') ? 'access_token' : 'auth_token') : 'aucune');
+      logger.log('🔄 Restauration de l\'authentification...');
+      logger.log('  • Token trouvé:', !!token);
+      logger.log('  • User data trouvé:', !!userData);
+      logger.log('  • Token clé utilisée:', token ? (localStorage.getItem('access_token') ? 'access_token' : 'auth_token') : 'aucune');
       
       if (token && userData) {
         try {
           // Vérifier si c'est un token mock (commence par "mock-jwt-token")
           if (token.startsWith('mock-jwt-token')) {
-            console.log('✅ Token mock détecté, restauration de l\'auth');
+            logger.log('✅ Token mock détecté, restauration de l\'auth');
             dispatch({ type: 'RESTORE_AUTH', payload: { user: userData, token } });
           } else {
             // Vérifier si le token est valide
             const isValid = tokenService.isTokenValid();
             if (isValid) {
-              console.log('✅ Token JWT valide, restauration de l\'auth');
+              logger.log('✅ Token JWT valide, restauration de l\'auth');
               dispatch({ type: 'RESTORE_AUTH', payload: { user: userData, token } });
             } else {
               // Token expiré ou invalide, mais on restaure quand même la session
               // Les intercepteurs axios géreront le refresh automatiquement si nécessaire
-              console.log('⚠️ Token expiré ou invalide, restauration de la session quand même');
-              console.log('ℹ️ Les intercepteurs axios géreront le refresh automatiquement');
+              logger.warn('⚠️ Token expiré ou invalide, restauration de la session quand même');
+              logger.log('ℹ️ Les intercepteurs axios géreront le refresh automatiquement');
               dispatch({ type: 'RESTORE_AUTH', payload: { user: userData, token } });
             }
           }
         } catch (error) {
-          console.error('❌ Erreur lors de la restauration de l\'authentification:', error);
+          logger.error('❌ Erreur lors de la restauration de l\'authentification:', error);
+          logger.warn('⚠️ Tentative de restauration malgré l\'erreur...');
           // En cas d'erreur, essayer quand même de restaurer si le token et l'utilisateur existent
-          console.log('⚠️ Tentative de restauration malgré l\'erreur...');
           try {
             dispatch({ type: 'RESTORE_AUTH', payload: { user: userData, token } });
           } catch (restoreError) {
-            console.error('❌ Échec de la restauration, nettoyage');
+            logger.error('❌ Échec de la restauration, nettoyage');
             tokenService.clearAll();
             localStorage.removeItem('user_data');
             dispatch({ type: 'SET_LOADING', payload: false });
           }
         }
       } else {
-        console.log('❌ Pas de token ou de données utilisateur, nettoyage');
+        logger.log('❌ Pas de token ou de données utilisateur, nettoyage');
         // Pas de token ou de données utilisateur, nettoyer
         tokenService.clearAll();
         localStorage.removeItem('user_data');

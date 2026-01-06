@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import axiosClient from '../../../shared/environment/envdev';
+import { baseURL } from '../../../shared/environment/envdev';
+import { logger } from '../../../shared/utils/logger';
+
+// Utiliser la configuration d'environnement existante
+const API_BASE_URL = baseURL.replace(/\/$/, ''); // Retirer le slash final si présent
 
 type SubscriptionStatus = {
   subscribed: boolean;
@@ -16,12 +20,10 @@ const getStoredToken = () => {
                 localStorage.getItem('token') ||
                 sessionStorage.getItem('access_token');
 
-  // Log pour déboguer
+  // Log uniquement en développement
   if (!token) {
-    // eslint-disable-next-line no-console
-    console.warn('⚠️ Aucun token trouvé dans le localStorage');
-    // eslint-disable-next-line no-console
-    console.log('Clés disponibles:', Object.keys(localStorage));
+    logger.warn('⚠️ Aucun token trouvé dans le localStorage');
+    logger.log('Clés disponibles:', Object.keys(localStorage));
   }
 
   return token;
@@ -62,22 +64,44 @@ export const usePushNotifications = () => {
     try {
       await navigator.serviceWorker.register('/sw.js');
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Erreur enregistrement Service Worker:', error);
+      logger.error('Erreur enregistrement Service Worker:', error);
     }
   }, []);
 
   const fetchVapidKey = useCallback(async () => {
     try {
-      const response = await axiosClient.get('/push/vapid-public-key');
-      const key = response.data.public_key as string | undefined;
+      const response = await fetch(`${API_BASE_URL}/push/vapid-public-key`, {
+        headers: {
+          Accept: 'application/json',
+          // Note: Le header 'ngrok-skip-browser-warning' a été retiré car il n'est pas autorisé
+          // par le backend dans Access-Control-Allow-Headers
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Impossible de récupérer la clé VAPID');
+      }
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        const payload = await response.text();
+        throw new Error(`Réponse inattendue (content-type ${contentType ?? 'inconnu'}): ${payload}`);
+      }
+      const data = await response.json();
+      const key = data.public_key as string | undefined;
       if (key) {
         setVapidPublicKey(key);
         return key;
       }
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Erreur récupération clé VAPID:', error);
+    } catch (error: any) {
+      // Détecter les erreurs CORS spécifiquement
+      const isCorsError = error?.message?.includes('CORS') || 
+                         error?.message?.includes('Failed to fetch') ||
+                         error?.name === 'TypeError';
+      
+      if (isCorsError) {
+        logger.warn('⚠️ Erreur CORS lors de la récupération de la clé VAPID. Vérifiez la configuration CORS du serveur.');
+      } else {
+        logger.error('Erreur récupération clé VAPID:', error);
+      }
     }
 
     return null;
@@ -143,10 +167,8 @@ export const usePushNotifications = () => {
 
       const token = getStoredToken();
       if (!token) {
-        // eslint-disable-next-line no-console
-        console.error('❌ Token manquant pour la souscription push');
-        // eslint-disable-next-line no-console
-        console.log('Vérification localStorage:', {
+        logger.error('❌ Token manquant pour la souscription push');
+        logger.log('Vérification localStorage:', {
           access_token: localStorage.getItem('access_token'),
           token: localStorage.getItem('token'),
           auth_token: localStorage.getItem('auth_token'),
@@ -156,34 +178,51 @@ export const usePushNotifications = () => {
 
       // Vérifier si le token est valide
       if (!isTokenValid(token)) {
-        // eslint-disable-next-line no-console
-        console.warn('⚠️ Token invalide ou expiré');
+        logger.warn('⚠️ Token invalide ou expiré');
         throw new Error('Token invalide ou expiré. Veuillez vous reconnecter.');
       }
 
-      // eslint-disable-next-line no-console
-      console.log('🔐 Token récupéré pour push subscription:', token.substring(0, 20) + '...');
+      logger.log('🔐 Token récupéré pour push subscription:', token.substring(0, 20) + '...');
 
-      const response = await axiosClient.post('/push/subscribe', {
-        endpoint: pushSubscription.endpoint,
-        keys: {
-          p256dh: arrayBufferToBase64(pushSubscription.getKey('p256dh')),
-          auth: arrayBufferToBase64(pushSubscription.getKey('auth')),
+      const response = await fetch(`${API_BASE_URL}/push/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          // Note: Le header 'ngrok-skip-browser-warning' a été retiré car il n'est pas autorisé
+          // par le backend dans Access-Control-Allow-Headers
         },
-        contentEncoding: 'aesgcm',
+        body: JSON.stringify({
+          endpoint: pushSubscription.endpoint,
+          keys: {
+            p256dh: arrayBufferToBase64(pushSubscription.getKey('p256dh')),
+            auth: arrayBufferToBase64(pushSubscription.getKey('auth')),
+          },
+          contentEncoding: 'aesgcm',
+        }),
       });
 
-      if (!response.data.success) {
-        throw new Error(response.data.message || "Erreur lors de l'enregistrement");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        logger.error('❌ Erreur souscription push:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
+        
+        if (response.status === 401) {
+          logger.error('🔐 Erreur d\'authentification - Token peut-être invalide ou expiré');
+          logger.log('Token utilisé:', token ? `${token.substring(0, 30)}...` : 'null');
+        }
+        
+        throw new Error(errorData.message || "Erreur lors de l'enregistrement");
       }
 
-      // eslint-disable-next-line no-console
-      console.log('✅ Souscription push enregistrée avec succès:', response.data);
       setSubscription(pushSubscription);
       return pushSubscription;
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Erreur souscription:', error);
+      logger.error('Erreur souscription:', error);
       throw error;
     }
   }, [isSupported, permission, vapidPublicKey, requestPermission, fetchVapidKey]);
@@ -194,12 +233,22 @@ export const usePushNotifications = () => {
         await subscription.unsubscribe();
       }
 
-      await axiosClient.post('/push/unsubscribe');
+      const token = getStoredToken();
+      if (token) {
+        await fetch(`${API_BASE_URL}/push/unsubscribe`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+            // Note: Le header 'ngrok-skip-browser-warning' a été retiré car il n'est pas autorisé
+            // par le backend dans Access-Control-Allow-Headers
+          },
+        });
+      }
 
       setSubscription(null);
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Erreur désinscription:', error);
+      logger.error('Erreur désinscription:', error);
       throw error;
     }
   }, [subscription]);
@@ -211,11 +260,20 @@ export const usePushNotifications = () => {
     }
 
     try {
-      const response = await axiosClient.get('/push/status');
-      return response.data;
+      const response = await fetch(`${API_BASE_URL}/push/status`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          // Note: Le header 'ngrok-skip-browser-warning' a été retiré car il n'est pas autorisé
+          // par le backend dans Access-Control-Allow-Headers
+        },
+      });
+
+      if (response.ok) {
+        return response.json();
+      }
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Erreur vérification statut:', error);
+      logger.error('Erreur vérification statut:', error);
     }
 
     return { subscribed: false, count: 0 };

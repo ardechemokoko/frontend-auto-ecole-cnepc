@@ -7,6 +7,7 @@ import { EyeIcon } from '@heroicons/react/24/outline';
 import { ROUTES } from '../../../shared/constants';
 import { Description } from '@mui/icons-material';
 import axiosClient from '../../../shared/environment/envdev';
+import { logger } from '../../../shared/utils/logger';
 
 interface ReceptionDossiersTableProps {
   dossiers: ReceptionDossier[];
@@ -65,7 +66,7 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
       const dossiersSansStatut = dossiers.filter(d => !newMap.has(d.id));
       
       if (dossiersSansStatut.length > 0) {
-        console.log(`📋 Chargement des statuts d'épreuves pour ${dossiersSansStatut.length} dossier(s)...`);
+        logger.log(`📋 Chargement des statuts d'épreuves pour ${dossiersSansStatut.length} dossier(s)...`);
         
         await Promise.all(
           dossiersSansStatut.map(async (dossier) => {
@@ -128,13 +129,13 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
               const generalStatus = computeGeneral(creneauxStatus, codeStatus, villeStatus);
               
               newMap.set(dossier.id, generalStatus);
-              console.log(`✅ Statut calculé pour dossier ${dossier.id}: ${generalStatus}`);
+              logger.log(`✅ Statut calculé pour dossier ${dossier.id}: ${generalStatus}`);
             } catch (err: any) {
               // En cas d'erreur (404 = pas de résultats), mettre 'non_saisi'
               if (err?.response?.status === 404) {
                 newMap.set(dossier.id, 'non_saisi');
               } else {
-                console.error(`❌ Erreur lors du chargement des résultats pour dossier ${dossier.id}:`, err);
+                logger.error(`❌ Erreur lors du chargement des résultats pour dossier ${dossier.id}:`, err);
                 newMap.set(dossier.id, 'non_saisi');
               }
             }
@@ -151,9 +152,9 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
   React.useEffect(() => {
     try {
       // Log compact de la liste
-      console.log('📦 ReceptionDossiersTable - dossiers (count):', dossiers?.length || 0);
+      logger.log('📦 ReceptionDossiersTable - dossiers (count):', dossiers?.length || 0);
       // Log détaillé des champs affichés + date examen + statut
-      console.table(
+      logger.table(
         (dossiers || []).map(d => ({
           id: d.id,
           reference: d.reference,
@@ -168,9 +169,9 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
       // Log de la réponse brute si disponible
       (dossiers || []).forEach(d => {
         if (d.details) {
-          console.log('🔎 programme_session (raw) for', d.id, d.details);
+          logger.log('🔎 programme_session (raw) for', d.id, d.details);
           if ((d as any).details?.dossier_complet) {
-            console.log('🧾 dossier_complet for', d.reference, (d as any).details.dossier_complet);
+            logger.log('🧾 dossier_complet for', d.reference, (d as any).details.dossier_complet);
           }
         }
       });
@@ -204,7 +205,7 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
 
   const handleSaved = (results: any) => {
     try {
-      console.log('✅ Epreuves enregistrées pour', selected?.reference, results);
+      logger.log('✅ Epreuves enregistrées pour', selected?.reference, results);
       // Mettre à jour le statut des épreuves dans le map
       if (selected && results?.general) {
         setEpreuvesMap(prev => {

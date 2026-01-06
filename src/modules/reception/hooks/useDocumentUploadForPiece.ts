@@ -44,18 +44,22 @@ export const useDocumentUploadForPiece = (
         return;
       }
 
+      // Selon LIAISON_PIECE_DOCUMENT.md, piece.type_document = PieceJustificative.id
+      // L'API n'accepte que piece_justification_id (pas type_document_id ni etape_id)
+      const pieceJustificationId = piece.type_document;
+
       const cleanFileName = file.name.trim();
       const formData = new FormData();
       formData.append('documentable_id', dossierId);
       formData.append('documentable_type', 'App\\Models\\Dossier');
-      formData.append('piece_justification_id', piece.type_document);
+      formData.append('piece_justification_id', pieceJustificationId);
       formData.append('valide', '0');
       formData.append('commentaires', '');
       formData.append('fichier', file, cleanFileName);
 
       console.log('📤 Upload document pour pièce justificative:', {
         dossierId,
-        pieceJustificationId: piece.type_document,
+        pieceJustificationId,
         pieceLibelle: piece.libelle,
         fileName: cleanFileName
       });
