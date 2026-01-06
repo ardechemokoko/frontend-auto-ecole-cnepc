@@ -160,8 +160,47 @@ const CircuitDetailPage: React.FC = () => {
 
   // === Ajouter une étape ===
   const handleAddEtape = async () => {
+    if (!id) {
+      setErrorForm('Identifiant de circuit manquant')
+      return
+    }
+    
+    // Validation des champs requis
+    if (!formEtape.code || !formEtape.libelle) {
+      setErrorForm('Le code et le libellé sont requis')
+      return
+    }
+    
+    if (!formEtape.statut_id) {
+      setErrorForm('Le statut est requis')
+      return
+    }
+    
     try {
-      const payload = { ...formEtape, circuit_id: id }
+      setErrorForm(null)
+      // Préparer le payload selon les paramètres de l'API
+      // Filtrer les pièces pour ne garder que celles avec un type_document valide
+      const piecesValides = (formEtape.pieces || [])
+        .filter(piece => piece.type_document && piece.type_document.trim() !== '')
+        .map(piece => ({
+          type_document: piece.type_document!,
+          libelle: piece.libelle || '',
+          obligatoire: piece.obligatoire || false
+        }))
+      
+      const payload = {
+        circuit_id: id,
+        code: formEtape.code.trim(),
+        libelle: formEtape.libelle.trim(),
+        ordre: formEtape.ordre || 0,
+        auto_advance: formEtape.auto_advance || false,
+        statut_id: formEtape.statut_id,
+        roles: (formEtape.roles || []).filter((role): role is string => Boolean(role)),
+        pieces: piecesValides
+      }
+      
+      console.log('📤 Payload de création d\'étape:', payload)
+      
       await etapeService.create(payload)
       setFormEtape({
         code: '',
@@ -175,7 +214,43 @@ const CircuitDetailPage: React.FC = () => {
       setOpenAddEtape(false)
       await fetchData()
     } catch (err: any) {
-      setErrorForm(err.message ?? 'Erreur lors de l’ajout de l’étape')
+      console.error('❌ Erreur lors de l\'ajout de l\'étape:', err)
+      console.error('📋 Réponse complète:', err.response?.data)
+      
+      let errorMessage = 'Erreur lors de l\'ajout de l\'étape'
+      
+      if (err.response?.status === 422) {
+        // Erreur de validation - afficher les détails
+        console.error('🚫 Erreur 422 - Validation échouée')
+        
+        if (err.response.data?.errors) {
+          // Si c'est un objet d'erreurs de validation Laravel
+          const errors = Object.entries(err.response.data.errors)
+            .map(([field, messages]: [string, any]) => {
+              const fieldName = field.replace(/_/g, ' ')
+              const messagesList = Array.isArray(messages) ? messages : [messages]
+              return `${fieldName}: ${messagesList.join(', ')}`
+            })
+            .join('\n')
+          errorMessage = `Erreurs de validation:\n${errors}`
+        } else if (err.response.data?.message) {
+          errorMessage = err.response.data.message
+        } else {
+          errorMessage = 'Erreur de validation. Le code de l\'étape est peut-être déjà utilisé dans un autre circuit.'
+        }
+      } else if (err.response?.data) {
+        if (err.response.data.message) {
+          errorMessage = err.response.data.message
+        } else if (err.response.data.error) {
+          errorMessage = err.response.data.error
+        } else if (typeof err.response.data === 'string') {
+          errorMessage = err.response.data
+        }
+      } else if (err.message) {
+        errorMessage = err.message
+      }
+      
+      setErrorForm(errorMessage)
     }
   }
 
@@ -268,10 +343,41 @@ const CircuitDetailPage: React.FC = () => {
       await fetchData()
     } catch (err: any) {
       console.error('❌ Erreur lors de la modification de l\'étape:', err)
-      const errorMessage = err.response?.data?.message 
-        || err.response?.data?.error 
-        || err.message 
-        || 'Erreur lors de la modification de l\'étape'
+      console.error('📋 Réponse complète:', err.response?.data)
+      
+      let errorMessage = 'Erreur lors de la modification de l\'étape'
+      
+      if (err.response?.status === 422) {
+        // Erreur de validation - afficher les détails
+        console.error('🚫 Erreur 422 - Validation échouée')
+        
+        if (err.response.data?.errors) {
+          // Si c'est un objet d'erreurs de validation Laravel
+          const errors = Object.entries(err.response.data.errors)
+            .map(([field, messages]: [string, any]) => {
+              const fieldName = field.replace(/_/g, ' ')
+              const messagesList = Array.isArray(messages) ? messages : [messages]
+              return `${fieldName}: ${messagesList.join(', ')}`
+            })
+            .join('\n')
+          errorMessage = `Erreurs de validation:\n${errors}`
+        } else if (err.response.data?.message) {
+          errorMessage = err.response.data.message
+        } else {
+          errorMessage = 'Erreur de validation. Le code de l\'étape est peut-être déjà utilisé dans un autre circuit.'
+        }
+      } else if (err.response?.data) {
+        if (err.response.data.message) {
+          errorMessage = err.response.data.message
+        } else if (err.response.data.error) {
+          errorMessage = err.response.data.error
+        } else if (typeof err.response.data === 'string') {
+          errorMessage = err.response.data
+        }
+      } else if (err.message) {
+        errorMessage = err.message
+      }
+      
       setErrorForm(errorMessage)
     }
   }
