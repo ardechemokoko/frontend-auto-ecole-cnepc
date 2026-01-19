@@ -19,8 +19,50 @@ const PushNotificationContext = createContext<PushNotificationContextValue | und
 
 export const PushNotificationProvider = ({ children }: { children: ReactNode }) => {
   const pushNotifications = usePushNotifications();
-  const { isSupported, loading, checkSubscriptionStatus, subscribe, unsubscribe } = pushNotifications;
+  const { isSupported, loading, checkSubscriptionStatus, subscribe, unsubscribe, permission, subscription } = pushNotifications;
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
+
+  // Vérifier la souscription locale (côté navigateur) et serveur
+  const checkLocalAndServerSubscription = useCallback(async () => {
+    if (!isSupported) {
+      setIsCheckingStatus(false);
+      return;
+    }
+
+    let mounted = true;
+    let hasLocalSubscription = false;
+
+    try {
+      // Vérifier d'abord la souscription locale (côté navigateur)
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        const registration = await navigator.serviceWorker.ready;
+        const localSubscription = await registration.pushManager.getSubscription();
+        hasLocalSubscription = localSubscription !== null;
+      }
+
+      // Vérifier aussi le statut serveur
+      const serverStatus = await checkSubscriptionStatus();
+      const hasServerSubscription = Boolean(serverStatus.subscribed);
+
+      if (mounted) {
+        // L'utilisateur est considéré comme souscrit s'il a une souscription locale OU serveur
+        // et que la permission est accordée
+        const subscribed = (hasLocalSubscription || hasServerSubscription) && permission === 'granted';
+        setIsSubscribed(subscribed);
+        setIsCheckingStatus(false);
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Erreur vérification souscription:', error);
+      if (mounted) {
+        // En cas d'erreur, on considère que l'utilisateur est souscrit s'il a une permission accordée
+        // et une souscription locale
+        setIsSubscribed(hasLocalSubscription && permission === 'granted');
+        setIsCheckingStatus(false);
+      }
+    }
+  }, [isSupported, checkSubscriptionStatus, permission]);
 
   useEffect(() => {
     if (!isSupported || loading) {
@@ -28,34 +70,35 @@ export const PushNotificationProvider = ({ children }: { children: ReactNode }) 
     }
 
     let mounted = true;
+    setIsCheckingStatus(true);
 
-    checkSubscriptionStatus().then((status) => {
-      if (mounted) {
-        const subscribed = Boolean(status.subscribed);
-        setIsSubscribed(subscribed);
-      }
-    });
+    checkLocalAndServerSubscription();
 
     return () => {
       mounted = false;
     };
-  }, [isSupported, loading, checkSubscriptionStatus]);
+  }, [isSupported, loading, checkLocalAndServerSubscription]);
+
+  // Mettre à jour isSubscribed immédiatement si subscription existe et permission est accordée
+  useEffect(() => {
+    if (subscription && permission === 'granted') {
+      setIsSubscribed(true);
+      setIsCheckingStatus(false);
+    }
+  }, [subscription, permission]);
 
   const enableNotifications = useCallback(async () => {
     try {
       await subscribe();
-      // Vérifier le statut après souscription pour confirmer
-      const status = await checkSubscriptionStatus();
-      const subscribed = Boolean(status.subscribed);
-      setIsSubscribed(subscribed);
-      
+      // Vérifier à nouveau le statut local et serveur après souscription
+      await checkLocalAndServerSubscription();
       return true;
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Erreur activation notifications:', error);
       return false;
     }
-  }, [subscribe, checkSubscriptionStatus]);
+  }, [subscribe, checkLocalAndServerSubscription]);
 
   const disableNotifications = useCallback(async () => {
     try {
@@ -69,14 +112,18 @@ export const PushNotificationProvider = ({ children }: { children: ReactNode }) 
     }
   }, [unsubscribe]);
 
+  // Le loading est true si le hook est en train de charger OU si on vérifie le statut
+  const effectiveLoading = loading || isCheckingStatus;
+
   const value = useMemo(
     () => ({
       ...pushNotifications,
+      loading: effectiveLoading,
       isSubscribed,
       enableNotifications,
       disableNotifications,
     }),
-    [pushNotifications, isSubscribed, enableNotifications, disableNotifications],
+    [pushNotifications, effectiveLoading, isSubscribed, enableNotifications, disableNotifications],
   );
 
   return <PushNotificationContext.Provider value={value}>{children}</PushNotificationContext.Provider>;
