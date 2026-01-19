@@ -11,30 +11,57 @@ export const PushNotificationPrompt = ({ onEnabled, onDismissed }: PushNotificat
     usePushNotificationContext();
 
   const [showPrompt, setShowPrompt] = useState(false);
+  // État local pour mémoriser que l'utilisateur a activé les notifications (sans localStorage)
+  // Initialiser directement avec isSubscribed pour éviter l'affichage au refresh
+  const [hasBeenActivated, setHasBeenActivated] = useState(() => {
+    // Initialiser avec la valeur de isSubscribed si disponible
+    // Note: isSubscribed peut ne pas être encore disponible au montage, donc on le met à jour dans useEffect
+    return false;
+  });
+
+  // Synchroniser hasBeenActivated avec isSubscribed à chaque changement
+  // Cela garantit que si l'utilisateur est déjà souscrit au refresh, le prompt ne s'affichera pas
+  useEffect(() => {
+    if (isSubscribed) {
+      setHasBeenActivated(true);
+      setShowPrompt(false);
+    }
+  }, [isSubscribed]);
 
   useEffect(() => {
     // Ne jamais afficher le prompt si :
     // - Les notifications ne sont pas supportées
-    // - Le chargement est en cours (vérification du statut)
+    // - Le chargement est en cours (vérification du statut) - IMPORTANT pour éviter l'affichage au refresh
     // - L'utilisateur est déjà souscrit
-    if (!isSupported || loading || isSubscribed) {
+    // - L'utilisateur a déjà activé les notifications avec succès
+    if (!isSupported || loading || isSubscribed || hasBeenActivated) {
       setShowPrompt(false);
       return;
     }
 
     // Afficher le prompt uniquement si :
     // - L'utilisateur n'est pas encore souscrit
-    // - Le chargement est terminé
-    // Attendre que le statut soit bien vérifié
+    // - Le chargement est terminé (loading === false)
+    // - L'utilisateur n'a pas déjà activé les notifications
+    // - Les notifications sont supportées
+    // Attendre que le statut soit bien vérifié (loading doit être false)
+    // ET que isSubscribed soit définitivement false
     const timer = setTimeout(() => {
       // Vérifier une dernière fois avant d'afficher
-      if (!isSubscribed && !loading && isSupported) {
+      // IMPORTANT: Ne pas afficher si loading est encore true ou si isSubscribed est true
+      // Cette vérification garantit que même si isSubscribed est mis à jour après le délai,
+      // le prompt ne s'affichera pas
+      if (!isSubscribed && !loading && isSupported && !hasBeenActivated) {
+        // Double vérification pour s'assurer que isSubscribed n'est toujours pas true
         setShowPrompt(true);
+      } else {
+        // Si isSubscribed est devenu true pendant le délai, ne pas afficher
+        setShowPrompt(false);
       }
-    }, 1500); // Augmenter le délai pour laisser le temps à la vérification du statut
+    }, 1500); // Délai pour laisser le temps à la vérification du statut
     
     return () => clearTimeout(timer);
-  }, [isSupported, permission, loading, isSubscribed]);
+  }, [isSupported, permission, loading, isSubscribed, hasBeenActivated]);
 
   const handleEnable = async () => {
     // Masquer immédiatement le prompt pour une meilleure UX
@@ -43,14 +70,18 @@ export const PushNotificationPrompt = ({ onEnabled, onDismissed }: PushNotificat
     try {
       const enabled = await enableNotifications();
       if (enabled) {
+        // Marquer comme activé pour ne plus afficher le prompt
+        setHasBeenActivated(true);
         onEnabled?.();
       }
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Erreur activation notifications:', error);
       window.alert(`Erreur: ${(error as Error).message}`);
-      // En cas d'erreur, on peut réafficher le prompt
-      setShowPrompt(true);
+      // En cas d'erreur, on peut réafficher le prompt seulement si ce n'était pas une activation réussie
+      if (!hasBeenActivated) {
+        setShowPrompt(true);
+      }
     }
   };
 
