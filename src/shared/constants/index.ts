@@ -14,6 +14,8 @@ export const ROUTES = {
   AUTO_ECOLES: '/auto-ecoles',
   TYPE_DEMANDES: '/type-demandes',
   GESTION_DOSSIER: '/gestion-dossier',
+  CREATE_DOSSIER: '/gestion-dossier/create/:step',
+  USAGER_DOSSIER: '/cnepc/dossiers/:id',
   PIECES_JUSTIFICATIVES: '/pieces-justificatives',
   CANDIDAT_DETAILS: '/candidat/:id',
   SETTINGS: '/settings',
@@ -33,6 +35,7 @@ export const ROUTES = {
   CANDIDATS_EXAMEN_CANDIDATS: '/candidats-examen/candidats',
   CANDIDATS_EXAMEN_SESSIONS: '/candidats-examen/sessions',
   CANDIDATS_EXAMEN_PLANIFICATION: '/candidats-examen/planification',
+  CANDIDATS_EXAMEN_EPREUVES: '/candidats-examen/epreuves/:id',
   CANDIDATS_EXAMEN_DEMO: '/candidats-examen/demo',
   
   // SETTINGS: '/settings',

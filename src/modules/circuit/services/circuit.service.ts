@@ -41,20 +41,30 @@ export class CircuitService {
     // PUT /api/circuits/{id}
     async update(id: string, payload: Partial<Circuit>): Promise<Circuit> {
         try {
+            console.log(`📤 PUT ${this.url}/${id}`, payload)
             const res = await this.axios.put<Circuit>(`${this.url}/${id}`, payload)
+            console.log(`✅ Réponse PUT:`, res.data)
             return res.data
         } catch (error) {
-            throw new Error(`Erreur de connexion (PUT id=${id}): ${this.humanize(error)}`)
+            console.error(`❌ Erreur PUT ${this.url}/${id}:`, error)
+            const errorMessage = this.humanize(error)
+            console.error(`❌ Message d'erreur:`, errorMessage)
+            throw new Error(`Erreur de connexion (PUT id=${id}): ${errorMessage}`)
         }
     }
 
     // PATCH /api/circuits/{id}
     async patch(id: string, payload: Partial<Circuit>): Promise<Circuit> {
         try {
+            console.log(`📤 PATCH ${this.url}/${id}`, payload)
             const res = await this.axios.patch<Circuit>(`${this.url}/${id}`, payload)
+            console.log(`✅ Réponse PATCH:`, res.data)
             return res.data
         } catch (error) {
-            throw new Error(`Erreur de connexion (PATCH id=${id}): ${this.humanize(error)}`)
+            console.error(`❌ Erreur PATCH ${this.url}/${id}:`, error)
+            const errorMessage = this.humanize(error)
+            console.error(`❌ Message d'erreur:`, errorMessage)
+            throw new Error(`Erreur de connexion (PATCH id=${id}): ${errorMessage}`)
         }
     }
 

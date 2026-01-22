@@ -19,7 +19,10 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  IconButton
+  IconButton,
+  Tabs,
+  Tab,
+  Paper
 } from '@mui/material';
 import { Search, Refresh, Close } from '@mui/icons-material';
 import axiosClient from '../../../shared/environment/envdev';
@@ -36,8 +39,8 @@ const ReceptionDossiersPage: React.FC = () => {
   const [dossiers, setDossiers] = React.useState<ReceptionDossier[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState<string>('');
-  const [selectedCircuitId, setSelectedCircuitId] = React.useState<string>('');
   const [circuits, setCircuits] = React.useState<CircuitSuivi[]>([]);
+  const [selectedTypeDemandeTab, setSelectedTypeDemandeTab] = React.useState<string>('');
   const [circuitCache, setCircuitCache] = React.useState<Map<string, CircuitSuivi>>(new Map());
   const [typeDemandeCache, setTypeDemandeCache] = React.useState<Map<string, TypeDemande>>(new Map());
   // Utiliser useRef pour éviter la dépendance circulaire
@@ -49,37 +52,32 @@ const ReceptionDossiersPage: React.FC = () => {
   const [loadingCircuit, setLoadingCircuit] = React.useState(false);
   const [documentsDialogOpen, setDocumentsDialogOpen] = React.useState(false);
 
-  // Charger les circuits
+  // État pour suivre quels circuits ont leurs étapes chargées
+  const [circuitsWithEtapesLoaded, setCircuitsWithEtapesLoaded] = React.useState<Set<string>>(new Set());
+  
+  // Refs pour éviter les dépendances circulaires
+  const circuitsRef = React.useRef<CircuitSuivi[]>([]);
+  const circuitCacheRef = React.useRef<Map<string, CircuitSuivi>>(new Map());
+  const hasLoadedCircuitsRef = React.useRef(false);
+  const hasLoadedDossiersRef = React.useRef(false);
+
+  // Charger uniquement les circuits de base (sans étapes) au début
   const loadCircuits = React.useCallback(async () => {
+    if (hasLoadedCircuitsRef.current) {
+      return; // Déjà chargé
+    }
+    
     try {
-      console.log('📋 Chargement des circuits actifs...');
+      console.log('📋 Chargement des circuits actifs (sans étapes)...');
       const circuitsData = await circuitSuiviService.getCircuitsActifs();
       
-      // Charger les étapes pour chaque circuit si elles ne sont pas déjà présentes
-      const circuitsAvecEtapes = await Promise.all(
-        circuitsData.map(async (circuit) => {
-          // Si le circuit n'a pas d'étapes mais a un ID, les charger
-          if (circuit.id && (!circuit.etapes || circuit.etapes.length === 0)) {
-            try {
-              console.log(`📋 Chargement des étapes pour le circuit ${circuit.id}...`);
-              const etapes = await circuitSuiviService.getEtapesByCircuitId(circuit.id);
-              if (etapes.length > 0) {
-                circuit.etapes = etapes;
-                console.log(`✅ ${etapes.length} étapes chargées pour le circuit ${circuit.libelle}`);
-              }
-            } catch (err: any) {
-              console.warn(`⚠️ Impossible de charger les étapes pour le circuit ${circuit.id}:`, err.message);
-            }
-          }
-          return circuit;
-        })
-      );
+      // Ne pas charger les étapes ici - elles seront chargées à la demande
+      setCircuits(circuitsData);
+      circuitsRef.current = circuitsData;
       
-      setCircuits(circuitsAvecEtapes);
-      
-      // Mettre à jour le cache
+      // Mettre à jour le cache avec les circuits de base
       const newCache = new Map<string, CircuitSuivi>();
-      circuitsAvecEtapes.forEach(circuit => {
+      circuitsData.forEach(circuit => {
         if (circuit.id) {
           newCache.set(circuit.id, circuit);
         }
@@ -89,7 +87,9 @@ const ReceptionDossiersPage: React.FC = () => {
         }
       });
       setCircuitCache(newCache);
-      console.log('✅ Circuits chargés avec leurs étapes:', circuitsAvecEtapes.length);
+      circuitCacheRef.current = newCache;
+      hasLoadedCircuitsRef.current = true;
+      console.log('✅ Circuits de base chargés:', circuitsData.length);
     } catch (err: any) {
       console.error('❌ Erreur lors du chargement des circuits:', err);
       // Ne pas bloquer l'application si les circuits ne se chargent pas
@@ -98,7 +98,55 @@ const ReceptionDossiersPage: React.FC = () => {
     }
   }, []);
 
+  // Charger les étapes d'un circuit uniquement quand nécessaire
+  const loadCircuitEtapes = React.useCallback(async (circuitId: string) => {
+    // Si les étapes sont déjà chargées, ne pas recharger
+    if (circuitsWithEtapesLoaded.has(circuitId)) {
+      return;
+    }
+
+    try {
+      console.log(`📋 Chargement des étapes pour le circuit ${circuitId}...`);
+      const etapes = await circuitSuiviService.getEtapesByCircuitId(circuitId);
+      
+      // Mettre à jour le circuit dans le state et le cache
+      setCircuits(prevCircuits => {
+        return prevCircuits.map(circuit => {
+          if (circuit.id === circuitId) {
+            const updatedCircuit = { ...circuit, etapes };
+            // Mettre à jour le cache
+            setCircuitCache(prevCache => {
+              const newCache = new Map(prevCache);
+              if (circuit.id) {
+                newCache.set(circuit.id, updatedCircuit);
+              }
+              if (circuit.nom_entite) {
+                newCache.set(circuit.nom_entite, updatedCircuit);
+              }
+              return newCache;
+            });
+            return updatedCircuit;
+          }
+          return circuit;
+        });
+      });
+      
+      // Marquer comme chargé
+      setCircuitsWithEtapesLoaded(prev => new Set(prev).add(circuitId));
+      
+      if (etapes.length > 0) {
+        console.log(`✅ ${etapes.length} étapes chargées pour le circuit ${circuitId}`);
+      }
+    } catch (err: any) {
+      console.warn(`⚠️ Impossible de charger les étapes pour le circuit ${circuitId}:`, err.message);
+    }
+  }, [circuitsWithEtapesLoaded]);
+
   const fetchDossiers = React.useCallback(async () => {
+    if (hasLoadedDossiersRef.current) {
+      return; // Déjà chargé
+    }
+    
     setLoading(true);
     setError(null);
     try {
@@ -152,6 +200,10 @@ const ReceptionDossiersPage: React.FC = () => {
       typeDemandeCacheRef.current = newTypeDemandeCache;
       setTypeDemandeCache(newTypeDemandeCache);
       
+      // Utiliser les refs pour éviter les dépendances
+      const currentCircuits = circuitsRef.current;
+      const currentCircuitCache = circuitCacheRef.current;
+      
       // Transformer les dossiers bruts en ReceptionDossier
       // Enrichir avec les informations du circuit basé sur type_demande_id -> type_demande.name -> circuit.nom_entite
       const enrichedDossiers = await Promise.all(
@@ -166,36 +218,37 @@ const ReceptionDossiersPage: React.FC = () => {
             if (typeDemande && typeDemande.name) {
               const nomEntite = typeDemande.name;
               
-              // Chercher le circuit correspondant via nom_entite
-              circuitForDossier = circuits.find(c => c.nom_entite === nomEntite) || null;
+              // Chercher le circuit correspondant via nom_entite (utiliser les refs)
+              circuitForDossier = currentCircuits.find(c => c.nom_entite === nomEntite) || null;
               
               // Si pas trouvé dans les circuits chargés, chercher dans le cache
               if (!circuitForDossier) {
-                circuitForDossier = circuitCache.get(nomEntite) || null;
+                circuitForDossier = currentCircuitCache.get(nomEntite) || null;
               }
               
-              // Si toujours pas trouvé, essayer de le charger
+              // Si toujours pas trouvé, essayer de le charger (sans étapes)
               if (!circuitForDossier) {
                 try {
                   circuitForDossier = await circuitSuiviService.getCircuitByNomEntite(nomEntite);
                   if (circuitForDossier) {
-                    // Charger les étapes si elles ne sont pas présentes
-                    if (circuitForDossier.id && (!circuitForDossier.etapes || circuitForDossier.etapes.length === 0)) {
-                      try {
-                        const etapes = await circuitSuiviService.getEtapesByCircuitId(circuitForDossier.id);
-                        if (etapes.length > 0) {
-                          circuitForDossier.etapes = etapes;
-                          console.log(`✅ ${etapes.length} étapes chargées pour le circuit ${circuitForDossier.libelle}`);
-                        }
-                      } catch (err) {
-                        console.warn(`⚠️ Impossible de charger les étapes pour le circuit ${circuitForDossier.id}:`, err);
-                      }
-                    }
+                    // Ne pas charger les étapes ici - elles seront chargées à la demande
                     if (circuitForDossier.nom_entite) {
+                      circuitCacheRef.current.set(circuitForDossier.nom_entite, circuitForDossier);
                       setCircuitCache(prev => new Map(prev).set(circuitForDossier!.nom_entite, circuitForDossier!));
                     }
                     if (circuitForDossier.id) {
+                      circuitCacheRef.current.set(circuitForDossier.id, circuitForDossier);
                       setCircuitCache(prev => new Map(prev).set(circuitForDossier!.id!, circuitForDossier!));
+                    }
+                    // Ajouter au state circuits si pas déjà présent
+                    if (!currentCircuits.find(c => c.id === circuitForDossier!.id)) {
+                      circuitsRef.current = [...currentCircuits, circuitForDossier];
+                      setCircuits(prev => {
+                        if (!prev.find(c => c.id === circuitForDossier!.id)) {
+                          return [...prev, circuitForDossier!];
+                        }
+                        return prev;
+                      });
                     }
                   }
                 } catch (err) {
@@ -234,6 +287,7 @@ const ReceptionDossiersPage: React.FC = () => {
       
       console.log('✅ Dossiers enrichis:', enrichedDossiers.length);
       setDossiers(enrichedDossiers);
+      hasLoadedDossiersRef.current = true;
     } catch (e: any) {
       console.error('❌ Erreur lors du chargement des dossiers:', e);
       setError(e?.message || 'Erreur lors du chargement');
@@ -241,15 +295,15 @@ const ReceptionDossiersPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [circuits, circuitCache]);
+  }, []); // Plus de dépendances - utilise les refs
 
+  // Charger les circuits une seule fois au montage
   React.useEffect(() => {
-    loadCircuits();
-  }, [loadCircuits]);
-
-  React.useEffect(() => {
-    fetchDossiers();
-  }, [fetchDossiers]);
+    loadCircuits().then(() => {
+      // Charger les dossiers après que les circuits soient chargés
+      fetchDossiers();
+    });
+  }, []); // Tableau de dépendances vide - exécuté une seule fois
 
   const handleReceive = async (id: string) => {
     try {
@@ -335,28 +389,8 @@ const ReceptionDossiersPage: React.FC = () => {
       );
     }
 
-    // Filtre par circuit (via type_demande_id -> type_demande.name -> circuit.nom_entite)
-    if (selectedCircuitId) {
-      const selectedCircuitData = circuits.find(c => c.id === selectedCircuitId);
-      if (selectedCircuitData) {
-        filtered = filtered.filter((dossier) => {
-          const dossierComplet = dossier.details?.dossier_complet || dossier.details?.dossier;
-          const typeDemandeId = dossierComplet?.type_demande_id;
-          
-          if (!typeDemandeId) return false;
-          
-          // Récupérer le type de demande
-          const typeDemande = typeDemandeCache.get(typeDemandeId);
-          if (!typeDemande || !typeDemande.name) return false;
-          
-          // Comparer le name du type de demande avec le nom_entite du circuit
-          return typeDemande.name === selectedCircuitData.nom_entite;
-        });
-      }
-    }
-
     return filtered;
-  }, [dossiers, searchTerm, selectedCircuitId, circuits, typeDemandeCache]);
+  }, [dossiers, searchTerm]);
 
   // Calculer les statistiques
   const statistics = React.useMemo(() => {
@@ -480,6 +514,54 @@ const ReceptionDossiersPage: React.FC = () => {
     return grouped;
   }, [filteredDossiers, circuitCache, circuits, typeDemandeCache]);
 
+  // Initialiser le premier onglet si disponible et charger ses étapes
+  React.useEffect(() => {
+    if (dossiersParCircuit.size > 0 && !selectedTypeDemandeTab) {
+      const firstCircuitKey = Array.from(dossiersParCircuit.keys())[0];
+      setSelectedTypeDemandeTab(firstCircuitKey);
+      
+      // Charger les étapes du premier circuit
+      const firstCircuitData = dossiersParCircuit.get(firstCircuitKey);
+      if (firstCircuitData?.circuit?.id) {
+        loadCircuitEtapes(firstCircuitData.circuit.id);
+      }
+    }
+  }, [dossiersParCircuit, selectedTypeDemandeTab, loadCircuitEtapes]);
+
+  // Gestion du changement d'onglet de type de demande
+  const handleTypeDemandeTabChange = React.useCallback((_event: React.SyntheticEvent, newValue: string) => {
+    setSelectedTypeDemandeTab(newValue);
+    
+    // Charger les étapes du circuit de l'onglet sélectionné
+    const circuitData = dossiersParCircuit.get(newValue);
+    if (circuitData?.circuit?.id) {
+      loadCircuitEtapes(circuitData.circuit.id);
+    }
+  }, [dossiersParCircuit, loadCircuitEtapes]);
+
+  // Obtenir les dossiers du type de demande sélectionné
+  // S'assurer que selectedTypeDemandeTab est valide, sinon utiliser le premier circuit disponible
+  const validSelectedTab = React.useMemo(() => {
+    if (selectedTypeDemandeTab && dossiersParCircuit.has(selectedTypeDemandeTab)) {
+      return selectedTypeDemandeTab;
+    }
+    if (dossiersParCircuit.size > 0) {
+      const firstKey = Array.from(dossiersParCircuit.keys())[0];
+      // Mettre à jour le state si nécessaire (mais pas dans le render, donc on retourne juste la valeur)
+      return firstKey;
+    }
+    return '';
+  }, [selectedTypeDemandeTab, dossiersParCircuit]);
+
+  // Synchroniser validSelectedTab avec selectedTypeDemandeTab si différent
+  React.useEffect(() => {
+    if (validSelectedTab && validSelectedTab !== selectedTypeDemandeTab) {
+      setSelectedTypeDemandeTab(validSelectedTab);
+    }
+  }, [validSelectedTab, selectedTypeDemandeTab]);
+
+  const currentTypeDemandeData = validSelectedTab ? dossiersParCircuit.get(validSelectedTab) : null;
+
   return (
     <Box sx={{ p: 2 }}>
       {/* En-tête */}
@@ -547,48 +629,27 @@ const ReceptionDossiersPage: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Barre de filtrage */}
+      {/* Barre de recherche */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                placeholder="Rechercher par nom, prénom, référence ou auto-école..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search />
-                    </InputAdornment>
-                  ),
-                }}
-                size="small"
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Circuit</InputLabel>
-                <Select
-                  value={selectedCircuitId}
-                  onChange={(e) => setSelectedCircuitId(e.target.value)}
-                  label="Circuit"
-                >
-                  <MenuItem value="">Tous les circuits</MenuItem>
-                  {circuits.map((circuit) => (
-                    <MenuItem key={circuit.id || circuit.libelle} value={circuit.id || circuit.libelle}>
-                      {circuit.libelle} {circuit.nom_entite && `(${circuit.nom_entite})`}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
+          <TextField
+            fullWidth
+            placeholder="Rechercher par nom, prénom, référence ou auto-école..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+            }}
+            size="small"
+          />
         </CardContent>
       </Card>
 
-      {/* Affichage des dossiers groupés par circuit */}
+      {/* Onglets pour chaque type de demande */}
       {loading ? (
         <Stack alignItems="center" sx={{ py: 4 }}>
           <CircularProgress />
@@ -596,38 +657,77 @@ const ReceptionDossiersPage: React.FC = () => {
       ) : (
         <Box>
           {dossiersParCircuit.size > 0 ? (
-            Array.from(dossiersParCircuit.entries()).map(([circuitKey, { circuit, dossiers: dossiersDuCircuit }]) => {
-              // Log pour déboguer
-              console.log(`📦 Passage du circuit à ReceptionDossierTypeTable:`, {
-                circuitKey,
-                circuitId: circuit.id,
-                libelle: circuit.libelle,
-                nom_entite: circuit.nom_entite,
-                etapesCount: circuit.etapes?.length || 0,
-                dossiersCount: dossiersDuCircuit.length
-              });
-              
-              return (
-                <Box key={circuitKey} sx={{ mb: 4 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                    <Typography variant="h6" fontWeight="bold">
-                      {circuit.libelle}
+            <>
+              <Paper sx={{ mb: 3, borderRadius: 0 }}>
+                <Tabs
+                  value={validSelectedTab || false}
+                  onChange={handleTypeDemandeTabChange}
+                  variant="scrollable"
+                  scrollButtons="auto"
+                  sx={{ 
+                    borderBottom: 1, 
+                    borderColor: 'divider',
+                    borderRadius: 0,
+                    '& .MuiTab-root': {
+                      borderRadius: 0
+                    },
+                    '& .MuiTabs-indicator': {
+                      borderRadius: 0
+                    }
+                  }}
+                >
+                  {Array.from(dossiersParCircuit.entries()).map(([circuitKey, { circuit, dossiers: dossiersDuCircuit }]) => (
+                    <Tab
+                      key={circuitKey}
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {circuit.libelle}
+                          </Typography>
+                          <Chip 
+                            label={dossiersDuCircuit.length} 
+                            size="small" 
+                            color="primary" 
+                            variant="outlined"
+                            sx={{ 
+                              height: 20,
+                              fontSize: '0.7rem',
+                              '& .MuiChip-label': {
+                                px: 1
+                              }
+                            }}
+                          />
+                        </Box>
+                      }
+                      value={circuitKey}
+                      sx={{ borderRadius: 0 }}
+                    />
+                  ))}
+                </Tabs>
+              </Paper>
+
+              {/* Affichage des dossiers du type de demande sélectionné */}
+              {currentTypeDemandeData ? (
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                    <Typography variant="h5" fontWeight="bold">
+                      {currentTypeDemandeData.circuit.libelle}
                     </Typography>
-                    {circuit.nom_entite && (
+                    {currentTypeDemandeData.circuit.nom_entite && (
                       <Chip 
-                        label={circuit.nom_entite} 
+                        label={currentTypeDemandeData.circuit.nom_entite} 
                         size="small" 
                         color="secondary" 
                         variant="outlined"
                       />
                     )}
                     <Chip 
-                      label={`${dossiersDuCircuit.length} dossier(s)`} 
+                      label={`${currentTypeDemandeData.dossiers.length} dossier(s)`} 
                       size="small" 
                       color="primary" 
                       variant="outlined"
                     />
-                    {!circuit.actif && (
+                    {!currentTypeDemandeData.circuit.actif && (
                       <Chip 
                         label="Inactif" 
                         size="small" 
@@ -635,27 +735,34 @@ const ReceptionDossiersPage: React.FC = () => {
                         variant="outlined"
                       />
                     )}
-                    {circuit.etapes && circuit.etapes.length > 0 && (
+                    {currentTypeDemandeData.circuit.etapes && currentTypeDemandeData.circuit.etapes.length > 0 && (
                       <Chip 
-                        label={`${circuit.etapes.length} étape(s)`} 
+                        label={`${currentTypeDemandeData.circuit.etapes.length} étape(s)`} 
                         size="small" 
                         color="info" 
                         variant="outlined"
                       />
                     )}
                   </Box>
-                  <Divider sx={{ mb: 2 }} />
                   <ReceptionDossierTypeTable 
-                    dossiers={dossiersDuCircuit} 
-                    typeDemandeName={circuit.nom_entite || circuit.libelle}
-                    typeDemandeId={circuit.id}
-                    circuit={circuit}
+                    dossiers={currentTypeDemandeData.dossiers} 
+                    typeDemandeName={currentTypeDemandeData.circuit.nom_entite || currentTypeDemandeData.circuit.libelle}
+                    typeDemandeId={currentTypeDemandeData.circuit.id}
+                    circuit={currentTypeDemandeData.circuit}
                     onReceive={handleReceive}
                     onOpenDocuments={handleOpenDocumentsDialog}
                   />
                 </Box>
-              );
-            })
+              ) : (
+                <Card>
+                  <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                    <Typography variant="body1" color="text.secondary">
+                      Sélectionnez un type de demande pour afficher les dossiers.
+                    </Typography>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           ) : (
             <Card>
               <CardContent sx={{ textAlign: 'center', py: 4 }}>
@@ -669,11 +776,10 @@ const ReceptionDossiersPage: React.FC = () => {
                     variant="outlined" 
                     onClick={() => {
                       setSearchTerm('');
-                      setSelectedCircuitId('');
                     }}
                     sx={{ mt: 2 }}
                   >
-                    Réinitialiser les filtres
+                    Réinitialiser la recherche
                   </Button>
                 )}
               </CardContent>

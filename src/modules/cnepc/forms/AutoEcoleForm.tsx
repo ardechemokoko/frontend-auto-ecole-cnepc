@@ -98,14 +98,19 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
   // Réinitialiser le formulaire quand l'auto-école change
   useEffect(() => {
     if (autoEcole) {
+      // Récupérer province_id depuis différentes sources possibles
+      const provinceId = (autoEcole as any).province_id || 
+                        (autoEcole as any).province?.id || 
+                        '';
+      
       reset({
-        nom_auto_ecole: autoEcole.nom_auto_ecole,
-        adresse: autoEcole.adresse,
-        email: autoEcole.email,
-        contact: autoEcole.contact,
-        statut: autoEcole.statut,
-        responsable_id: autoEcole.responsable_id,
-        province_id: (autoEcole as any).province_id || '',
+        nom_auto_ecole: autoEcole.nom_auto_ecole || '',
+        adresse: autoEcole.adresse || '',
+        email: autoEcole.email || '',
+        contact: autoEcole.contact || '',
+        statut: autoEcole.statut ?? true,
+        responsable_id: autoEcole.responsable_id || '',
+        province_id: provinceId,
       });
     } else {
       reset({
@@ -146,8 +151,13 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
     }
 
     // ✅ Vérification des permissions (sauf en mode création avec responsable fourni)
-    if (!isCreationWithResponsable && responsableId && responsableId !== user?.id && user?.role !== 'admin') {
-      setError('🚫 Seul un administrateur peut créer une auto-école pour un autre utilisateur.');
+    // Les rôles admin, ROLE_ADMIN et ROLE_CNEPC peuvent créer une auto-école pour un autre utilisateur
+    const canCreateForOthers = user?.role === 'admin' || 
+                                user?.role === 'ROLE_ADMIN' || 
+                                user?.role === 'ROLE_CNEPC';
+    
+    if (!isCreationWithResponsable && responsableId && responsableId !== user?.id && !canCreateForOthers) {
+      setError('🚫 Seul un administrateur ou un membre du CNEPC peut créer une auto-école pour un autre utilisateur.');
       setLoading(false);
       return;
     }
@@ -302,10 +312,14 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
           )}
 
           {/* Vérification des permissions */}
-          {user?.role !== 'ROLE_AUTO_ECOLE' && user?.role !== 'ROLE_ADMIN' && !isCreationWithResponsable && (
+          {user?.role !== 'ROLE_AUTO_ECOLE' && 
+           user?.role !== 'ROLE_ADMIN' && 
+           user?.role !== 'ROLE_CNEPC' &&
+           user?.role !== 'admin' &&
+           !isCreationWithResponsable && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               <Typography variant="body2">
-                <strong>⚠️ Attention :</strong> Seuls les responsables d'auto-école et les administrateurs peuvent créer ou modifier des auto-écoles.
+                <strong>⚠️ Attention :</strong> Seuls les responsables d'auto-école, les administrateurs et les membres du CNEPC peuvent créer ou modifier des auto-écoles.
                 <br />
                 Votre rôle actuel : <strong>{user?.role || 'Non défini'}</strong>
               </Typography>
@@ -398,9 +412,9 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
               <Controller
                 name="province_id"
                 control={control}
-                rules={{ required: 'La province est requise' }}
+                rules={{ required: !autoEcole ? 'La province est requise' : false }}
                 render={({ field }) => (
-                  <FormControl fullWidth error={!!errors.province_id} required>
+                  <FormControl fullWidth error={!!errors.province_id} required={!autoEcole}>
                     <InputLabel id="province-label">Province</InputLabel>
                     <Select
                       {...field}
@@ -481,7 +495,20 @@ const AutoEcoleForm: React.FC<AutoEcoleFormProps> = ({
         <Button
           onClick={handleSubmit(onSubmit)}
           variant="contained"
-          disabled={loading || (!isCreationWithResponsable && user?.role !== 'responsable_auto_ecole' && user?.role !== 'admin')}
+          disabled={
+            loading || 
+            !isValid || 
+            // En mode création, vérifier les permissions
+            (!autoEcole && 
+             !isCreationWithResponsable && 
+             user?.role !== 'ROLE_AUTO_ECOLE' && 
+             user?.role !== 'ROLE_ADMIN' && 
+             user?.role !== 'ROLE_CNEPC' &&
+             user?.role !== 'responsable_auto_ecole' && 
+             user?.role !== 'admin')
+            // En mode modification, permettre la modification si le formulaire est valide
+            // Les rôles admin, ROLE_ADMIN et ROLE_CNEPC peuvent modifier
+          }
           startIcon={loading && <CircularProgress size={20} />}
         >
           {loading ? 'Sauvegarde...' : (autoEcole ? 'Modifier' : 'Créer')}

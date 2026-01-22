@@ -30,8 +30,11 @@ import {
   Email,
   School,
   CalendarToday,
+  Quiz,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { CandidatExamen } from '../types';
+import { ROUTES } from '../../../shared/constants';
 
 interface CandidatExamenTableProps {
   candidats: CandidatExamen[];
@@ -56,6 +59,7 @@ const CandidatExamenTable: React.FC<CandidatExamenTableProps> = ({
   onSelectionChange,
   selectable = false,
 }) => {
+  const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedCandidat, setSelectedCandidat] = useState<CandidatExamen | null>(null);
 
@@ -67,6 +71,13 @@ const CandidatExamenTable: React.FC<CandidatExamenTableProps> = ({
   const handleMenuClose = () => {
     setAnchorEl(null);
     setSelectedCandidat(null);
+  };
+
+  // Naviguer vers la page des épreuves
+  const handleOpenEpreuvePage = (candidat: CandidatExamen) => {
+    // Le candidat.id est l'ID du programme-session
+    navigate(`${ROUTES.CANDIDATS_EXAMEN}/epreuves/${candidat.id}`);
+    handleMenuClose();
   };
 
   const handleSelectAll = (checked: boolean) => {
@@ -259,12 +270,23 @@ const CandidatExamenTable: React.FC<CandidatExamenTableProps> = ({
                   </TableCell>
                   
                   <TableCell align="right">
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handleMenuOpen(e, candidat)}
-                    >
-                      <MoreVert />
-                    </IconButton>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
+                      <Tooltip title="Gérer les épreuves">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenEpreuvePage(candidat)}
+                          color="primary"
+                        >
+                          <Quiz fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleMenuOpen(e, candidat)}
+                      >
+                        <MoreVert />
+                      </IconButton>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))
@@ -291,6 +313,13 @@ const CandidatExamenTable: React.FC<CandidatExamenTableProps> = ({
             <Edit fontSize="small" />
           </ListItemIcon>
           <ListItemText>Modifier</ListItemText>
+        </MenuItem>
+        
+        <MenuItem onClick={() => { handleOpenEpreuvePage(selectedCandidat!); }}>
+          <ListItemIcon>
+            <Quiz fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Gérer les épreuves</ListItemText>
         </MenuItem>
         
         <MenuItem onClick={handleMenuClose}>

@@ -1,27 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Paper,
   Typography,
   Button,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Alert,
   CircularProgress,
   Box,
-  Chip,
-  Divider,
   Stepper,
   Step,
   StepLabel,
-  Grid,
   Collapse,
 } from '@mui/material';
 import {
   PersonAdd,
-  School,
   ArrowBack,
   ArrowForward,
   CheckCircle,
@@ -30,36 +21,78 @@ import {
 } from '@mui/icons-material';
 import {
   AutoEcole,
-  Formation,
-  Referentiel,
   autoEcoleService,
-  typeDemandeService,
-  referentielService,
   TypeDemande,
+  gestionDossierService,
 } from '../services';
 import { authService } from '../../auth/services/authService';
-
-interface CreateDossierFormProps {
-  onSuccess: () => void;
-}
+import { 
+  NumeroPermisParts, 
+  PermisData, 
+  PersonneData, 
+  CandidatData, 
+  FormationData,
+  CreateDossierFormProps 
+} from './types';
+import { 
+  checkIsNouveauPermis,
+  checkIsFicheEnregistre,
+  getFieldLabel,
+  extractCategorieFromNumeroPermis,
+  buildNumeroPermis,
+  buildNumeroOriginePermis
+} from './utils';
+import {
+  validateStep0,
+  validateStepNumeroPermis,
+  validatePermisOrigine,
+  validateStepAutoEcole,
+  validatePersonne,
+  validateCandidat
+} from './validation';
+import { useAutoEcoles, useFormations, useTypeDemandes, useReferentiels } from './hooks';
+import {
+  TypeDemandeStep,
+  AutoEcoleFormationStep,
+  NumeroPermisStep,
+  PermisInfoStep,
+  PermisOrigineStep,
+  PermisBOrigineStep,
+  SearchCandidatStep,
+  CandidatRecapStep,
+  PersonneFormStep,
+  CandidatFormStep,
+  FinalisationStep,
+} from './steps';
 
 const CreateDossierForm: React.FC<CreateDossierFormProps> = ({ onSuccess }) => {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [verifyingPermis, setVerifyingPermis] = useState(false);
+  const [permisVerified, setPermisVerified] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [candidatTrouveFromPermis, setCandidatTrouveFromPermis] = useState<any | null>(null);
+  const [candidatNonTrouve, setCandidatNonTrouve] = useState(false);
+  
+  // États pour la vérification du permis principal (Duplicata/Fiche d'enregistrement)
+  const [verifyingPermisPrincipal, setVerifyingPermisPrincipal] = useState(false);
+  const [permisPrincipalVerified, setPermisPrincipalVerified] = useState(false);
+  const [verificationErrorPrincipal, setVerificationErrorPrincipal] = useState<string | null>(null);
+  const [candidatTrouveFromPermisPrincipal, setCandidatTrouveFromPermisPrincipal] = useState<any | null>(null);
+  const [candidatNonTrouvePrincipal, setCandidatNonTrouvePrincipal] = useState(false);
+  
+  // États pour la vérification du permis d'origine (catégorie C/D/E)
+  const [verifyingPermisOrigine, setVerifyingPermisOrigine] = useState(false);
+  const [permisOrigineVerified, setPermisOrigineVerified] = useState(false);
+  const [verificationErrorOrigine, setVerificationErrorOrigine] = useState<string | null>(null);
+  const [candidatTrouveFromPermisOrigine, setCandidatTrouveFromPermisOrigine] = useState<any | null>(null);
+  const [candidatNonTrouveOrigine, setCandidatNonTrouveOrigine] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState(0);
   
   // États pour les données
-  const [autoEcoles, setAutoEcoles] = useState<AutoEcole[]>([]);
-  const [loadingAutoEcoles, setLoadingAutoEcoles] = useState(false);
   const [selectedAutoEcole, setSelectedAutoEcole] = useState<AutoEcole | null>(null);
-  const [formations, setFormations] = useState<Formation[]>([]);
-  const [loadingFormations, setLoadingFormations] = useState(false);
-  const [typeDemandes, setTypeDemandes] = useState<TypeDemande[]>([]);
-  const [loadingTypeDemandes, setLoadingTypeDemandes] = useState(false);
-  const [referentiels, setReferentiels] = useState<Referentiel[]>([]);
-  const [loadingReferentiels, setLoadingReferentiels] = useState(false);
   const [candidatId, setCandidatId] = useState<string | null>(null);
   const [personneId, setPersonneId] = useState<string | null>(null);
   
@@ -67,12 +100,61 @@ const CreateDossierForm: React.FC<CreateDossierFormProps> = ({ onSuccess }) => {
   const [selectedTypeDemande, setSelectedTypeDemande] = useState<TypeDemande | null>(null);
   const [typeDemandeId, setTypeDemandeId] = useState<string>('');
   const [isNouveauPermis, setIsNouveauPermis] = useState(false);
+  const [isFicheEnregistre, setIsFicheEnregistre] = useState(false);
+  
+  // État pour le numéro de permis (pour les types autres que nouveau permis)
+  const [numeroPermis, setNumeroPermis] = useState<string>('');
+
+  // État pour le format de numéro de permis
+  const [permisFormat, setPermisFormat] = useState<'standard' | 'op'>('standard');
+  const [permisOrigineFormat, setPermisOrigineFormat] = useState<'standard' | 'op'>('standard');
+
+  // États pour la construction du numéro de permis
+  const [numeroPermisParts, setNumeroPermisParts] = useState<NumeroPermisParts>({
+    annee: '',
+    province: '',
+    categorie: '',
+    numero: '',
+  });
+
+  // États pour la construction du numéro de permis d'origine
+  const [numeroOriginePermisParts, setNumeroOriginePermisParts] = useState<NumeroPermisParts>({
+    annee: '',
+    province: '',
+    categorie: '',
+    numero: '',
+  });
+
+  // États pour les informations du permis (pour les types autres que nouveau permis)
+  const [permisData, setPermisData] = useState<PermisData>({
+    numero_permis: '',
+    numero_origine_permis: '',
+    lieu_de_dobtention_du_permis: '',
+    date_de_dobtention_du_permis: '',
+    date_de_delivrance_du_permis: '',
+  });
+
+  // États pour les informations du permis B d'origine (pour nouveau permis de type C)
+  const [numeroBOriginePermisParts, setNumeroBOriginePermisParts] = useState<NumeroPermisParts>({
+    annee: '',
+    province: '',
+    categorie: '',
+    numero: '',
+  });
+  const [permisBOrigineFormat, setPermisBOrigineFormat] = useState<'standard' | 'op'>('standard');
+  const [permisBOrigineData, setPermisBOrigineData] = useState<PermisData>({
+    numero_permis: '',
+    numero_origine_permis: '',
+    lieu_de_dobtention_du_permis: '',
+    date_de_dobtention_du_permis: '',
+    date_de_delivrance_du_permis: '',
+  });
 
   // États du formulaire - Auto-école et formation (si nouveau permis)
   const [autoEcoleId, setAutoEcoleId] = useState<string>('');
 
   // États du formulaire - Informations personnelles
-  const [personneData, setPersonneData] = useState({
+  const [personneData, setPersonneData] = useState<PersonneData>({
     nom: '',
     prenom: '',
     email: '',
@@ -83,8 +165,16 @@ const CreateDossierForm: React.FC<CreateDossierFormProps> = ({ onSuccess }) => {
     password_confirmation: '',
   });
 
+  // États pour le captcha
+  const [captchaId, setCaptchaId] = useState<string>('');
+  const [captchaCode, setCaptchaCode] = useState<string>('');
+
+  // État pour le candidat sélectionné (recherche)
+  const [selectedCandidat, setSelectedCandidat] = useState<any | null>(null);
+  const [candidatMode, setCandidatMode] = useState<'new' | 'existing' | null>(null);
+
   // États du formulaire - Informations du candidat
-  const [candidatData, setCandidatData] = useState({
+  const [candidatData, setCandidatData] = useState<CandidatData>({
     date_naissance: '',
     lieu_naissance: '',
     nip: '',
@@ -95,11 +185,86 @@ const CreateDossierForm: React.FC<CreateDossierFormProps> = ({ onSuccess }) => {
   });
 
   // États du formulaire - Formation et référentiel
-  const [formationData, setFormationData] = useState({
+  const [formationData, setFormationData] = useState<FormationData>({
     formation_id: '',
     referenciel_id: '',
     commentaires: '',
   });
+
+  // Fonction pour déterminer la catégorie du permis à partir du numéro saisi
+  const getPermisCategorie = (): string => {
+    if (isNouveauPermis) return '';
+    
+    const numPermisComplet = permisData.numero_permis || numeroPermis || buildNumeroPermis(numeroPermisParts, permisFormat);
+    if (!numPermisComplet) return '';
+    
+    // Si format OP, on ne peut pas extraire la catégorie
+    if (numPermisComplet.toUpperCase().startsWith('PERM')) return '';
+    
+    // Extraire la catégorie du numéro de permis
+    const categorie = numeroPermisParts.categorie?.toUpperCase() || extractCategorieFromNumeroPermis(numPermisComplet);
+    return categorie || '';
+  };
+
+  // Fonction pour déterminer si on doit afficher l'étape "Permis d'origine"
+  const needsPermisOrigine = (): boolean => {
+    if (isNouveauPermis) return false;
+    if (isFicheEnregistre) return false; // Pour fiche enregistre, le permis d'origine est déjà saisi à l'étape 2
+    
+    const categorie = getPermisCategorie();
+    return Boolean(categorie && ['C', 'D', 'E'].includes(categorie));
+  };
+
+  // Utiliser les hooks personnalisés pour charger les données (déclarer avant getSteps)
+  const { autoEcoles, loading: loadingAutoEcoles, loadAutoEcoles } = useAutoEcoles();
+  const { formations, loading: loadingFormations, loadFormations } = useFormations();
+  const { typeDemandes, loading: loadingTypeDemandes, loadTypeDemandes } = useTypeDemandes();
+  const { referentiels, loading: loadingReferentiels, loadReferentiels } = useReferentiels();
+
+  // Fonction pour déterminer si la formation sélectionnée est de type permis C
+  const isFormationTypeC = (): boolean => {
+    if (!isNouveauPermis || !formationData.formation_id) return false;
+    if (!formations || formations.length === 0) return false; // Vérification de sécurité
+    
+    const selectedFormation = formations.find(f => f.id === formationData.formation_id);
+    if (!selectedFormation) return false;
+    
+    // Vérifier type_permis (snake_case)
+    if (selectedFormation.type_permis) {
+      const typePermis = selectedFormation.type_permis as any;
+      if (typePermis.libelle) {
+        const libelle = typePermis.libelle.toUpperCase();
+        return libelle.includes('PERMIS C') || libelle === 'C' || libelle.includes('PERMIS C');
+      }
+      if (typePermis.code) {
+        const code = typePermis.code.toUpperCase();
+        return code.includes('PERMIS_C') || code === 'PERMIS_C' || code === 'C';
+      }
+      if (typePermis.nom) {
+        const nom = typePermis.nom.toUpperCase();
+        return nom.includes('PERMIS C') || nom === 'C' || nom.includes('PERMIS C');
+      }
+    }
+    
+    // Vérifier typePermis (camelCase)
+    if (selectedFormation.typePermis) {
+      const typePermis = selectedFormation.typePermis as any;
+      if (typePermis.libelle) {
+        const libelle = typePermis.libelle.toUpperCase();
+        return libelle.includes('PERMIS C') || libelle === 'C' || libelle.includes('PERMIS C');
+      }
+      if (typePermis.code) {
+        const code = typePermis.code.toUpperCase();
+        return code.includes('PERMIS_C') || code === 'PERMIS_C' || code === 'C';
+      }
+      if (typePermis.nom) {
+        const nom = typePermis.nom.toUpperCase();
+        return nom.includes('PERMIS C') || nom === 'C' || nom.includes('PERMIS C');
+      }
+    }
+    
+    return false;
+  };
 
   // Déterminer les étapes dynamiquement selon le type de demande
   const getSteps = () => {
@@ -107,80 +272,33 @@ const CreateDossierForm: React.FC<CreateDossierFormProps> = ({ onSuccess }) => {
     
     if (isNouveauPermis) {
       baseSteps.push('Auto-école et Formation');
+      // Si la formation est de type C, ajouter l'étape permis B d'origine
+      if (isFormationTypeC()) {
+        baseSteps.push('Permis B d\'origine');
+      }
+    } else {
+      // Pour les autres types de permis
+      baseSteps.push('Numéro de permis');
+      baseSteps.push('Informations du permis');
+      
+      // Si catégorie C/D/E, ajouter l'étape permis d'origine
+      if (needsPermisOrigine()) {
+        baseSteps.push('Permis d\'origine');
+      }
     }
     
-    baseSteps.push('Informations personnelles', 'Informations du candidat', 'Finalisation');
+    // Si un candidat existant est sélectionné, on ne montre pas les étapes de création
+    const hasExistingCandidat = candidatMode === 'existing' && selectedCandidat && candidatId;
+    if (!hasExistingCandidat) {
+      baseSteps.push('Informations personnelles', 'Informations du candidat');
+    }
+    
+    baseSteps.push('Finalisation');
     
     return baseSteps;
   };
 
   const steps = getSteps();
-
-  // Fonction pour détecter si c'est un nouveau permis
-  const checkIsNouveauPermis = (typeDemandeName: string): boolean => {
-    const nameLower = typeDemandeName.toLowerCase();
-    return nameLower.includes('nouveau permis') || 
-           nameLower.includes('nouveau') && nameLower.includes('permis') ||
-           nameLower === 'nouveau permis';
-  };
-
-  // Charger les auto-écoles
-  const loadAutoEcoles = async () => {
-    setLoadingAutoEcoles(true);
-    try {
-      const response = await autoEcoleService.getAutoEcoles(1, 100);
-      setAutoEcoles(response.data || []);
-    } catch (err: any) {
-      console.error('Erreur lors du chargement des auto-écoles:', err);
-      setError('Impossible de charger les auto-écoles');
-    } finally {
-      setLoadingAutoEcoles(false);
-    }
-  };
-
-  // Charger les formations de l'auto-école
-  const loadFormations = async (autoEcoleId: string) => {
-    setLoadingFormations(true);
-    try {
-      const data = await autoEcoleService.getFormationsByAutoEcole(autoEcoleId);
-      setFormations(data.filter(f => f.statut));
-    } catch (err: any) {
-      console.error('Erreur lors du chargement des formations:', err);
-      setError('Impossible de charger les formations');
-    } finally {
-      setLoadingFormations(false);
-    }
-  };
-
-  // Charger les types de demande
-  const loadTypeDemandes = async () => {
-    setLoadingTypeDemandes(true);
-    try {
-      const response = await typeDemandeService.getTypeDemandes(1, 100);
-      setTypeDemandes(response.data || []);
-    } catch (err: any) {
-      console.error('Erreur lors du chargement des types de demande:', err);
-    } finally {
-      setLoadingTypeDemandes(false);
-    }
-  };
-
-  // Charger les référentiels (uniquement ceux de type "type_permis")
-  const loadReferentiels = async () => {
-    setLoadingReferentiels(true);
-    try {
-      const response = await referentielService.getReferentiels(1, 100);
-      // Filtrer pour ne garder que les référentiels de type "type_permis"
-      const referentielsTypePermis = (response.data || []).filter(
-        (referentiel) => referentiel.type_ref === 'type_permis'
-      );
-      setReferentiels(referentielsTypePermis);
-    } catch (err: any) {
-      console.error('Erreur lors du chargement des référentiels:', err);
-    } finally {
-      setLoadingReferentiels(false);
-    }
-  };
 
   // Charger les données au montage
   useEffect(() => {
@@ -207,6 +325,85 @@ const CreateDossierForm: React.FC<CreateDossierFormProps> = ({ onSuccess }) => {
       }
     }
   }, [autoEcoleId, autoEcoles, isNouveauPermis, showForm]);
+  
+  // Handler pour la sélection du référentiel
+  const handleReferencielChange = useCallback((referencielId: string) => {
+    console.log('📤 [handleReferencielChange] Sélection du référentiel:', referencielId);
+    setFormationData(prev => {
+      console.log('📤 [handleReferencielChange] Mise à jour formationData.referenciel_id de', prev.referenciel_id, 'vers', referencielId);
+      return { ...prev, referenciel_id: referencielId };
+    });
+  }, []);
+
+  // Auto-sélectionner le référentiel après chargement des référentiels si une catégorie est déjà définie
+  useEffect(() => {
+    if (referentiels.length > 0 && numeroPermisParts.categorie) {
+      const categorieUpper = numeroPermisParts.categorie.toUpperCase();
+      
+      // Si la catégorie contient plusieurs valeurs (ex: "B, C"), prendre la première
+      const premiereCategorie = categorieUpper.split(',')[0].trim();
+      
+      console.log('🔍 [useEffect] Recherche du référentiel pour la catégorie:', premiereCategorie);
+      console.log('📋 [useEffect] Référentiels disponibles:', referentiels.length, referentiels.map(r => ({ id: r.id, code: r.code, libelle: r.libelle })));
+      console.log('📋 [useEffect] Référentiel actuellement sélectionné:', formationData.referenciel_id);
+      
+      // Rechercher le référentiel qui correspond à la catégorie
+      // Exemples : "C" -> "PERMIS_C", "B" -> "PERMIS_B", "A" -> "PERMIS_A", etc.
+      const referentielTrouve = referentiels.find((ref) => {
+        if (!ref.code) return false;
+        const codeUpper = ref.code.toUpperCase();
+        // Correspondance exacte (ex: "C" === "C")
+        if (codeUpper === premiereCategorie) return true;
+        // Correspondance avec préfixe PERMIS_ (ex: "PERMIS_C" pour catégorie "C")
+        if (codeUpper === `PERMIS_${premiereCategorie}`) return true;
+        // Correspondance avec préfixe PERMIS (ex: "PERMIS_C" contient "C")
+        if (codeUpper.includes(`PERMIS_${premiereCategorie}`) || codeUpper.includes(`PERMIS${premiereCategorie}`)) return true;
+        // Correspondance inverse : le code contient la catégorie (ex: "PERMIS_C" contient "C")
+        if (codeUpper.includes(premiereCategorie)) return true;
+        return false;
+      });
+      
+      if (referentielTrouve) {
+        // Mettre à jour même si un référentiel est déjà sélectionné, pour s'assurer que c'est le bon
+        if (formationData.referenciel_id !== referentielTrouve.id) {
+          console.log('✅ [useEffect] Référentiel automatiquement sélectionné après chargement pour la catégorie:', premiereCategorie, referentielTrouve);
+          setFormationData(prev => ({
+            ...prev,
+            referenciel_id: referentielTrouve.id,
+          }));
+        } else {
+          console.log('ℹ️ [useEffect] Le référentiel correct est déjà sélectionné');
+        }
+      } else {
+        console.log('⚠️ [useEffect] Aucun référentiel trouvé pour la catégorie:', premiereCategorie);
+        console.log('📋 [useEffect] Codes des référentiels disponibles:', referentiels.map(r => r.code));
+      }
+    }
+  }, [referentiels, numeroPermisParts.categorie]);
+
+  // Pré-remplir les données quand un candidat est sélectionné (uniquement si mode 'existing')
+  useEffect(() => {
+    if (selectedCandidat && candidatMode === 'existing') {
+      const personne = selectedCandidat.personne;
+      
+      // Définir les IDs directement (pas besoin de pré-remplir les formulaires si on crée directement le dossier)
+      if (personne?.id) {
+        setPersonneId(personne.id);
+      }
+      if (selectedCandidat.id) {
+        setCandidatId(selectedCandidat.id);
+      }
+      
+      console.log('✅ Candidat existant sélectionné - IDs définis:', {
+        personneId: personne?.id,
+        candidatId: selectedCandidat.id,
+      });
+    } else if (candidatMode === 'new' && selectedCandidat) {
+      // Réinitialiser les IDs si on passe en mode nouveau candidat
+      setPersonneId(null);
+      setCandidatId(null);
+    }
+  }, [selectedCandidat, candidatMode]);
 
   // Réinitialiser le formulaire
   const resetForm = () => {
@@ -214,6 +411,58 @@ const CreateDossierForm: React.FC<CreateDossierFormProps> = ({ onSuccess }) => {
     setTypeDemandeId('');
     setSelectedTypeDemande(null);
     setIsNouveauPermis(false);
+    setIsFicheEnregistre(false);
+    setVerifyingPermis(false);
+    setPermisVerified(false);
+    setVerificationError(null);
+    setCandidatTrouveFromPermis(null);
+    setCandidatNonTrouve(false);
+    setCandidatTrouveFromPermisPrincipal(null);
+    setCandidatNonTrouvePrincipal(false);
+    setVerifyingPermisPrincipal(false);
+    setPermisPrincipalVerified(false);
+    setVerificationErrorPrincipal(null);
+    setVerifyingPermisOrigine(false);
+    setPermisOrigineVerified(false);
+    setVerificationErrorOrigine(null);
+    setCandidatTrouveFromPermisOrigine(null);
+    setCandidatNonTrouveOrigine(false);
+    setNumeroPermis('');
+    setPermisFormat('standard');
+    setPermisOrigineFormat('standard');
+    setNumeroPermisParts({
+      annee: '',
+      province: '',
+      categorie: '',
+      numero: '',
+    });
+    setNumeroOriginePermisParts({
+      annee: '',
+      province: '',
+      categorie: '',
+      numero: '',
+    });
+    setPermisData({
+      numero_permis: '',
+      numero_origine_permis: '',
+      lieu_de_dobtention_du_permis: '',
+      date_de_dobtention_du_permis: '',
+      date_de_delivrance_du_permis: '',
+    });
+    setNumeroBOriginePermisParts({
+      annee: '',
+      province: '',
+      categorie: '',
+      numero: '',
+    });
+    setPermisBOrigineFormat('standard');
+    setPermisBOrigineData({
+      numero_permis: '',
+      numero_origine_permis: '',
+      lieu_de_dobtention_du_permis: '',
+      date_de_dobtention_du_permis: '',
+      date_de_delivrance_du_permis: '',
+    });
     setAutoEcoleId('');
     setSelectedAutoEcole(null);
     setCandidatId(null);
@@ -242,284 +491,1109 @@ const CreateDossierForm: React.FC<CreateDossierFormProps> = ({ onSuccess }) => {
       referenciel_id: '',
       commentaires: '',
     });
+    setCaptchaId('');
+    setCaptchaCode('');
+    setSelectedCandidat(null);
+    setCandidatMode(null);
     setError(null);
     setSuccess(null);
   };
 
-  // Validation de l'étape 0 : Type de demande
-  const validateStep0 = () => {
-    if (!typeDemandeId) {
-      setError('Veuillez sélectionner un type de demande');
-      return false;
+
+
+
+  // Fonction helper pour détecter si un message mentionne des champs du candidat
+  // Ces champs doivent être validés à l'étape "Informations du candidat", pas à l'étape "Informations personnelles"
+  const messageMentionneChampsCandidat = (message: string): boolean => {
+    if (!message) return false;
+    const messageLower = message.toLowerCase();
+    
+    // Détecter les mots-clés des champs du candidat
+    const champsCandidatKeywords = [
+      'date de naissance',
+      'lieu de naissance',
+      'nip',
+      'numéro d\'identification personnel',
+      'numero d\'identification personnel',
+      'numéro de pièce',
+      'numero de piece',
+      'date_naissance',
+      'lieu_naissance',
+      'numero_piece'
+    ];
+    
+    // Vérifier si le message contient un des mots-clés
+    const contientKeyword = champsCandidatKeywords.some(keyword => messageLower.includes(keyword));
+    
+    // Vérifier si le message mentionne "veuillez remplir les champs obligatoires" 
+    // ET contient au moins un champ du candidat (signe qu'il s'agit d'une erreur de validation candidat)
+    const estMessageValidationAvecChampsCandidat = 
+      (messageLower.includes('veuillez remplir') || 
+       messageLower.includes('champs obligatoires') ||
+       messageLower.includes('champ obligatoire')) &&
+      contientKeyword;
+    
+    // Vérifier si le message contient plusieurs champs du candidat ensemble
+    // (signe qu'il s'agit d'une erreur de validation candidat)
+    const contientPlusieursChampsCandidat = [
+      messageLower.includes('date') && messageLower.includes('naissance'),
+      messageLower.includes('lieu') && messageLower.includes('naissance'),
+      messageLower.includes('nip') || messageLower.includes('identification personnel'),
+      messageLower.includes('pièce') || messageLower.includes('piece')
+    ].filter(Boolean).length >= 2;
+    
+    // Détecter spécifiquement le message exact mentionné par l'utilisateur
+    // "Veuillez remplir les champs obligatoires suivants : Date de naissance, Lieu de naissance, NIP (Numéro d'Identification Personnel), Numéro de pièce"
+    const estMessageExact = 
+      messageLower.includes('veuillez remplir les champs obligatoires suivants') &&
+      (messageLower.includes('date de naissance') || messageLower.includes('lieu de naissance') || 
+       messageLower.includes('nip') || messageLower.includes('numéro de pièce') || messageLower.includes('numero de piece'));
+    
+    const result = contientKeyword || estMessageValidationAvecChampsCandidat || contientPlusieursChampsCandidat || estMessageExact;
+    
+    // Log pour déboguer
+    if (result) {
+      console.log('🔍 Message détecté comme contenant des champs du candidat:', message);
     }
-    return true;
+    
+    return result;
   };
 
-  // Validation de l'étape auto-école/formation (si nouveau permis)
-  const validateStepAutoEcole = () => {
-    if (!isNouveauPermis) return true; // Pas nécessaire si ce n'est pas nouveau permis
-    
-    if (!autoEcoleId) {
-      setError('Veuillez sélectionner une auto-école');
-      return false;
-    }
-    if (!formationData.formation_id) {
-      setError('Veuillez sélectionner une formation');
-      return false;
-    }
-    return true;
-  };
-
-  // Fonction utilitaire pour obtenir le libellé d'un champ
-  const getFieldLabel = (field: string): string => {
-    const labels: Record<string, string> = {
-      nom: 'Nom',
-      prenom: 'Prénom',
-      email: 'Email',
-      contact: 'Contact',
-      telephone: 'Téléphone',
-      adresse: 'Adresse',
-      password: 'Mot de passe',
-      password_confirmation: 'Confirmation du mot de passe',
-      date_naissance: 'Date de naissance',
-      lieu_naissance: 'Lieu de naissance',
-      nip: 'NIP (Numéro d\'Identification Personnel)',
-      type_piece: 'Type de pièce',
-      numero_piece: 'Numéro de pièce',
-      nationalite: 'Nationalité',
-      genre: 'Genre',
-      personne_id: 'Personne',
-    };
-    return labels[field.toLowerCase()] || field;
-  };
-
-  // Validation des informations personnelles
-  // IMPORTANT : Selon INSCRIPTION_CANDIDAT_UPDATES.md, cette étape valide UNIQUEMENT :
-  // - nom, prenom, email, contact (obligatoire), telephone (optionnel), adresse, password, password_confirmation
-  // Les champs du candidat (date_naissance, lieu_naissance, nip, numero_piece) sont validés à l'étape suivante
-  const validatePersonne = () => {
-    const champsManquants: string[] = [];
-    
-    // Vérifier UNIQUEMENT les champs de la personne (selon la documentation)
-    if (!personneData.nom || personneData.nom.trim() === '') {
-      champsManquants.push('Nom');
-    }
-    if (!personneData.prenom || personneData.prenom.trim() === '') {
-      champsManquants.push('Prénom');
-    }
-    if (!personneData.email || personneData.email.trim() === '') {
-      champsManquants.push('Email');
-    }
-    if (!personneData.contact || personneData.contact.trim() === '') {
-      champsManquants.push('Contact');
-    }
-    if (!personneData.password || personneData.password.trim() === '') {
-      champsManquants.push('Mot de passe');
-    }
-    if (!personneData.password_confirmation || personneData.password_confirmation.trim() === '') {
-      champsManquants.push('Confirmation du mot de passe');
-    }
-    
-    // Afficher UNIQUEMENT les champs manquants de la personne
-    if (champsManquants.length > 0) {
-      setError(`Veuillez remplir les champs obligatoires suivants pour les informations personnelles : ${champsManquants.join(', ')}`);
-      return false;
-    }
-    
-    // Validation de l'email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(personneData.email)) {
-      setError('Veuillez entrer un email valide (exemple : nom@email.com)');
-      return false;
-    }
-    
-    // Validation du mot de passe
-    if (personneData.password.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères');
-      return false;
-    }
-    
-    // Validation de la confirmation du mot de passe
-    if (personneData.password !== personneData.password_confirmation) {
-      setError('Les mots de passe ne correspondent pas. Veuillez vérifier votre saisie.');
-      return false;
-    }
-    
-    return true;
-  };
-
-  // Validation des informations du candidat
-  const validateCandidat = () => {
-    const champsManquants: string[] = [];
-    
-    // Vérifier chaque champ individuellement
-    if (!candidatData.date_naissance || candidatData.date_naissance.trim() === '') {
-      champsManquants.push('Date de naissance');
-    }
-    if (!candidatData.lieu_naissance || candidatData.lieu_naissance.trim() === '') {
-      champsManquants.push('Lieu de naissance');
-    }
-    if (!candidatData.nip || candidatData.nip.trim() === '') {
-      champsManquants.push('NIP (Numéro d\'Identification Personnel)');
-    }
-    if (!candidatData.numero_piece || candidatData.numero_piece.trim() === '') {
-      champsManquants.push('Numéro de pièce');
-    }
-    
-    // Afficher les champs manquants
-    if (champsManquants.length > 0) {
-      setError(`Veuillez remplir les champs obligatoires suivants : ${champsManquants.join(', ')}`);
-      return false;
-    }
-    
-    return true;
-  };
-
-  // Calculer l'index réel de l'étape
+  // Calculer l'index réel de l'étape selon la logique :
+  // Pour nouveau permis type C : Type demande -> Auto-école/Formation -> Permis B d'origine -> Récapitulatif/PersonneFormStep -> CandidatFormStep -> Finalisation
+  // Pour nouveau permis non-C : Type demande -> Auto-école/Formation -> PersonneFormStep -> CandidatFormStep -> Finalisation
+  // Pour autres types avec permis d'origine : Type demande -> Numéro permis -> Informations permis -> Permis d'origine -> PersonneFormStep -> CandidatFormStep -> Finalisation
+  // Pour autres types sans permis d'origine : Type demande -> Numéro permis -> Informations permis -> PersonneFormStep -> CandidatFormStep -> Finalisation
   const getRealStepIndex = (step: number): number => {
-    if (step === 0) return 0; // Type de demande
-    if (step === 1 && isNouveauPermis) return 1; // Auto-école/Formation
-    if (step === 1 && !isNouveauPermis) return 2; // Informations personnelles (saut auto-école)
-    if (step === 2 && isNouveauPermis) return 2; // Informations personnelles
-    if (step === 2 && !isNouveauPermis) return 3; // Informations candidat
-    if (step === 3 && isNouveauPermis) return 3; // Informations candidat
-    if (step === 4 && isNouveauPermis) return 4; // Finalisation
-    if (step === 3 && !isNouveauPermis) return 4; // Finalisation
+    if (step === 0) return 0; // Étape 1 : Type de demande
+    
+    const hasExistingCandidat = candidatMode === 'existing' && selectedCandidat && candidatId;
+    const hasPermisOrigine = needsPermisOrigine();
+    
+    if (isNouveauPermis) {
+      // Pour nouveau permis : Type demande -> Auto-école/Formation -> [Permis B d'origine si type C] -> [Récapitulatif OU PersonneFormStep] -> CandidatFormStep -> Finalisation
+      const hasPermisBOrigine = isFormationTypeC();
+      if (step === 1) return 1; // Auto-école/Formation
+      if (hasPermisBOrigine) {
+        if (step === 2) return 2; // Permis B d'origine
+        if (step === 3) return 3; // Récapitulatif
+      if (hasExistingCandidat) {
+        return 6; // Finalisation (sauter Personne et Candidat)
+      } else {
+          if (step === 4) return 4; // Informations personnelles
+          if (step === 5) return 5; // Informations candidat
+          if (step === 6) return 6; // Finalisation
+      }
+    } else {
+        if (hasExistingCandidat) {
+          return 6; // Finalisation (sauter Personne et Candidat)
+        } else {
+          if (step === 2) return 2; // (pas utilisé, on passe directement à 4)
+          if (step === 4) return 4; // Informations personnelles
+          if (step === 5) return 5; // Informations candidat
+          if (step === 6) return 6; // Finalisation
+        }
+      }
+    } else {
+      // Pour autres types : Type demande -> Numéro permis -> Informations permis -> [Permis origine] -> Personne -> Candidat -> Finalisation
+      if (step === 1) return 1; // Numéro de permis
+      if (step === 2) return 2; // Informations du permis
+      
+      let currentRealStep = 3;
+      
+      // Si permis d'origine requis, c'est l'étape 3
+      if (hasPermisOrigine) {
+        if (step === 3) return 3; // Permis d'origine
+        currentRealStep = 4;
+      }
+      
+      if (hasExistingCandidat) {
+        // Sauter Personne et Candidat, aller directement à Finalisation
+        return 6; // Finalisation
+      } else {
+        // Informations personnelles - étape 4
+        if (step === 4) return 4; // Informations personnelles
+        // Informations candidat - étape 5
+        if (step === 5) return 5; // Informations candidat
+        // Finalisation - étape 6
+        if (step === 6) return 6; // Finalisation
+      }
+    }
+    
     return step;
   };
 
-  // Passer à l'étape suivante
-  const handleNext = async () => {
+  // Fonction pour enregistrer les informations personnelles via auth/register
+  const handleRegisterPersonne = async () => {
     setError(null);
-
-    const realStep = getRealStepIndex(activeStep);
-
-    if (realStep === 0) {
-      // Étape 0 : Valider la sélection du type de demande
-      if (!validateStep0()) return;
-      
-      const typeDemande = typeDemandes.find(td => td.id === typeDemandeId);
-      if (typeDemande) {
-        setSelectedTypeDemande(typeDemande);
-        const isNouveau = checkIsNouveauPermis(typeDemande.name);
-        setIsNouveauPermis(isNouveau);
-        setActiveStep(1);
-      }
-    } else if (realStep === 1 && isNouveauPermis) {
-      // Étape auto-école/formation (si nouveau permis)
-      if (!validateStepAutoEcole()) return;
-      setActiveStep(2);
-    } else if (realStep === 2) {
-      // Informations personnelles (realStep === 2 pour les deux cas : nouveau permis ou non)
-      // IMPORTANT : Selon la documentation, cette étape ne valide QUE les champs de la personne
-      // Les champs du candidat (date_naissance, lieu_naissance, nip, numero_piece) 
-      // seront validés à l'étape suivante (Informations du candidat)
-      console.log('🔍 [VALIDATION] Étape Informations personnelles - activeStep:', activeStep, 'realStep:', realStep, 'isNouveauPermis:', isNouveauPermis);
-      if (!validatePersonne()) {
-        console.log('❌ [VALIDATION] Échec validation informations personnelles');
+    
+    // Valider les données de la personne
+      if (!validatePersonne({ personneData, setError })) {
         return;
       }
-      console.log('✅ [VALIDATION] Validation informations personnelles réussie');
       
-      setLoading(true);
-      try {
-        const registerResponse = await authService.register({
+        // Vérifier que le captcha est rempli
+        if (!captchaId || !captchaCode) {
+          setError('Veuillez remplir le code captcha');
+          return;
+        }
+
+    setLoading(true);
+    try {
+        const registerPayload = {
           email: personneData.email,
           password: personneData.password,
           password_confirmation: personneData.password_confirmation,
           nom: personneData.nom,
           prenom: personneData.prenom,
           contact: personneData.contact,
-          telephone: personneData.telephone,
-          adresse: personneData.adresse,
+          telephone: personneData.telephone || personneData.contact,
+          adresse: personneData.adresse || '',
           role: 'candidat',
-        });
+          captcha_id: captchaId,
+          captcha_code: captchaCode,
+        };
+
+        console.log('📤 Données complètes envoyées à auth/register:', JSON.stringify(registerPayload, null, 2));
+
+        const registerResponse = await authService.register(registerPayload);
         
-        if (registerResponse.user.personne?.id) {
+      if (registerResponse.user?.personne?.id) {
           setPersonneId(registerResponse.user.personne.id);
-          setActiveStep(isNouveauPermis ? 3 : 2);
+        // Passer à l'étape suivante : Informations du candidat
+        // Calculer l'étape suivante selon le contexte
+        let nextStep = 5; // Par défaut pour nouveau permis
+        if (!isNouveauPermis) {
+          // Pour autres types de permis, l'étape suivante dépend de si on a un permis d'origine
+          const hasPermisOrigine = needsPermisOrigine();
+          nextStep = hasPermisOrigine ? 6 : 5; // Si permis d'origine, PersonneFormStep est à 4, donc CandidatFormStep est à 6
+        }
+        console.log('✅ [handleRegisterPersonne] Passage à l\'étape suivante:', nextStep, 'isNouveauPermis:', isNouveauPermis, 'needsPermisOrigine:', needsPermisOrigine());
+        setActiveStep(nextStep);
         } else {
           setError('Erreur: Impossible de récupérer l\'ID de la personne');
         }
       } catch (err: any) {
-        // Selon la documentation INSCRIPTION_CANDIDAT_UPDATES.md :
-        // Étape 1 (Informations personnelles) = POST /auth/register
-        // Ne concerne QUE : nom, prenom, email, contact, telephone, adresse, password, password_confirmation, role
-        // Les champs du candidat (date_naissance, lieu_naissance, nip, numero_piece) sont à l'ÉTAPE 2
+        console.error('❌ Erreur complète lors de l\'enregistrement:', err);
+        console.error('📋 Réponse d\'erreur:', err.response?.data);
         
+      // Gérer les erreurs de validation
         if (err.response?.data?.errors) {
-          const champsPersonne = ['nom', 'prenom', 'email', 'contact', 'telephone', 'adresse', 'password', 'password_confirmation', 'role'];
-          const champsCandidat = ['date_naissance', 'lieu_naissance', 'nip', 'type_piece', 'numero_piece', 'nationalite', 'genre', 'personne_id'];
-          const erreursPersonne: string[] = [];
-          
-          Object.entries(err.response.data.errors).forEach(([field, messages]: [string, any]) => {
-            const fieldLower = field.toLowerCase();
-            
-            // Ignorer COMPLÈTEMENT tous les champs du candidat (ils seront validés à l'étape suivante)
-            if (champsCandidat.includes(fieldLower)) {
-              // Ignorer silencieusement - ces champs ne sont pas pertinents à cette étape
-              return;
-            }
-            
-            // Ne garder QUE les erreurs des champs de la personne
-            if (champsPersonne.includes(fieldLower)) {
-              const messageList = Array.isArray(messages) ? messages : [messages];
-              const fieldLabel = getFieldLabel(field);
-              erreursPersonne.push(`${fieldLabel}: ${messageList.join(', ')}`);
-            }
-          });
-          
-          if (erreursPersonne.length > 0) {
-            setError(`Erreur de validation pour les informations personnelles :\n• ${erreursPersonne.join('\n• ')}`);
+        const errors = err.response.data.errors;
+        const errorMessages: string[] = [];
+        
+        Object.entries(errors).forEach(([field, messages]: [string, any]) => {
+          if (Array.isArray(messages)) {
+            messages.forEach((msg: string) => errorMessages.push(`${getFieldLabel(field)}: ${msg}`));
           } else {
-            // Si aucune erreur de personne, vérifier le message général
-            const messageGeneral = err.response?.data?.message || '';
-            
-            // Si le message général mentionne des champs du candidat, ne pas l'afficher
-            const mentionsChampsCandidat = champsCandidat.some(champ => 
-              messageGeneral.toLowerCase().includes(champ.toLowerCase()) ||
-              messageGeneral.includes('Date de naissance') ||
-              messageGeneral.includes('Lieu de naissance') ||
-              messageGeneral.includes('NIP') ||
-              messageGeneral.includes('Numéro de pièce')
-            );
-            
-            if (mentionsChampsCandidat) {
-              // Le message mentionne des champs du candidat, ne pas l'afficher
-              // Ces champs seront validés à l'étape suivante
-              setError('Erreur lors de l\'enregistrement des informations personnelles. Veuillez vérifier que tous les champs sont correctement remplis.');
-            } else {
-              setError(messageGeneral || 'Erreur lors de l\'enregistrement des informations personnelles');
-            }
+            errorMessages.push(`${getFieldLabel(field)}: ${messages}`);
           }
-        } else {
-          const messageGeneral = err.response?.data?.message || err.message || '';
-          
-          // Vérifier si le message général mentionne des champs du candidat
-          const champsCandidat = ['date_naissance', 'lieu_naissance', 'nip', 'numero_piece'];
-          const mentionsChampsCandidat = champsCandidat.some(champ => 
-            messageGeneral.toLowerCase().includes(champ.toLowerCase()) ||
-            messageGeneral.includes('Date de naissance') ||
-            messageGeneral.includes('Lieu de naissance') ||
-            messageGeneral.includes('NIP') ||
-            messageGeneral.includes('Numéro de pièce')
-          );
-          
-          if (mentionsChampsCandidat) {
-            // Le message mentionne des champs du candidat, ne pas l'afficher tel quel
-            setError('Erreur lors de l\'enregistrement des informations personnelles. Veuillez vérifier que tous les champs sont correctement remplis.');
+        });
+        
+        if (errorMessages.length > 0) {
+          setError(errorMessages.join(', '));
           } else {
-            setError(messageGeneral || 'Erreur lors de l\'enregistrement');
+          setError('Erreur lors de l\'enregistrement. Veuillez vérifier vos informations.');
+        }
+      } else if (err.response?.data?.message) {
+        setError(err.response.data.message);
+        } else {
+        // Vérifier si c'est une erreur de connexion au service externe (Authentik)
+        const errorString = err.message?.toLowerCase() || '';
+        if (errorString.includes('Could not resolve host') || 
+            errorString.includes('iam.transports.gouv.ga') ||
+            errorString.includes('Authentik') ||
+            errorString.includes('cURL error 6')) {
+          setError('Erreur de connexion au service d\'authentification. Veuillez réessayer plus tard ou contacter le support technique si le problème persiste.');
+          } else {
+          setError('Erreur lors de l\'enregistrement. Veuillez réessayer.');
           }
         }
       } finally {
         setLoading(false);
       }
-    } else if (realStep === 3) {
-      // Informations du candidat (realStep === 3 pour les deux cas : nouveau permis ou non)
-      console.log('🔍 [VALIDATION] Étape Informations du candidat - activeStep:', activeStep, 'realStep:', realStep, 'isNouveauPermis:', isNouveauPermis);
-      if (!validateCandidat()) {
+  };
+
+  // Fonction pour créer le candidat via autoEcoleService.createCandidat
+  const handleCreateCandidat = async () => {
+      setError(null);
+    
+    // Valider les données du candidat
+      if (!validateCandidat({ candidatData, setError })) {
+        return;
+      }
+      
+        if (!personneId) {
+          setError('Erreur: ID de la personne manquant. Veuillez recommencer.');
+          return;
+        }
+        
+    setLoading(true);
+    try {
+        const numero_candidat = `CAN-${Date.now()}`;
+        const candidatPayload = {
+          personne_id: personneId,
+          numero_candidat,
+          date_naissance: candidatData.date_naissance,
+          lieu_naissance: candidatData.lieu_naissance,
+          nip: candidatData.nip,
+          type_piece: candidatData.type_piece,
+          numero_piece: candidatData.numero_piece,
+          nationalite: candidatData.nationalite,
+          genre: candidatData.genre,
+        };
+      
+      console.log('📤 Création du candidat via /candidats:', JSON.stringify(candidatPayload, null, 2));
+        
+        const response = await autoEcoleService.createCandidat(candidatPayload as any);
+      
+      if (response.data?.id) {
+        setCandidatId(response.data.id);
+        // Passer à la finalisation - calculer l'étape suivante selon le contexte
+        let nextStep = 6; // Par défaut pour nouveau permis et autres types sans permis d'origine
+        if (!isNouveauPermis) {
+          // Pour autres types de permis, l'étape suivante dépend de si on a un permis d'origine
+          const hasPermisOrigine = needsPermisOrigine();
+          // Si permis d'origine, CandidatFormStep est à l'étape 6, donc FinalisationStep est à l'étape 7
+          nextStep = hasPermisOrigine ? 7 : 6;
+        }
+        console.log('✅ [handleCreateCandidat] Passage à l\'étape suivante:', nextStep, 'isNouveauPermis:', isNouveauPermis, 'needsPermisOrigine:', needsPermisOrigine());
+        setActiveStep(nextStep);
+      } else {
+        setError('Erreur: Impossible de récupérer l\'ID du candidat créé.');
+      }
+      } catch (err: any) {
+      console.error('❌ Erreur lors de la création du candidat:', err);
+      console.error('📋 Réponse d\'erreur:', err.response?.data);
+      
+      // Gérer les erreurs de validation
+        if (err.response?.data?.errors) {
+        const errors = err.response.data.errors;
+        const errorMessages: string[] = [];
+        
+        Object.entries(errors).forEach(([field, messages]: [string, any]) => {
+          if (Array.isArray(messages)) {
+            messages.forEach((msg: string) => errorMessages.push(`${getFieldLabel(field)}: ${msg}`));
+          } else {
+            errorMessages.push(`${getFieldLabel(field)}: ${messages}`);
+          }
+        });
+        
+        if (errorMessages.length > 0) {
+          setError(errorMessages.join(', '));
+          } else {
+          setError('Erreur lors de la création du candidat. Veuillez vérifier vos informations.');
+          }
+      } else if (err.response?.data?.message) {
+        setError(err.response.data.message);
+        } else {
+        setError('Erreur lors de la création du candidat. Veuillez réessayer.');
+        }
+      } finally {
+        setLoading(false);
+      }
+  };
+
+  // Fonction pour vérifier le permis principal (Duplicata/Fiche d'enregistrement)
+  const handleVerifyPermisPrincipal = async () => {
+    const numPermisComplet = buildNumeroPermis(numeroPermisParts, permisFormat);
+    if (!numPermisComplet || numPermisComplet.trim() === '') {
+      setVerificationErrorPrincipal('Veuillez remplir le numéro de permis');
+      return;
+    }
+    
+    setVerifyingPermisPrincipal(true);
+    setVerificationErrorPrincipal(null);
+    setPermisPrincipalVerified(false);
+    
+    try {
+      console.log('🔍 Vérification du permis principal:', numPermisComplet);
+      const response = await gestionDossierService.getChangePermis(numPermisComplet);
+      console.log('✅ Permis principal vérifié avec succès:', response);
+      
+      // Extraire les données de la réponse (peut être un tableau ou un objet)
+      let permisDataFromApi: any = null;
+      if (Array.isArray(response) && response.length > 0) {
+        permisDataFromApi = response[0];
+        console.log('✅ Permis principal trouvé dans la réponse (tableau)');
+      } else if (response && typeof response === 'object' && !Array.isArray(response)) {
+        permisDataFromApi = response;
+        console.log('✅ Permis principal trouvé dans la réponse (objet)');
+      }
+      
+      if (!permisDataFromApi) {
+        setVerificationErrorPrincipal('Le permis renseigné n\'existe pas ou n\'est pas authentifié. Veuillez vérifier le numéro de permis.');
+        setPermisPrincipalVerified(false);
+        setVerifyingPermisPrincipal(false);
+        return;
+      }
+      
+      // Auto-compléter les informations du permis
+      setPermisData(prev => ({
+        ...prev,
+        numero_permis: numPermisComplet,
+        lieu_de_dobtention_du_permis: permisDataFromApi.lieu_obtention || prev.lieu_de_dobtention_du_permis || '',
+        date_de_dobtention_du_permis: permisDataFromApi.date_obtention ? permisDataFromApi.date_obtention.split('T')[0] : prev.date_de_dobtention_du_permis || '',
+        date_de_delivrance_du_permis: permisDataFromApi.date_validite ? permisDataFromApi.date_validite.split('T')[0] : prev.date_de_delivrance_du_permis || '',
+      }));
+      
+      // Mettre à jour numeroPermis avec le numéro complet de l'API
+      setNumeroPermis(numPermisComplet);
+      
+      // Si le format est standard, essayer de parser le numéro de permis pour extraire les parties
+      if (permisFormat === 'standard' && permisDataFromApi.numero_permis) {
+        const numPermisApi = permisDataFromApi.numero_permis;
+        // Format attendu: AAAA-P-C-NNNN (ex: 2024-1-A-1234)
+        const parts = numPermisApi.split('-');
+        if (parts.length === 4) {
+          setNumeroPermisParts({
+            annee: parts[0] || '',
+            province: parts[1] || '',
+            categorie: parts[2] || '',
+            numero: parts[3] || '',
+          });
+        } else {
+          // Si le format n'est pas standard, extraire au moins la catégorie si disponible
+          if (permisDataFromApi.categorie) {
+            const categorieUpper = permisDataFromApi.categorie.toUpperCase();
+            setNumeroPermisParts(prev => ({
+              ...prev,
+              categorie: categorieUpper,
+            }));
+          }
+        }
+      } else if (permisDataFromApi.categorie) {
+        // Pour le format OP ou si on ne peut pas parser, utiliser au moins la catégorie
+        const categorieUpper = permisDataFromApi.categorie.toUpperCase();
+        setNumeroPermisParts(prev => ({
+          ...prev,
+          categorie: categorieUpper,
+        }));
+      }
+      
+      // Auto-sélectionner le référentiel correspondant à la catégorie
+      if (permisDataFromApi.categorie) {
+        const categorieUpper = permisDataFromApi.categorie.toUpperCase();
+        
+        // Si la catégorie contient plusieurs valeurs (ex: "B, C"), prendre la première
+        const premiereCategorie = categorieUpper.split(',')[0].trim();
+        
+        console.log('🔍 [handleVerifyPermisPrincipal] Recherche du référentiel pour la catégorie:', premiereCategorie);
+        console.log('📋 [handleVerifyPermisPrincipal] Référentiels disponibles:', referentiels.length, referentiels.map(r => ({ id: r.id, code: r.code, libelle: r.libelle })));
+        
+        // Essayer de sélectionner le référentiel immédiatement si disponible
+        if (referentiels.length > 0) {
+          const referentielTrouve = referentiels.find(
+            (ref) => ref.code && ref.code.toUpperCase() === premiereCategorie
+          );
+          
+          if (referentielTrouve) {
+            console.log('✅ [handleVerifyPermisPrincipal] Référentiel automatiquement sélectionné pour la catégorie:', premiereCategorie, referentielTrouve);
+            setFormationData(prev => ({
+              ...prev,
+              referenciel_id: referentielTrouve.id,
+            }));
+          } else {
+            console.log('⚠️ [handleVerifyPermisPrincipal] Aucun référentiel trouvé pour la catégorie:', premiereCategorie);
+            console.log('📋 [handleVerifyPermisPrincipal] Codes des référentiels disponibles:', referentiels.map(r => r.code));
+            // Le mapping sera fait par le useEffect quand les référentiels seront chargés
+          }
+        } else {
+          console.log('⏳ [handleVerifyPermisPrincipal] Référentiels non encore chargés, le mapping sera fait après le chargement via useEffect');
+        }
+      }
+      
+      // Auto-compléter les informations du permis d'origine si la catégorie nécessite un permis d'origine (C, D, E)
+      if (permisDataFromApi.categorie) {
+        const categorieUpper = permisDataFromApi.categorie.toUpperCase();
+        const categories = categorieUpper.split(',').map((c: string) => c.trim());
+        const needsPermisOrigine = categories.some((cat: string) => ['C', 'D', 'E'].includes(cat));
+        
+        if (needsPermisOrigine && permisDataFromApi.numero_origine_permis) {
+          console.log('🔍 [handleVerifyPermisPrincipal] Auto-complétion du permis d\'origine pour catégorie:', categorieUpper);
+          console.log('📋 [handleVerifyPermisPrincipal] Numéro permis d\'origine:', permisDataFromApi.numero_origine_permis);
+          console.log('📋 [handleVerifyPermisPrincipal] Lieu origine:', permisDataFromApi.lieu_origine);
+          
+          // Essayer de parser le numéro de permis d'origine si format standard (AAAA-P-C-NNNN)
+          const numOriginePermis = permisDataFromApi.numero_origine_permis.trim();
+          const parts = numOriginePermis.split('-');
+          
+          if (parts.length === 4) {
+            // Format standard: AAAA-P-C-NNNN
+            setNumeroOriginePermisParts({
+              annee: parts[0] || '',
+              province: parts[1] || '',
+              categorie: parts[2] || '',
+              numero: parts[3] || '',
+            });
+            setPermisOrigineFormat('standard');
+            console.log('✅ [handleVerifyPermisPrincipal] Permis d\'origine parsé (format standard):', {
+              annee: parts[0],
+              province: parts[1],
+              categorie: parts[2],
+              numero: parts[3]
+            });
+          } else {
+            // Format OP ou autre format
+            setNumeroOriginePermisParts({
+              annee: '',
+              province: '',
+              categorie: '',
+              numero: numOriginePermis,
+            });
+            setPermisOrigineFormat('op');
+            console.log('✅ [handleVerifyPermisPrincipal] Permis d\'origine en format OP:', numOriginePermis);
+          }
+          
+          // Mettre à jour permisData avec le numéro d'origine
+          // Note: lieu_origine de l'API sera utilisé pour lieu_de_dobtention_du_permis dans le dossier
+          setPermisData(prev => ({
+            ...prev,
+            numero_origine_permis: numOriginePermis,
+            // Si lieu_origine est présent, l'utiliser pour lieu_de_dobtention_du_permis
+            // (ce champ sera utilisé pour le permis d'origine dans le dossier)
+            lieu_de_dobtention_du_permis: permisDataFromApi.lieu_origine || prev.lieu_de_dobtention_du_permis || '',
+          }));
+        }
+      }
+      
+      // Rechercher un candidat existant avec nom, prénom et date de naissance
+      if (permisDataFromApi.nom && permisDataFromApi.prenom && permisDataFromApi.date_naissance) {
+        try {
+          console.log('🔍 [handleVerifyPermisPrincipal] Recherche d\'un candidat existant:', {
+            nom: permisDataFromApi.nom,
+            prenom: permisDataFromApi.prenom,
+            date_naissance: permisDataFromApi.date_naissance
+          });
+          
+          // Rechercher par nom et prénom
+          const searchResponse = await autoEcoleService.getCandidats(1, 50, {
+            search: `${permisDataFromApi.nom} ${permisDataFromApi.prenom}`.trim(),
+          });
+          
+          if (searchResponse.data && searchResponse.data.length > 0) {
+            // Formater la date de naissance pour comparaison (YYYY-MM-DD)
+            const dateNaissanceFormatee = permisDataFromApi.date_naissance.split('T')[0];
+            
+            // Chercher un candidat avec le même nom, prénom et date de naissance
+            const candidatTrouve = searchResponse.data.find((candidat: any) => {
+              const candidatDateNaissance = candidat.date_naissance ? candidat.date_naissance.split('T')[0] : null;
+              const nomMatch = candidat.personne?.nom?.toUpperCase().trim() === permisDataFromApi.nom.toUpperCase().trim();
+              const prenomMatch = candidat.personne?.prenom?.toUpperCase().trim() === permisDataFromApi.prenom.toUpperCase().trim();
+              const dateMatch = candidatDateNaissance === dateNaissanceFormatee;
+              
+              return nomMatch && prenomMatch && dateMatch;
+            });
+            
+            if (candidatTrouve) {
+              console.log('✅ [handleVerifyPermisPrincipal] Candidat existant trouvé:', candidatTrouve);
+              // Stocker le candidat trouvé pour afficher le récapitulatif
+              setCandidatTrouveFromPermisPrincipal(candidatTrouve);
+              setCandidatNonTrouvePrincipal(false);
+            } else {
+              console.log('ℹ️ [handleVerifyPermisPrincipal] Aucun candidat existant trouvé');
+              setCandidatTrouveFromPermisPrincipal(null);
+              setCandidatNonTrouvePrincipal(true);
+              // Auto-compléter les informations personnelles
+              setPersonneData(prev => ({
+                ...prev,
+                nom: permisDataFromApi.nom || prev.nom,
+                prenom: permisDataFromApi.prenom || prev.prenom,
+              }));
+              
+              // Auto-compléter les informations du candidat
+              setCandidatData(prev => ({
+                ...prev,
+                date_naissance: permisDataFromApi.date_naissance ? permisDataFromApi.date_naissance.split('T')[0] : prev.date_naissance,
+                lieu_naissance: permisDataFromApi.lieu_naissance || prev.lieu_naissance,
+                nationalite: permisDataFromApi.nationalite || prev.nationalite || 'Sénégalaise',
+                genre: permisDataFromApi.sexe === 'M' ? 'M' : permisDataFromApi.sexe === 'F' ? 'F' : prev.genre,
+                numero_piece: permisDataFromApi.numero_identite || prev.numero_piece,
+              }));
+              
+              // S'assurer que le mode est "new" pour créer un nouveau candidat
+              setCandidatMode('new');
+              setSelectedCandidat(null);
+            }
+          } else {
+            console.log('ℹ️ [handleVerifyPermisPrincipal] Aucun candidat trouvé dans la recherche');
+            setCandidatTrouveFromPermisPrincipal(null);
+            setCandidatNonTrouvePrincipal(true);
+            // Auto-compléter les informations personnelles
+            setPersonneData(prev => ({
+              ...prev,
+              nom: permisDataFromApi.nom || prev.nom,
+              prenom: permisDataFromApi.prenom || prev.prenom,
+            }));
+            
+            // Auto-compléter les informations du candidat
+            setCandidatData(prev => ({
+              ...prev,
+              date_naissance: permisDataFromApi.date_naissance ? permisDataFromApi.date_naissance.split('T')[0] : prev.date_naissance,
+              lieu_naissance: permisDataFromApi.lieu_naissance || prev.lieu_naissance,
+              nationalite: permisDataFromApi.nationalite || prev.nationalite || 'Sénégalaise',
+              genre: permisDataFromApi.sexe === 'M' ? 'M' : permisDataFromApi.sexe === 'F' ? 'F' : prev.genre,
+              numero_piece: permisDataFromApi.numero_identite || prev.numero_piece,
+            }));
+            
+            // S'assurer que le mode est "new" pour créer un nouveau candidat
+            setCandidatMode('new');
+            setSelectedCandidat(null);
+          }
+        } catch (searchErr: any) {
+          console.error('❌ [handleVerifyPermisPrincipal] Erreur lors de la recherche du candidat:', searchErr);
+          // En cas d'erreur, considérer qu'aucun candidat n'a été trouvé
+          setCandidatTrouveFromPermisPrincipal(null);
+          setCandidatNonTrouvePrincipal(true);
+          // Auto-compléter quand même les informations
+          setPersonneData(prev => ({
+            ...prev,
+            nom: permisDataFromApi.nom || prev.nom,
+            prenom: permisDataFromApi.prenom || prev.prenom,
+          }));
+          
+          setCandidatData(prev => ({
+            ...prev,
+            date_naissance: permisDataFromApi.date_naissance ? permisDataFromApi.date_naissance.split('T')[0] : prev.date_naissance,
+            lieu_naissance: permisDataFromApi.lieu_naissance || prev.lieu_naissance,
+            nationalite: permisDataFromApi.nationalite || prev.nationalite || 'Sénégalaise',
+            genre: permisDataFromApi.sexe === 'M' ? 'M' : permisDataFromApi.sexe === 'F' ? 'F' : prev.genre,
+            numero_piece: permisDataFromApi.numero_identite || prev.numero_piece,
+          }));
+        }
+      }
+      
+      setPermisPrincipalVerified(true);
+      setVerificationErrorPrincipal(null);
+      setVerifyingPermisPrincipal(false);
+    } catch (err: any) {
+      console.error('❌ Erreur lors de la vérification du permis principal:', err);
+      setVerifyingPermisPrincipal(false);
+      setPermisPrincipalVerified(false);
+      
+      // Gérer les différents types d'erreurs
+      if (err.response?.status === 404) {
+        setVerificationErrorPrincipal('Le permis renseigné n\'existe pas dans le système. Veuillez vérifier le numéro de permis.');
+      } else if (err.response?.status === 400) {
+        setVerificationErrorPrincipal('Le format du numéro de permis est invalide. Veuillez vérifier le numéro saisi.');
+      } else if (err.response?.data?.message) {
+        setVerificationErrorPrincipal(`Erreur lors de la vérification du permis: ${err.response.data.message}`);
+      } else if (err.message) {
+        setVerificationErrorPrincipal(`Erreur lors de la vérification du permis: ${err.message}`);
+      } else {
+        setVerificationErrorPrincipal('Le permis renseigné n\'existe pas ou n\'est pas authentifié. Veuillez vérifier le numéro de permis.');
+      }
+    }
+  };
+
+  // Fonction pour vérifier le permis d'origine (catégorie C/D/E)
+  const handleVerifyPermisOrigine = async () => {
+    const numPermisOrigineComplet = buildNumeroOriginePermis(numeroOriginePermisParts, permisOrigineFormat);
+    if (!numPermisOrigineComplet || numPermisOrigineComplet.trim() === '') {
+      setVerificationErrorOrigine('Veuillez remplir le numéro du permis d\'origine');
+      return;
+    }
+    
+    setVerifyingPermisOrigine(true);
+    setVerificationErrorOrigine(null);
+    setPermisOrigineVerified(false);
+    
+    try {
+      console.log('🔍 Vérification du permis d\'origine:', numPermisOrigineComplet);
+      const response = await gestionDossierService.getChangePermis(numPermisOrigineComplet);
+      console.log('✅ Permis d\'origine vérifié avec succès:', response);
+      
+      // Extraire les données de la réponse (peut être un tableau ou un objet)
+      let permisDataFromApi: any = null;
+      if (Array.isArray(response) && response.length > 0) {
+        permisDataFromApi = response[0];
+        console.log('✅ Permis d\'origine trouvé dans la réponse (tableau)');
+      } else if (response && typeof response === 'object' && !Array.isArray(response)) {
+        permisDataFromApi = response;
+        console.log('✅ Permis d\'origine trouvé dans la réponse (objet)');
+      }
+      
+      if (!permisDataFromApi) {
+        setVerificationErrorOrigine('Le permis d\'origine renseigné n\'existe pas ou n\'est pas authentifié. Veuillez vérifier le numéro de permis.');
+        setPermisOrigineVerified(false);
+        setVerifyingPermisOrigine(false);
+        return;
+      }
+      
+      // Auto-compléter le lieu d'origine si disponible
+      if (permisDataFromApi.lieu_obtention || permisDataFromApi.lieu_origine) {
+        const lieuOrigine = permisDataFromApi.lieu_origine || permisDataFromApi.lieu_obtention;
+        setPermisData(prev => ({
+          ...prev,
+          lieu_de_dobtention_du_permis: lieuOrigine || prev.lieu_de_dobtention_du_permis || '',
+        }));
+        console.log('✅ Lieu d\'origine auto-complété:', lieuOrigine);
+      }
+      
+      // Rechercher un candidat existant avec nom, prénom et date de naissance
+      if (permisDataFromApi.nom && permisDataFromApi.prenom && permisDataFromApi.date_naissance) {
+        try {
+          console.log('🔍 [handleVerifyPermisOrigine] Recherche d\'un candidat existant:', {
+            nom: permisDataFromApi.nom,
+            prenom: permisDataFromApi.prenom,
+            date_naissance: permisDataFromApi.date_naissance
+          });
+          
+          // Rechercher par nom et prénom
+          const searchResponse = await autoEcoleService.getCandidats(1, 50, {
+            search: `${permisDataFromApi.nom} ${permisDataFromApi.prenom}`.trim(),
+          });
+          
+          if (searchResponse.data && searchResponse.data.length > 0) {
+            // Formater la date de naissance pour comparaison (YYYY-MM-DD)
+            const dateNaissanceFormatee = permisDataFromApi.date_naissance.split('T')[0];
+            
+            // Chercher un candidat avec le même nom, prénom et date de naissance
+            const candidatTrouve = searchResponse.data.find((candidat: any) => {
+              const candidatDateNaissance = candidat.date_naissance ? candidat.date_naissance.split('T')[0] : null;
+              const nomMatch = candidat.personne?.nom?.toUpperCase().trim() === permisDataFromApi.nom.toUpperCase().trim();
+              const prenomMatch = candidat.personne?.prenom?.toUpperCase().trim() === permisDataFromApi.prenom.toUpperCase().trim();
+              const dateMatch = candidatDateNaissance === dateNaissanceFormatee;
+              
+              return nomMatch && prenomMatch && dateMatch;
+            });
+            
+            if (candidatTrouve) {
+              console.log('✅ [handleVerifyPermisOrigine] Candidat existant trouvé:', candidatTrouve);
+              // Stocker le candidat trouvé pour afficher le récapitulatif
+              setCandidatTrouveFromPermisOrigine(candidatTrouve);
+              setCandidatNonTrouveOrigine(false);
+              // Passer automatiquement à l'étape 4 pour afficher CandidatRecapStep
+              setActiveStep(4);
+            } else {
+              console.log('ℹ️ [handleVerifyPermisOrigine] Aucun candidat existant trouvé');
+              setCandidatTrouveFromPermisOrigine(null);
+              setCandidatNonTrouveOrigine(true);
+              // Auto-compléter les informations personnelles
+              setPersonneData(prev => ({
+                ...prev,
+                nom: permisDataFromApi.nom || prev.nom,
+                prenom: permisDataFromApi.prenom || prev.prenom,
+              }));
+              
+              // Auto-compléter les informations du candidat
+              setCandidatData(prev => ({
+                ...prev,
+                date_naissance: permisDataFromApi.date_naissance ? permisDataFromApi.date_naissance.split('T')[0] : prev.date_naissance,
+                lieu_naissance: permisDataFromApi.lieu_naissance || prev.lieu_naissance,
+                nationalite: permisDataFromApi.nationalite || prev.nationalite || 'Sénégalaise',
+                genre: permisDataFromApi.sexe === 'M' ? 'M' : permisDataFromApi.sexe === 'F' ? 'F' : prev.genre,
+                numero_piece: permisDataFromApi.numero_identite || prev.numero_piece,
+              }));
+              
+              // S'assurer que le mode est "new" pour créer un nouveau candidat
+              setCandidatMode('new');
+              setSelectedCandidat(null);
+            }
+          } else {
+            console.log('ℹ️ [handleVerifyPermisOrigine] Aucun candidat trouvé dans la recherche');
+            setCandidatTrouveFromPermisOrigine(null);
+            setCandidatNonTrouveOrigine(true);
+            // Auto-compléter les informations personnelles
+            setPersonneData(prev => ({
+              ...prev,
+              nom: permisDataFromApi.nom || prev.nom,
+              prenom: permisDataFromApi.prenom || prev.prenom,
+            }));
+            
+            // Auto-compléter les informations du candidat
+            setCandidatData(prev => ({
+              ...prev,
+              date_naissance: permisDataFromApi.date_naissance ? permisDataFromApi.date_naissance.split('T')[0] : prev.date_naissance,
+              lieu_naissance: permisDataFromApi.lieu_naissance || prev.lieu_naissance,
+              nationalite: permisDataFromApi.nationalite || prev.nationalite || 'Sénégalaise',
+              genre: permisDataFromApi.sexe === 'M' ? 'M' : permisDataFromApi.sexe === 'F' ? 'F' : prev.genre,
+              numero_piece: permisDataFromApi.numero_identite || prev.numero_piece,
+            }));
+            
+            // S'assurer que le mode est "new" pour créer un nouveau candidat
+            setCandidatMode('new');
+            setSelectedCandidat(null);
+          }
+        } catch (searchErr: any) {
+          console.error('❌ [handleVerifyPermisOrigine] Erreur lors de la recherche du candidat:', searchErr);
+          // En cas d'erreur, considérer qu'aucun candidat n'a été trouvé
+          setCandidatTrouveFromPermisOrigine(null);
+          setCandidatNonTrouveOrigine(true);
+          // Auto-compléter quand même les informations
+          setPersonneData(prev => ({
+            ...prev,
+            nom: permisDataFromApi.nom || prev.nom,
+            prenom: permisDataFromApi.prenom || prev.prenom,
+          }));
+          
+          setCandidatData(prev => ({
+            ...prev,
+            date_naissance: permisDataFromApi.date_naissance ? permisDataFromApi.date_naissance.split('T')[0] : prev.date_naissance,
+            lieu_naissance: permisDataFromApi.lieu_naissance || prev.lieu_naissance,
+            nationalite: permisDataFromApi.nationalite || prev.nationalite || 'Sénégalaise',
+            genre: permisDataFromApi.sexe === 'M' ? 'M' : permisDataFromApi.sexe === 'F' ? 'F' : prev.genre,
+            numero_piece: permisDataFromApi.numero_identite || prev.numero_piece,
+          }));
+        }
+      }
+      
+      setPermisOrigineVerified(true);
+      setVerificationErrorOrigine(null);
+      setVerifyingPermisOrigine(false);
+    } catch (err: any) {
+      console.error('❌ Erreur lors de la vérification du permis d\'origine:', err);
+      setVerifyingPermisOrigine(false);
+      setPermisOrigineVerified(false);
+      
+      // Gérer les différents types d'erreurs
+      if (err.response?.status === 404) {
+        setVerificationErrorOrigine('Le permis d\'origine renseigné n\'existe pas dans le système. Veuillez vérifier le numéro de permis.');
+      } else if (err.response?.status === 400) {
+        setVerificationErrorOrigine('Le format du numéro de permis d\'origine est invalide. Veuillez vérifier le numéro saisi.');
+      } else if (err.response?.data?.message) {
+        setVerificationErrorOrigine(`Erreur lors de la vérification du permis d'origine: ${err.response.data.message}`);
+      } else if (err.message) {
+        setVerificationErrorOrigine(`Erreur lors de la vérification du permis d'origine: ${err.message}`);
+      } else {
+        setVerificationErrorOrigine('Le permis d\'origine renseigné n\'existe pas ou n\'est pas authentifié. Veuillez vérifier le numéro de permis.');
+      }
+    }
+  };
+
+  // Fonction pour vérifier le permis B d'origine
+  const handleVerifyPermis = async () => {
+    const numPermisBOrigineComplet = buildNumeroOriginePermis(numeroBOriginePermisParts, permisBOrigineFormat);
+    if (!numPermisBOrigineComplet || numPermisBOrigineComplet.trim() === '') {
+      setVerificationError('Veuillez remplir le numéro du permis B d\'origine');
+      return;
+    }
+    
+    setVerifyingPermis(true);
+    setVerificationError(null);
+    setPermisVerified(false);
+    
+    try {
+      console.log('🔍 Vérification du permis B d\'origine:', numPermisBOrigineComplet);
+      const response = await gestionDossierService.getChangePermis(numPermisBOrigineComplet);
+      console.log('✅ Permis B vérifié avec succès:', response);
+      
+      // Extraire les données de la réponse (peut être un tableau ou un objet)
+      let permisData: any = null;
+      if (Array.isArray(response) && response.length > 0) {
+        permisData = response[0];
+        console.log('✅ Permis B trouvé dans la réponse (tableau)');
+      } else if (response && typeof response === 'object' && !Array.isArray(response)) {
+        permisData = response;
+        console.log('✅ Permis B trouvé dans la réponse (objet)');
+      }
+      
+      if (!permisData) {
+        setVerificationError('Le permis B renseigné n\'existe pas ou n\'est pas authentifié. Veuillez vérifier le numéro de permis.');
+        setPermisVerified(false);
+        setVerifyingPermis(false);
+        return;
+      }
+      
+      // Auto-compléter les informations du permis B
+      const updatedPermisBOrigineData: PermisData = {
+        ...permisBOrigineData,
+        numero_origine_permis: numPermisBOrigineComplet,
+        lieu_de_dobtention_du_permis: permisData.lieu_obtention || permisBOrigineData.lieu_de_dobtention_du_permis || '',
+        date_de_dobtention_du_permis: permisData.date_obtention ? permisData.date_obtention.split('T')[0] : permisBOrigineData.date_de_dobtention_du_permis || '',
+        date_de_delivrance_du_permis: permisData.date_validite ? permisData.date_validite.split('T')[0] : permisBOrigineData.date_de_delivrance_du_permis || '',
+      };
+      setPermisBOrigineData(updatedPermisBOrigineData);
+      
+      // Rechercher un candidat existant avec nom, prénom et date de naissance
+      if (permisData.nom && permisData.prenom && permisData.date_naissance) {
+        try {
+          console.log('🔍 Recherche d\'un candidat existant:', {
+            nom: permisData.nom,
+            prenom: permisData.prenom,
+            date_naissance: permisData.date_naissance
+          });
+          
+          // Rechercher par nom et prénom
+          const searchResponse = await autoEcoleService.getCandidats(1, 50, {
+            search: `${permisData.nom} ${permisData.prenom}`.trim(),
+          });
+          
+          if (searchResponse.data && searchResponse.data.length > 0) {
+            // Formater la date de naissance pour comparaison (YYYY-MM-DD)
+            const dateNaissanceFormatee = permisData.date_naissance.split('T')[0];
+            
+            // Chercher un candidat avec le même nom, prénom et date de naissance
+            const candidatTrouve = searchResponse.data.find((candidat: any) => {
+              const candidatDateNaissance = candidat.date_naissance ? candidat.date_naissance.split('T')[0] : null;
+              const nomMatch = candidat.personne?.nom?.toUpperCase().trim() === permisData.nom.toUpperCase().trim();
+              const prenomMatch = candidat.personne?.prenom?.toUpperCase().trim() === permisData.prenom.toUpperCase().trim();
+              const dateMatch = candidatDateNaissance === dateNaissanceFormatee;
+              
+              return nomMatch && prenomMatch && dateMatch;
+            });
+            
+            if (candidatTrouve) {
+              console.log('✅ Candidat existant trouvé:', candidatTrouve);
+              // Stocker le candidat trouvé pour afficher le récapitulatif
+              setCandidatTrouveFromPermis(candidatTrouve);
+              setCandidatNonTrouve(false);
+            } else {
+              console.log('ℹ️ Aucun candidat existant trouvé');
+              setCandidatTrouveFromPermis(null);
+              setCandidatNonTrouve(true);
+              // Auto-compléter les informations personnelles
+              setPersonneData(prev => ({
+                ...prev,
+                nom: permisData.nom || prev.nom,
+                prenom: permisData.prenom || prev.prenom,
+              }));
+              
+              // Auto-compléter les informations du candidat
+              setCandidatData(prev => ({
+                ...prev,
+                date_naissance: permisData.date_naissance ? permisData.date_naissance.split('T')[0] : prev.date_naissance,
+                lieu_naissance: permisData.lieu_naissance || prev.lieu_naissance,
+                nationalite: permisData.nationalite || prev.nationalite || 'Sénégalaise',
+                genre: permisData.sexe === 'M' ? 'M' : permisData.sexe === 'F' ? 'F' : prev.genre,
+                numero_piece: permisData.numero_identite || prev.numero_piece,
+              }));
+              
+              // S'assurer que le mode est "new" pour créer un nouveau candidat
+              setCandidatMode('new');
+              setSelectedCandidat(null);
+            }
+          } else {
+            console.log('ℹ️ Aucun candidat trouvé dans la recherche');
+            setCandidatTrouveFromPermis(null);
+            setCandidatNonTrouve(true);
+            // Auto-compléter les informations personnelles
+            setPersonneData(prev => ({
+              ...prev,
+              nom: permisData.nom || prev.nom,
+              prenom: permisData.prenom || prev.prenom,
+            }));
+            
+            // Auto-compléter les informations du candidat
+            setCandidatData(prev => ({
+              ...prev,
+              date_naissance: permisData.date_naissance ? permisData.date_naissance.split('T')[0] : prev.date_naissance,
+              lieu_naissance: permisData.lieu_naissance || prev.lieu_naissance,
+              nationalite: permisData.nationalite || prev.nationalite || 'Sénégalaise',
+              genre: permisData.sexe === 'M' ? 'M' : permisData.sexe === 'F' ? 'F' : prev.genre,
+              numero_piece: permisData.numero_identite || prev.numero_piece,
+            }));
+            
+            setCandidatMode('new');
+            setSelectedCandidat(null);
+          }
+        } catch (searchErr: any) {
+          console.error('⚠️ Erreur lors de la recherche de candidat, auto-complétion quand même:', searchErr);
+          setCandidatTrouveFromPermis(null);
+          setCandidatNonTrouve(true);
+          // En cas d'erreur de recherche, auto-compléter quand même
+          setPersonneData(prev => ({
+            ...prev,
+            nom: permisData.nom || prev.nom,
+            prenom: permisData.prenom || prev.prenom,
+          }));
+          
+          setCandidatData(prev => ({
+            ...prev,
+            date_naissance: permisData.date_naissance ? permisData.date_naissance.split('T')[0] : prev.date_naissance,
+            lieu_naissance: permisData.lieu_naissance || prev.lieu_naissance,
+            nationalite: permisData.nationalite || prev.nationalite || 'Sénégalaise',
+            genre: permisData.sexe === 'M' ? 'M' : permisData.sexe === 'F' ? 'F' : prev.genre,
+            numero_piece: permisData.numero_identite || prev.numero_piece,
+          }));
+          
+          setCandidatMode('new');
+          setSelectedCandidat(null);
+        }
+      }
+      
+      setPermisVerified(true);
+      setVerificationError(null);
+      setVerifyingPermis(false);
+    } catch (err: any) {
+      console.error('❌ Erreur lors de la vérification du permis B:', err);
+      setVerifyingPermis(false);
+      setPermisVerified(false);
+      
+      // Gérer les différents types d'erreurs
+      if (err.response?.status === 404) {
+        setVerificationError('Le permis B renseigné n\'existe pas dans le système. Veuillez vérifier le numéro de permis.');
+      } else if (err.response?.status === 400) {
+        setVerificationError('Le format du numéro de permis B est invalide. Veuillez vérifier le numéro saisi.');
+      } else if (err.response?.data?.message) {
+        setVerificationError(`Erreur lors de la vérification du permis B: ${err.response.data.message}`);
+      } else if (err.message) {
+        setVerificationError(`Erreur lors de la vérification du permis B: ${err.message}`);
+      } else {
+        setVerificationError('Le permis B renseigné n\'existe pas ou n\'est pas authentifié. Veuillez vérifier le numéro de permis.');
+      }
+    }
+  };
+
+  // Réinitialiser la vérification quand le numéro change
+  useEffect(() => {
+    const numPermisBOrigineComplet = buildNumeroOriginePermis(numeroBOriginePermisParts, permisBOrigineFormat);
+    if (numPermisBOrigineComplet && permisBOrigineData.numero_origine_permis !== numPermisBOrigineComplet) {
+      setPermisVerified(false);
+      setVerificationError(null);
+    }
+  }, [numeroBOriginePermisParts, permisBOrigineFormat]);
+
+  // Passer à l'étape suivante
+  const handleNext = async () => {
+    setError(null);
+    console.log('🔍 [HANDLE_NEXT] activeStep:', activeStep, 'isNouveauPermis:', isNouveauPermis, 'needsPermisOrigine:', needsPermisOrigine());
+
+    if (activeStep === 0) {
+      // Étape 0 : Valider la sélection du type de demande
+      if (!validateStep0({ typeDemandeId, setError })) return;
+      
+      const typeDemande = typeDemandes.find(td => td.id === typeDemandeId);
+      if (typeDemande) {
+        setSelectedTypeDemande(typeDemande);
+        const isNouveau = checkIsNouveauPermis(typeDemande.name);
+        const isFiche = checkIsFicheEnregistre(typeDemande.name);
+        setIsNouveauPermis(isNouveau);
+        setIsFicheEnregistre(isFiche);
+        setActiveStep(1);
+      }
+    } else if (activeStep === 1 && isNouveauPermis) {
+      // Étape auto-école/formation (si nouveau permis)
+      if (!validateStepAutoEcole({ isNouveauPermis, autoEcoleId, formationId: formationData.formation_id, setError })) return;
+      // Si la formation est de type C, passer à l'étape permis B d'origine, sinon passer au choix candidat
+      const hasPermisBOrigine = isFormationTypeC();
+      setActiveStep(hasPermisBOrigine ? 2 : 3);
+    } else if (activeStep === 2 && isNouveauPermis && isFormationTypeC()) {
+      // Étape permis B d'origine (si nouveau permis de type C)
+      const numPermisBOrigineComplet = buildNumeroOriginePermis(numeroBOriginePermisParts, permisBOrigineFormat);
+      if (!numPermisBOrigineComplet || numPermisBOrigineComplet.trim() === '') {
+        setError('Veuillez remplir le numéro du permis B d\'origine');
+        return;
+      }
+      if (!permisBOrigineData.lieu_de_dobtention_du_permis || permisBOrigineData.lieu_de_dobtention_du_permis.trim() === '') {
+        setError('Veuillez remplir le lieu d\'obtention du permis B');
+        return;
+      }
+      if (!permisBOrigineData.date_de_dobtention_du_permis) {
+        setError('Veuillez remplir la date d\'obtention du permis B');
+        return;
+      }
+      if (!permisBOrigineData.date_de_delivrance_du_permis) {
+        setError('Veuillez remplir la date de délivrance du permis B');
+        return;
+      }
+      
+      // Vérifier que le permis B a été vérifié avant de continuer
+      if (!permisVerified) {
+        setError('Veuillez vérifier le permis B d\'origine avant de continuer. Cliquez sur le bouton "Vérifier le permis".');
+        return;
+      }
+      
+      // Passer directement à l'étape suivante (récapitulatif si candidat trouvé, sinon PersonneFormStep)
+      setActiveStep(3);
+    } else if (activeStep === 1 && !isNouveauPermis) {
+      // Étape numéro de permis (si pas nouveau permis)
+      if (!validateStepNumeroPermis({ setError, isFicheEnregistre, numeroPermisParts, setNumeroPermis, permisFormat })) return;
+      
+      // Vérifier que le permis a été vérifié avant de continuer (pour Duplicata et Fiche d'enregistrement uniquement)
+      if ((isFicheEnregistre || selectedTypeDemande?.name === 'DUPLICATA') && !permisPrincipalVerified) {
+        setError('Veuillez vérifier le permis avant de continuer. Cliquez sur le bouton "Vérifier le permis".');
+        return;
+      }
+      
+      // Copier le numéro de permis dans permisData
+      setPermisData(prev => ({ ...prev, numero_permis: numeroPermis }));
+      setActiveStep(2);
+    } else if (activeStep === 2 && !isNouveauPermis) {
+      // Étape informations du permis (si pas nouveau permis)
+      // Valider seulement les champs du permis (sans permis d'origine car c'est une étape séparée)
+      if (!permisData.lieu_de_dobtention_du_permis || permisData.lieu_de_dobtention_du_permis.trim() === '') {
+        setError('Veuillez remplir le lieu d\'obtention du permis');
+        return;
+      }
+      if (!permisData.date_de_dobtention_du_permis) {
+        setError('Veuillez remplir la date d\'obtention du permis');
+        return;
+      }
+      if (!permisData.date_de_delivrance_du_permis) {
+        setError('Veuillez remplir la date de délivrance du permis');
+        return;
+      }
+      
+      // Si catégorie C/D/E, passer à l'étape permis d'origine, sinon passer directement à PersonneFormStep
+      const hasPermisOrigine = needsPermisOrigine();
+      setActiveStep(hasPermisOrigine ? 3 : 3);
+    } else if (activeStep === 3 && !isNouveauPermis && needsPermisOrigine()) {
+      // Étape permis d'origine (si catégorie C/D/E)
+      // Vérifier que le permis d'origine a été vérifié avant de continuer
+      if (!permisOrigineVerified) {
+        setError('Veuillez vérifier le permis d\'origine avant de continuer. Cliquez sur le bouton "Vérifier le permis d\'origine".');
+        return;
+      }
+      if (!validatePermisOrigine({ 
+        setError, 
+        numeroOriginePermisParts, 
+        permisOrigineFormat, 
+        setPermisData, 
+        permisData 
+      })) return;
+      setActiveStep(4);
+    } else if ((activeStep === 2 && isNouveauPermis && !isFormationTypeC()) ||
+               (activeStep === 3 && isNouveauPermis && isFormationTypeC() && !candidatTrouveFromPermis) ||
+               (activeStep === 3 && !isNouveauPermis && !needsPermisOrigine()) ||
+               (activeStep === 4 && !isNouveauPermis && needsPermisOrigine())) {
+      // PersonneFormStep - La navigation se fait automatiquement, pas besoin de validation ici
+      // Si candidat existant sélectionné (via récapitulatif), passer directement à la finalisation
+      if (candidatMode === 'existing' && selectedCandidat && selectedCandidat.id) {
+        setCandidatId(selectedCandidat.id);
+        setPersonneId(selectedCandidat.personne?.id || null);
+        // Calculer l'étape de finalisation
+        if (isNouveauPermis) {
+          setActiveStep(6);
+        } else {
+          const finalStep = needsPermisOrigine() ? 6 : 5;
+          setActiveStep(finalStep);
+        }
+        return;
+      }
+      // Sinon, continuer normalement (la validation se fera dans PersonneFormStep)
+      return;
+    } else if (activeStep === 4 && isNouveauPermis) {
+      // Informations personnelles (pour nouveau permis) - étape 4
+      // L'enregistrement se fait via le bouton dans PersonneFormStep
+      return;
+    } else if (activeStep === 4 && !isNouveauPermis) {
+      // Informations personnelles (pour autres types de permis) - étape 4
+      // L'enregistrement se fait via le bouton dans PersonneFormStep
+      return;
+    } else if (activeStep === 5 && isNouveauPermis) {
+      // Informations du candidat (pour nouveau permis) - étape 5
+      // La création se fait via le bouton dans CandidatFormStep
+      return;
+    } else if (activeStep === 5 && !isNouveauPermis) {
+      // Informations du candidat (pour autres types de permis) - étape 5
+      // La création se fait via le bouton dans CandidatFormStep
+      return;
+    } else if ((activeStep === 5 && !isNouveauPermis && !needsPermisOrigine()) || 
+               (activeStep === 6 && !isNouveauPermis && needsPermisOrigine())) {
+      // Informations du candidat (pour autres types de permis)
+      // activeStep 5 si pas de permis d'origine, activeStep 6 si permis d'origine affiché
+      console.log('🔍 [VALIDATION] Étape Informations du candidat - activeStep:', activeStep, 'isNouveauPermis:', isNouveauPermis);
+      // Réinitialiser l'erreur avant la validation pour éviter qu'une erreur précédente persiste
+      setError(null);
+      if (!validateCandidat({ candidatData, setError })) {
         console.log('❌ [VALIDATION] Échec validation informations candidat');
+        console.log('📋 Données candidat:', { 
+          date_naissance: candidatData.date_naissance, 
+          lieu_naissance: candidatData.lieu_naissance, 
+          nip: candidatData.nip, 
+          numero_piece: candidatData.numero_piece 
+        });
         return;
       }
       console.log('✅ [VALIDATION] Validation informations candidat réussie');
@@ -547,7 +1621,8 @@ const CreateDossierForm: React.FC<CreateDossierFormProps> = ({ onSuccess }) => {
         
         const response = await autoEcoleService.createCandidat(candidatPayload as any);
         setCandidatId(response.data.id);
-        setActiveStep(isNouveauPermis ? 4 : 3);
+        // Passer à la finalisation
+        setActiveStep(6);
       } catch (err: any) {
         if (err.response?.data?.errors) {
           // Filtrer uniquement les erreurs pertinentes pour l'étape "Informations du candidat"
@@ -605,6 +1680,43 @@ const CreateDossierForm: React.FC<CreateDossierFormProps> = ({ onSuccess }) => {
         commentaires: formationData.commentaires || undefined,
       };
 
+      // Ajouter les informations du permis si ce n'est pas un nouveau permis
+      if (!isNouveauPermis) {
+        // Numéro de permis (utiliser celui de l'étape ou celui de permisData)
+        const numPermis = permisData.numero_permis || numeroPermis;
+        if (numPermis) {
+          if (isFicheEnregistre) {
+            dossierPayload.numero_origine_permis = numPermis;
+          } else {
+            dossierPayload.numero_permis = numPermis;
+          }
+        }
+        
+        // Numéro d'origine du permis (si fourni)
+        if (permisData.numero_origine_permis && permisData.numero_origine_permis.trim() !== '') {
+          dossierPayload.numero_origine_permis = permisData.numero_origine_permis;
+        }
+        
+        // Lieu d'obtention du permis
+        if (permisData.lieu_de_dobtention_du_permis && permisData.lieu_de_dobtention_du_permis.trim() !== '') {
+          dossierPayload.lieu_de_dobtention_du_permis = permisData.lieu_de_dobtention_du_permis;
+        }
+        
+        // Date d'obtention du permis
+        if (permisData.date_de_dobtention_du_permis) {
+          // Convertir la date au format ISO si nécessaire
+          const dateObtention = new Date(permisData.date_de_dobtention_du_permis);
+          dossierPayload.date_de_dobtention_du_permis = dateObtention.toISOString();
+        }
+        
+        // Date de délivrance du permis
+        if (permisData.date_de_delivrance_du_permis) {
+          // Convertir la date au format ISO si nécessaire
+          const dateDelivrance = new Date(permisData.date_de_delivrance_du_permis);
+          dossierPayload.date_de_delivrance_du_permis = dateDelivrance.toISOString();
+        }
+      }
+
       // Ajouter auto_ecole_id et formation_id seulement si nouveau permis
       if (isNouveauPermis) {
         if (!selectedAutoEcole || !formationData.formation_id) {
@@ -612,16 +1724,101 @@ const CreateDossierForm: React.FC<CreateDossierFormProps> = ({ onSuccess }) => {
           setLoading(false);
           return;
         }
+        // Pour un nouveau permis, utiliser l'auto-école et la formation choisies par l'utilisateur
         dossierPayload.auto_ecole_id = selectedAutoEcole.id;
         dossierPayload.formation_id = formationData.formation_id;
+        
+        // Si la formation est de type C, ajouter les informations du permis B d'origine
+        if (isFormationTypeC()) {
+          if (permisBOrigineData.numero_origine_permis && permisBOrigineData.numero_origine_permis.trim() !== '') {
+            dossierPayload.numero_origine_permis = permisBOrigineData.numero_origine_permis;
+          }
+          if (permisBOrigineData.lieu_de_dobtention_du_permis && permisBOrigineData.lieu_de_dobtention_du_permis.trim() !== '') {
+            dossierPayload.lieu_de_dobtention_du_permis = permisBOrigineData.lieu_de_dobtention_du_permis;
+          }
+          if (permisBOrigineData.date_de_dobtention_du_permis) {
+            const dateObtention = new Date(permisBOrigineData.date_de_dobtention_du_permis);
+            dossierPayload.date_de_dobtention_du_permis = dateObtention.toISOString();
+          }
+          if (permisBOrigineData.date_de_delivrance_du_permis) {
+            const dateDelivrance = new Date(permisBOrigineData.date_de_delivrance_du_permis);
+            dossierPayload.date_de_delivrance_du_permis = dateDelivrance.toISOString();
+          }
+        }
       }
 
       // Ajouter referenciel_id si fourni
       if (formationData.referenciel_id) {
         dossierPayload.referenciel_id = formationData.referenciel_id;
+        
+        // Si referenciel_id est fourni ET que ce n'est PAS un nouveau permis,
+        // chercher automatiquement l'auto-école CNEPC et sa formation correspondante
+        // Pour un nouveau permis, on utilise déjà l'auto-école et la formation choisies par l'utilisateur
+        if (!isNouveauPermis) {
+        try {
+          console.log('🔍 Recherche de l\'auto-école CNEPC...');
+          
+          // Récupérer toutes les auto-écoles
+          const autoEcolesResponse = await autoEcoleService.getAutoEcoles(1, 1000, {});
+          const allAutoEcoles = autoEcolesResponse.data || [];
+          
+          // Trouver l'auto-école CNEPC
+          const cnepcAutoEcole = allAutoEcoles.find((ae: AutoEcole) => 
+            ae.nom_auto_ecole && ae.nom_auto_ecole.trim().toUpperCase() === 'CNEPC'
+          );
+          
+          if (cnepcAutoEcole) {
+            console.log('✅ Auto-école CNEPC trouvée:', cnepcAutoEcole.id);
+            
+            // Récupérer les formations de l'auto-école CNEPC
+            const cnepcFormations = await autoEcoleService.getFormationsByAutoEcole(cnepcAutoEcole.id);
+            console.log(`📋 ${cnepcFormations.length} formation(s) trouvée(s) pour CNEPC`);
+            
+            // Trouver la formation dont le type_permis_id correspond au referenciel_id
+            const matchingFormation = cnepcFormations.find((formation: any) => {
+              const formationTypePermisId = formation.type_permis_id || formation.type_permis?.id;
+              return formationTypePermisId === formationData.referenciel_id;
+            });
+            
+            if (matchingFormation) {
+              console.log('✅ Formation correspondante trouvée:', matchingFormation.id);
+              dossierPayload.auto_ecole_id = cnepcAutoEcole.id;
+              dossierPayload.formation_id = matchingFormation.id;
+            } else {
+              console.warn('⚠️ Aucune formation trouvée pour le type de permis:', formationData.referenciel_id);
+            }
+          } else {
+            console.warn('⚠️ Auto-école CNEPC non trouvée');
+          }
+        } catch (err: any) {
+          console.error('❌ Erreur lors de la recherche de l\'auto-école CNEPC:', err);
+          // Ne pas bloquer la création du dossier si la recherche échoue
+          }
+        } else {
+          console.log('ℹ️ Nouveau permis détecté - utilisation de l\'auto-école et de la formation choisies par l\'utilisateur');
+        }
       }
       
+      console.log('📤 Payload envoyé pour la création du dossier:', JSON.stringify(dossierPayload, null, 2));
+      
       const response = await autoEcoleService.createDossier(dossierPayload);
+
+      console.log('✅ Réponse complète de la création du dossier:', JSON.stringify(response, null, 2));
+      
+      if (response.data) {
+        const dossierData = response.data as any;
+        console.log('📋 JSON complet du dossier créé:', JSON.stringify(dossierData, null, 2));
+        console.log('🔍 Vérification des champs importants:', {
+          id: dossierData.id,
+          auto_ecole_id: dossierData.auto_ecole_id,
+          formation_id: dossierData.formation_id,
+          referenciel_id: dossierData.referenciel_id,
+          hasAutoEcole: !!dossierData.auto_ecole,
+          hasFormation: !!dossierData.formation,
+          autoEcoleNom: dossierData.auto_ecole?.nom_auto_ecole,
+          formationId: dossierData.formation?.id,
+        });
+      }
 
       setSuccess(response.message || 'Dossier créé avec succès !');
       
@@ -647,419 +1844,590 @@ const CreateDossierForm: React.FC<CreateDossierFormProps> = ({ onSuccess }) => {
   };
 
   // Obtenir le contenu de l'étape actuelle
-  const getStepContent = (step: number) => {
-    const realStep = getRealStepIndex(step);
-
-    switch (realStep) {
-      case 0:
-        return (
-          <FormControl fullWidth required>
-            <InputLabel>Type de demande</InputLabel>
-            <Select
-              value={typeDemandeId}
-              onChange={(e) => setTypeDemandeId(e.target.value)}
-              label="Type de demande"
-              disabled={loadingTypeDemandes || loading}
-            >
-              {loadingTypeDemandes ? (
-                <MenuItem disabled>
-                  <CircularProgress size={20} sx={{ mr: 1 }} />
-                  Chargement des types de demande...
-                </MenuItem>
-              ) : typeDemandes.length === 0 ? (
-                <MenuItem disabled>
-                  Aucun type de demande disponible
-                </MenuItem>
-              ) : (
-                typeDemandes.map((typeDemande) => (
-                  <MenuItem key={typeDemande.id} value={typeDemande.id}>
-                    {typeDemande.name}
-                  </MenuItem>
-                ))
-              )}
-            </Select>
-            {selectedTypeDemande && (
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                {isNouveauPermis 
-                  ? 'Ce type de demande nécessite la sélection d\'une auto-école et d\'une formation.'
-                  : 'Ce type de demande ne nécessite pas d\'auto-école ni de formation.'}
-              </Typography>
-            )}
-          </FormControl>
-        );
-
-      case 1:
-        if (isNouveauPermis) {
-          // Auto-école et Formation
-          const selectedFormation = formations.find(f => f.id === formationData.formation_id);
-          return (
-            <Box>
-              <FormControl fullWidth required sx={{ mb: 3 }}>
-                <InputLabel>Auto-École</InputLabel>
-                <Select
-                  value={autoEcoleId}
-                  onChange={(e) => setAutoEcoleId(e.target.value)}
-                  label="Auto-École"
-                  disabled={loadingAutoEcoles || loading}
-                >
-                  {loadingAutoEcoles ? (
-                    <MenuItem disabled>
-                      <CircularProgress size={20} sx={{ mr: 1 }} />
-                      Chargement des auto-écoles...
-                    </MenuItem>
-                  ) : autoEcoles.length === 0 ? (
-                    <MenuItem disabled>
-                      Aucune auto-école disponible
-                    </MenuItem>
-                  ) : (
-                    autoEcoles.map((autoEcole) => (
-                      <MenuItem key={autoEcole.id} value={autoEcole.id}>
-                        {autoEcole.nom_auto_ecole}
-                      </MenuItem>
-                    ))
-                  )}
-                </Select>
-              </FormControl>
-
-              <FormControl fullWidth required sx={{ mb: 3 }}>
-                <InputLabel>Formation</InputLabel>
-                <Select
-                  value={formationData.formation_id}
-                  onChange={(e) => setFormationData({ ...formationData, formation_id: e.target.value })}
-                  label="Formation"
-                  disabled={loadingFormations || loading || !autoEcoleId}
-                >
-                  {loadingFormations ? (
-                    <MenuItem disabled>
-                      <CircularProgress size={20} sx={{ mr: 1 }} />
-                      Chargement des formations...
-                    </MenuItem>
-                  ) : !autoEcoleId ? (
-                    <MenuItem disabled>
-                      Veuillez d'abord sélectionner une auto-école
-                    </MenuItem>
-                  ) : formations.length === 0 ? (
-                    <MenuItem disabled>
-                      Aucune formation active disponible
-                    </MenuItem>
-                  ) : (
-                    formations.map((formation) => {
-                      let typePermisLabel = 'N/A';
-                      if (formation.typePermis) {
-                        typePermisLabel = ('libelle' in formation.typePermis) 
-                          ? formation.typePermis.libelle 
-                          : ('nom' in formation.typePermis ? formation.typePermis.nom : 'N/A');
-                      } else if (formation.type_permis) {
-                        typePermisLabel = ('libelle' in formation.type_permis) 
-                          ? formation.type_permis.libelle 
-                          : ('nom' in formation.type_permis ? formation.type_permis.nom : 'N/A');
-                      }
-                      
-                      return (
-                        <MenuItem key={formation.id} value={formation.id}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <School fontSize="small" />
-                              <Typography variant="body1" fontWeight="medium">
-                                {formation.nom || `Formation ${typePermisLabel}`}
-                              </Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
-                              <Chip 
-                                label={typePermisLabel} 
-                                size="small" 
-                                variant="outlined"
-                              />
-                              <Chip 
-                                label={formation.montant_formate || `${formation.montant} FCFA`} 
-                                size="small" 
-                                color="primary"
-                                variant="outlined"
-                              />
-                            </Box>
-                          </Box>
-                        </MenuItem>
-                      );
-                    })
-                  )}
-                </Select>
-              </FormControl>
-            </Box>
-          );
+  // Fonction pour déterminer si l'étape actuelle affiche CandidatRecapStep
+  const isCandidatRecapStep = (step: number): boolean => {
+    if (isNouveauPermis) {
+      const hasPermisBOrigine = isFormationTypeC();
+      if (hasPermisBOrigine) {
+        // Étape 3 : CandidatRecapStep si candidat trouvé après permis B d'origine
+        if (step === 3) {
+          return !!candidatTrouveFromPermis;
         }
-        // Si pas nouveau permis, cette étape ne devrait pas être affichée
-        return null;
-
-      case 2:
-        if (isNouveauPermis) {
-          // Informations personnelles (après auto-école)
-          return renderPersonneForm();
-        } else {
-          // Informations personnelles (directement après type de demande)
-          return renderPersonneForm();
+        // Étape 4 : CandidatRecapStep si candidat trouvé après permis d'origine (pour nouveau permis, ce cas ne devrait pas arriver)
+        if (step === 4) {
+          return !!candidatTrouveFromPermisOrigine;
         }
+      }
+    } else {
+      const hasPermisOrigine = needsPermisOrigine();
+      if (hasPermisOrigine) {
+        // Étape 4 : CandidatRecapStep si candidat trouvé après vérification du permis d'origine
+        if (step === 4) {
+          return !!candidatTrouveFromPermisOrigine;
+        }
+      } else {
+        // Étape 3 : CandidatRecapStep si candidat trouvé après vérification du permis principal
+        if (step === 3) {
+          return !!candidatTrouveFromPermisPrincipal;
+        }
+      }
+    }
+    return false;
+  };
 
-      case 3:
-        // Informations du candidat
-        return renderCandidatForm();
-
-      case 4:
-        // Finalisation
-        return (
-          <Box>
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>Référentiel (optionnel)</InputLabel>
-              <Select
-                value={formationData.referenciel_id}
-                onChange={(e) => setFormationData({ ...formationData, referenciel_id: e.target.value })}
-                label="Référentiel (optionnel)"
-                disabled={loadingReferentiels || loading}
-              >
-                <MenuItem value="">
-                  <em>Aucun référentiel</em>
-                </MenuItem>
-                {loadingReferentiels ? (
-                  <MenuItem disabled>
-                    <CircularProgress size={20} sx={{ mr: 1 }} />
-                    Chargement des référentiels...
-                  </MenuItem>
-                ) : referentiels.length === 0 ? (
-                  <MenuItem disabled>
-                    Aucun référentiel disponible
-                  </MenuItem>
-                ) : (
-                  referentiels.map((referentiel) => (
-                    <MenuItem key={referentiel.id} value={referentiel.id}>
-                      {referentiel.libelle} ({referentiel.code})
-                    </MenuItem>
-                  ))
-                )}
-              </Select>
-            </FormControl>
-
-            <TextField
-              label="Commentaires (optionnel)"
-              value={formationData.commentaires}
-              onChange={(e) => setFormationData({ ...formationData, commentaires: e.target.value })}
-              multiline
-              rows={3}
-              fullWidth
-              placeholder="Ajoutez des notes ou commentaires concernant ce dossier..."
-              disabled={loading}
-            />
-          </Box>
-        );
-
-      default:
-        return 'Étape inconnue';
+  // Fonction pour déterminer si l'étape actuelle affiche CandidatFormStep
+  const isCandidatFormStep = (step: number): boolean => {
+    const hasExistingCandidat = candidatMode === 'existing' && selectedCandidat && candidatId;
+    const hasPermisOrigine = needsPermisOrigine();
+    
+    if (isNouveauPermis) {
+      // Pour nouveau permis : CandidatFormStep est à l'étape 5 si pas de candidat existant
+      return step === 5 && !hasExistingCandidat;
+    } else {
+      // Pour autres types
+      if (hasPermisOrigine) {
+        // Avec permis d'origine : CandidatFormStep est à l'étape 6 si pas de candidat existant
+        return step === 6 && !hasExistingCandidat;
+      } else {
+        // Sans permis d'origine : CandidatFormStep est à l'étape 5 si pas de candidat existant
+        return step === 5 && !hasExistingCandidat;
+      }
     }
   };
 
-  // Rendre le formulaire des informations personnelles
-  const renderPersonneForm = () => (
-    <Grid container spacing={2}>
-      <Grid item xs={12}>
-        <Typography variant="subtitle2" color="primary" gutterBottom>
-          Informations d'identité
-        </Typography>
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField
-          label="Nom"
-          value={personneData.nom}
-          onChange={(e) => setPersonneData({ ...personneData, nom: e.target.value })}
-          fullWidth
-          required
-          disabled={loading}
-        />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField
-          label="Prénom"
-          value={personneData.prenom}
-          onChange={(e) => setPersonneData({ ...personneData, prenom: e.target.value })}
-          fullWidth
-          required
-          disabled={loading}
-        />
-      </Grid>
-      <Grid item xs={12}>
-        <Divider sx={{ my: 1 }} />
-        <Typography variant="subtitle2" color="primary" gutterBottom>
-          Coordonnées
-        </Typography>
-      </Grid>
-      <Grid item xs={12}>
-        <TextField
-          label="Email"
-          type="email"
-          value={personneData.email}
-          onChange={(e) => setPersonneData({ ...personneData, email: e.target.value })}
-          fullWidth
-          required
-          disabled={loading}
-        />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField
-          label="Contact"
-          value={personneData.contact}
-          onChange={(e) => setPersonneData({ ...personneData, contact: e.target.value })}
-          fullWidth
-          required
-          disabled={loading}
-          placeholder="Ex: 0612345678"
-        />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField
-          label="Téléphone"
-          value={personneData.telephone}
-          onChange={(e) => setPersonneData({ ...personneData, telephone: e.target.value })}
-          fullWidth
-          disabled={loading}
-          placeholder="Ex: 0612345678"
-        />
-      </Grid>
-      <Grid item xs={12}>
-        <TextField
-          label="Adresse"
-          value={personneData.adresse}
-          onChange={(e) => setPersonneData({ ...personneData, adresse: e.target.value })}
-          fullWidth
-          multiline
-          rows={2}
-          disabled={loading}
-        />
-      </Grid>
-      <Grid item xs={12}>
-        <Divider sx={{ my: 1 }} />
-        <Typography variant="subtitle2" color="primary" gutterBottom>
-          Sécurité
-        </Typography>
-      </Grid>
-      <Grid item xs={12}>
-        <TextField
-          label="Mot de passe"
-          type="password"
-          value={personneData.password}
-          onChange={(e) => setPersonneData({ ...personneData, password: e.target.value })}
-          fullWidth
-          required
-          disabled={loading}
-          helperText="Minimum 8 caractères"
-        />
-      </Grid>
-      <Grid item xs={12}>
-        <TextField
-          label="Confirmer le mot de passe"
-          type="password"
-          value={personneData.password_confirmation}
-          onChange={(e) => setPersonneData({ ...personneData, password_confirmation: e.target.value })}
-          fullWidth
-          required
-          disabled={loading}
-        />
-      </Grid>
-    </Grid>
-  );
+  // Fonction pour déterminer si l'étape actuelle affiche PersonneFormStep
+  // Cette fonction vérifie le contenu réel de l'étape, pas seulement le numéro
+  const isPersonneFormStep = (step: number): boolean => {
+    const hasExistingCandidat = candidatMode === 'existing' && selectedCandidat && candidatId;
+    const hasPermisOrigine = needsPermisOrigine();
+    
+    if (isNouveauPermis) {
+      const hasPermisBOrigine = isFormationTypeC();
+      if (hasPermisBOrigine) {
+        // Étape 3 : PersonneFormStep uniquement si candidat non trouvé ET pas de candidat existant (sinon c'est CandidatRecapStep ou FinalisationStep)
+        if (step === 3) {
+          return !candidatTrouveFromPermis && !hasExistingCandidat;
+        }
+        // Étape 4 : PersonneFormStep si candidat non trouvé OU si mode est 'new' (après "Créer un nouveau candidat")
+        if (step === 4) {
+          return (!candidatTrouveFromPermis || candidatMode === 'new') && !hasExistingCandidat;
+        }
+        return false;
+      } else {
+        // Pour nouveau permis non-C : PersonneFormStep est à l'étape 4 si pas de candidat existant
+        return step === 4 && !hasExistingCandidat;
+      }
+    } else {
+      // Pour autres types
+      if (hasPermisOrigine) {
+        // Étape 3 : PermisOrigineStep (pas PersonneFormStep)
+        if (step === 3) {
+          return false;
+        }
+        // Étape 4 : PersonneFormStep si candidat non trouvé après permis d'origine OU si mode est 'new', ET pas de candidat existant
+        if (step === 4) {
+          return (!candidatTrouveFromPermisOrigine || candidatMode === 'new') && !hasExistingCandidat;
+        }
+        return false;
+      } else {
+        // Sans permis d'origine
+        // Étape 3 : PersonneFormStep si candidat non trouvé après permis principal OU si mode est 'new', ET pas de candidat existant
+        if (step === 3) {
+          return (!candidatTrouveFromPermisPrincipal || candidatMode === 'new') && !hasExistingCandidat;
+        }
+        // Étape 4 : Ne devrait pas être PersonneFormStep dans ce cas
+        return false;
+      }
+    }
+  };
 
-  // Rendre le formulaire des informations du candidat
-  const renderCandidatForm = () => (
-    <Grid container spacing={2}>
-      <Grid item xs={12}>
-        <Typography variant="subtitle2" color="primary" gutterBottom>
-          Informations de naissance
-        </Typography>
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField
-          label="Date de naissance"
-          type="date"
-          value={candidatData.date_naissance}
-          onChange={(e) => setCandidatData({ ...candidatData, date_naissance: e.target.value })}
-          fullWidth
-          required
-          disabled={loading}
-          InputLabelProps={{ shrink: true }}
+  const getStepContent = (step: number) => {
+    const hasExistingCandidat = candidatMode === 'existing' && selectedCandidat && candidatId;
+    const hasPermisOrigine = needsPermisOrigine();
+
+    // Étape 0 : Type de demande (toujours)
+    if (step === 0) {
+      return (
+        <TypeDemandeStep
+          typeDemandeId={typeDemandeId}
+          typeDemandes={typeDemandes}
+          loadingTypeDemandes={loadingTypeDemandes}
+          loading={loading}
+          selectedTypeDemande={selectedTypeDemande}
+          isNouveauPermis={isNouveauPermis}
+          onTypeDemandeChange={setTypeDemandeId}
         />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField
-          label="Lieu de naissance"
-          value={candidatData.lieu_naissance}
-          onChange={(e) => setCandidatData({ ...candidatData, lieu_naissance: e.target.value })}
-          fullWidth
-          required
-          disabled={loading}
+      );
+    }
+
+    if (isNouveauPermis) {
+      // Pour nouveau permis
+      // Étape 1 : Auto-école et Formation
+      if (step === 1) {
+        return (
+          <AutoEcoleFormationStep
+            autoEcoles={autoEcoles}
+            loadingAutoEcoles={loadingAutoEcoles}
+            formations={formations}
+            loadingFormations={loadingFormations}
+            loading={loading}
+            autoEcoleId={autoEcoleId}
+            formationId={formationData.formation_id}
+            onAutoEcoleChange={setAutoEcoleId}
+            onFormationChange={(value) => setFormationData({ ...formationData, formation_id: value })}
+          />
+        );
+      }
+      // Étape 2 : Permis B d'origine (si type C)
+      if (step === 2 && isFormationTypeC()) {
+        return (
+          <PermisBOrigineStep
+            numeroBOriginePermisParts={numeroBOriginePermisParts}
+            permisBOrigineFormat={permisBOrigineFormat}
+            permisBOrigineData={permisBOrigineData}
+            loading={loading}
+            verifyingPermis={verifyingPermis}
+            permisVerified={permisVerified}
+            verificationError={verificationError}
+            candidatNonTrouve={candidatNonTrouve}
+            onNumeroBOriginePermisPartsChange={setNumeroBOriginePermisParts}
+            onPermisBOrigineFormatChange={setPermisBOrigineFormat}
+            onPermisBOrigineDataChange={setPermisBOrigineData}
+            onVerifyPermis={handleVerifyPermis}
+          />
+        );
+      }
+      // Étape 3 : Récapitulatif candidat (si candidat trouvé) OU PersonneFormStep (si candidat non trouvé)
+      if (step === 3 && isFormationTypeC()) {
+        // Si un candidat a été trouvé lors de la vérification du permis, afficher le récapitulatif
+        if (candidatTrouveFromPermis) {
+          return (
+            <CandidatRecapStep
+              candidat={candidatTrouveFromPermis}
+              loading={loading}
+              onConfirm={() => {
+                // Confirmer le candidat trouvé
+                setSelectedCandidat(candidatTrouveFromPermis);
+                setCandidatMode('existing');
+                setCandidatId(candidatTrouveFromPermis.id);
+                if (candidatTrouveFromPermis.personne?.id) {
+                  setPersonneId(candidatTrouveFromPermis.personne.id);
+                }
+                setCandidatTrouveFromPermis(null);
+                // Passer directement à la finalisation car candidat existant
+                setActiveStep(6);
+              }}
+              onRefineSearch={() => {
+                // Permettre d'affiner la recherche - revenir à SearchCandidatStep
+                setCandidatTrouveFromPermis(null);
+                setCandidatMode(null);
+                setSelectedCandidat(null);
+                // Rester à l'étape 3 pour afficher SearchCandidatStep
+              }}
+              onCreateNew={() => {
+                // Créer un nouveau candidat - passer aux étapes PersonneFormStep puis CandidatFormStep
+                setCandidatTrouveFromPermis(null);
+                setCandidatMode('new');
+                setSelectedCandidat(null);
+                // Passer à l'étape PersonneFormStep (étape 4)
+                setActiveStep(4);
+              }}
+            />
+          );
+        }
+        // Sinon, afficher PersonneFormStep (candidat non trouvé)
+        return (
+          <PersonneFormStep
+            personneData={personneData}
+            loading={loading}
+            captchaId={captchaId}
+            captchaCode={captchaCode}
+            onPersonneDataChange={setPersonneData}
+            onCaptchaIdChange={setCaptchaId}
+            onCaptchaCodeChange={setCaptchaCode}
+            onRegister={handleRegisterPersonne}
+            error={error}
+          />
+        );
+      }
+      // Si candidat existant, on saute directement à la finalisation
+      if (hasExistingCandidat) {
+        return (
+          <FinalisationStep
+            formationData={formationData}
+            referentiels={referentiels}
+            loadingReferentiels={loadingReferentiels}
+            loading={loading}
+            onFormationDataChange={setFormationData}
+            onSubmit={handleSubmit}
+            error={error}
+          />
+        );
+      }
+      // Étape 4 : Récapitulatif candidat (si candidat trouvé) OU Informations personnelles (sinon)
+      if (step === 4) {
+        // Si candidat trouvé après vérification du permis d'origine, afficher le récapitulatif
+        if (candidatTrouveFromPermisOrigine) {
+          return (
+            <CandidatRecapStep
+              candidat={candidatTrouveFromPermisOrigine}
+              loading={loading}
+              onConfirm={() => {
+                // Confirmer le candidat trouvé
+                setSelectedCandidat(candidatTrouveFromPermisOrigine);
+                setCandidatMode('existing');
+                setCandidatId(candidatTrouveFromPermisOrigine.id);
+                if (candidatTrouveFromPermisOrigine.personne?.id) {
+                  setPersonneId(candidatTrouveFromPermisOrigine.personne.id);
+                }
+                
+                // Passer directement à la finalisation car candidat existant
+                setActiveStep(6);
+              }}
+              onRefineSearch={() => {
+                // Réinitialiser et permettre de rechercher à nouveau
+                setCandidatTrouveFromPermisOrigine(null);
+                setCandidatNonTrouveOrigine(false);
+              }}
+              onCreateNew={() => {
+                // Réinitialiser et passer à la création d'un nouveau candidat
+                setCandidatTrouveFromPermisOrigine(null);
+                setCandidatNonTrouveOrigine(true);
+                setCandidatMode('new');
+                setSelectedCandidat(null);
+                // Rester à l'étape 4 pour afficher PersonneFormStep
+              }}
+            />
+          );
+        }
+        
+        // Si candidat existant (via autre moyen), passer à la finalisation
+        if (hasExistingCandidat) {
+          return (
+            <FinalisationStep
+              formationData={formationData}
+              referentiels={referentiels}
+              loadingReferentiels={loadingReferentiels}
+              loading={loading}
+              onFormationDataChange={setFormationData}
+              onSubmit={handleSubmit}
+              error={error}
+            />
+          );
+        }
+        
+        // Sinon, afficher le formulaire de création de personne
+        return (
+          <PersonneFormStep
+            personneData={personneData}
+            loading={loading}
+            captchaId={captchaId}
+            captchaCode={captchaCode}
+            onPersonneDataChange={setPersonneData}
+            onCaptchaIdChange={setCaptchaId}
+            onCaptchaCodeChange={setCaptchaCode}
+            onRegister={handleRegisterPersonne}
+            error={error}
+          />
+        );
+      }
+      // Étape 5 : Informations candidat
+      if (step === 5) {
+        return (
+          <CandidatFormStep
+            candidatData={candidatData}
+            loading={loading}
+            onCandidatDataChange={setCandidatData}
+            onCreateCandidat={handleCreateCandidat}
+            error={error}
+          />
+        );
+      }
+      // Finalisation (étape 6)
+      return (
+        <FinalisationStep
+          formationData={formationData}
+          referentiels={referentiels}
+          loadingReferentiels={loadingReferentiels}
+          loading={loading}
+          onFormationDataChange={setFormationData}
+          onSubmit={handleSubmit}
+          error={error}
         />
-      </Grid>
-      <Grid item xs={12}>
-        <Divider sx={{ my: 1 }} />
-        <Typography variant="subtitle2" color="primary" gutterBottom>
-          Identification
-        </Typography>
-      </Grid>
-      <Grid item xs={12}>
-        <TextField
-          label="NIP (Numéro d'Identification Personnel)"
-          value={candidatData.nip}
-          onChange={(e) => setCandidatData({ ...candidatData, nip: e.target.value })}
-          fullWidth
-          required
-          disabled={loading}
+      );
+    } else {
+      // Pour autres types de permis
+      // Étape 1 : Numéro de permis
+      if (step === 1) {
+        // Afficher la vérification uniquement pour Duplicata et Fiche d'enregistrement
+        const shouldShowVerification = isFicheEnregistre || selectedTypeDemande?.name === 'DUPLICATA';
+        
+        return (
+          <NumeroPermisStep
+            numeroPermisParts={numeroPermisParts}
+            isFicheEnregistre={isFicheEnregistre}
+            loading={loading}
+            format={permisFormat}
+            referentiels={referentiels}
+            loadingReferentiels={loadingReferentiels}
+            referencielId={formationData.referenciel_id}
+            onNumeroPermisPartsChange={setNumeroPermisParts}
+            onFormatChange={setPermisFormat}
+            onReferencielChange={handleReferencielChange}
+            verifyingPermis={shouldShowVerification ? verifyingPermisPrincipal : undefined}
+            permisVerified={shouldShowVerification ? permisPrincipalVerified : undefined}
+            verificationError={shouldShowVerification ? verificationErrorPrincipal : undefined}
+            onVerifyPermis={shouldShowVerification ? handleVerifyPermisPrincipal : undefined}
+          />
+        );
+      }
+      // Étape 2 : Informations du permis
+      if (step === 2) {
+        return (
+          <PermisInfoStep
+            permisData={permisData}
+            numeroPermis={numeroPermis}
+            loading={loading}
+            onPermisDataChange={setPermisData}
+          />
+        );
+      }
+      // Étape 3 : Permis d'origine (si catégorie C/D/E) OU Récapitulatif candidat/PersonneFormStep (sinon)
+      if (step === 3) {
+        if (hasPermisOrigine) {
+          return (
+            <PermisOrigineStep
+              numeroOriginePermisParts={numeroOriginePermisParts}
+              loading={loading}
+              permisOrigineFormat={permisOrigineFormat}
+              lieuOrigine={permisData.lieu_de_dobtention_du_permis}
+              verifyingPermis={verifyingPermisOrigine}
+              permisVerified={permisOrigineVerified}
+              verificationError={verificationErrorOrigine}
+              candidatNonTrouve={candidatNonTrouveOrigine}
+              onNumeroOriginePermisPartsChange={setNumeroOriginePermisParts}
+              onPermisOrigineFormatChange={setPermisOrigineFormat}
+              onLieuOrigineChange={(lieu) => setPermisData(prev => ({ ...prev, lieu_de_dobtention_du_permis: lieu }))}
+              onVerifyPermis={handleVerifyPermisOrigine}
+            />
+          );
+        } else {
+          // Si candidat trouvé après vérification du permis, afficher le récapitulatif
+          if (candidatTrouveFromPermisPrincipal) {
+            return (
+              <CandidatRecapStep
+                candidat={candidatTrouveFromPermisPrincipal}
+                loading={loading}
+                onConfirm={() => {
+                  // Confirmer le candidat trouvé
+                  setSelectedCandidat(candidatTrouveFromPermisPrincipal);
+                  setCandidatMode('existing');
+                  setCandidatId(candidatTrouveFromPermisPrincipal.id);
+                  if (candidatTrouveFromPermisPrincipal.personne?.id) {
+                    setPersonneId(candidatTrouveFromPermisPrincipal.personne.id);
+                  }
+                  
+                  // Passer directement à la finalisation car candidat existant
+                  setActiveStep(6);
+                }}
+                onRefineSearch={() => {
+                  // Réinitialiser et permettre de rechercher à nouveau
+                  setCandidatTrouveFromPermisPrincipal(null);
+                  setCandidatNonTrouvePrincipal(false);
+                }}
+                onCreateNew={() => {
+                  // Réinitialiser et passer à la création d'un nouveau candidat
+                  setCandidatTrouveFromPermisPrincipal(null);
+                  setCandidatNonTrouvePrincipal(true);
+                  setCandidatMode('new');
+                  setSelectedCandidat(null);
+                  // Rester à l'étape 3 pour afficher PersonneFormStep
+                }}
+              />
+            );
+          }
+          
+          // Si candidat existant (via autre moyen), passer à la finalisation
+          if (hasExistingCandidat) {
+            return (
+              <FinalisationStep
+                formationData={formationData}
+                referentiels={referentiels}
+                loadingReferentiels={loadingReferentiels}
+                loading={loading}
+                onFormationDataChange={setFormationData}
+                onSubmit={handleSubmit}
+                error={error}
+              />
+            );
+          }
+          
+          // Sinon, afficher le formulaire de création de personne
+          return (
+            <PersonneFormStep
+              personneData={personneData}
+              loading={loading}
+              captchaId={captchaId}
+              captchaCode={captchaCode}
+              onPersonneDataChange={setPersonneData}
+              onCaptchaIdChange={setCaptchaId}
+              onCaptchaCodeChange={setCaptchaCode}
+              onRegister={handleRegisterPersonne}
+              error={error}
+            />
+          );
+        }
+      }
+      // Étape 4 : CandidatRecapStep (si candidat trouvé après permis d'origine) OU PersonneFormStep (si candidat non trouvé)
+      if (step === 4 && hasPermisOrigine) {
+        // Si candidat trouvé après vérification du permis d'origine, afficher le récapitulatif
+        if (candidatTrouveFromPermisOrigine) {
+          return (
+            <CandidatRecapStep
+              candidat={candidatTrouveFromPermisOrigine}
+              loading={loading}
+              onConfirm={() => {
+                // Confirmer le candidat trouvé
+                setSelectedCandidat(candidatTrouveFromPermisOrigine);
+                setCandidatMode('existing');
+                setCandidatId(candidatTrouveFromPermisOrigine.id);
+                if (candidatTrouveFromPermisOrigine.personne?.id) {
+                  setPersonneId(candidatTrouveFromPermisOrigine.personne.id);
+                }
+                
+                // Passer directement à la finalisation car candidat existant
+                setActiveStep(6);
+              }}
+              onRefineSearch={() => {
+                // Réinitialiser et permettre de rechercher à nouveau
+                setCandidatTrouveFromPermisOrigine(null);
+                setCandidatNonTrouveOrigine(false);
+              }}
+              onCreateNew={() => {
+                // Réinitialiser et passer à la création d'un nouveau candidat
+                setCandidatTrouveFromPermisOrigine(null);
+                setCandidatNonTrouveOrigine(true);
+                setCandidatMode('new');
+                setSelectedCandidat(null);
+                // Rester à l'étape 4 pour afficher PersonneFormStep
+              }}
+            />
+          );
+        }
+        
+        // Si candidat existant (via autre moyen), passer à la finalisation
+        if (hasExistingCandidat) {
+          return (
+            <FinalisationStep
+              formationData={formationData}
+              referentiels={referentiels}
+              loadingReferentiels={loadingReferentiels}
+              loading={loading}
+              onFormationDataChange={setFormationData}
+              onSubmit={handleSubmit}
+              error={error}
+            />
+          );
+        }
+        
+        // Sinon, afficher PersonneFormStep (candidat non trouvé)
+        return (
+          <PersonneFormStep
+            personneData={personneData}
+            loading={loading}
+            captchaId={captchaId}
+            captchaCode={captchaCode}
+            onPersonneDataChange={setPersonneData}
+            onCaptchaIdChange={setCaptchaId}
+            onCaptchaCodeChange={setCaptchaCode}
+            onRegister={handleRegisterPersonne}
+            error={error}
+          />
+        );
+      }
+      // Étape 5 : Informations candidat (pour autres types sans permis d'origine)
+      if (step === 5) {
+        // Si candidat existant, passer à la finalisation
+        if (hasExistingCandidat) {
+          return (
+            <FinalisationStep
+              formationData={formationData}
+              referentiels={referentiels}
+              loadingReferentiels={loadingReferentiels}
+              loading={loading}
+              onFormationDataChange={setFormationData}
+              onSubmit={handleSubmit}
+              error={error}
+            />
+          );
+        }
+        // Sinon, afficher CandidatFormStep
+        return (
+          <CandidatFormStep
+            candidatData={candidatData}
+            loading={loading}
+            onCandidatDataChange={setCandidatData}
+            onCreateCandidat={handleCreateCandidat}
+            error={error}
+          />
+        );
+      }
+      // Étape 6 : Informations candidat (si permis d'origine affiché et nouveau candidat) OU Finalisation
+      if (step === 6) {
+        // Si candidat existant sélectionné, afficher toujours FinalisationStep
+        if (hasExistingCandidat) {
+          return (
+            <FinalisationStep
+              formationData={formationData}
+              referentiels={referentiels}
+              loadingReferentiels={loadingReferentiels}
+              loading={loading}
+              onFormationDataChange={setFormationData}
+              onSubmit={handleSubmit}
+              error={error}
+            />
+          );
+        }
+        // Sinon, selon si on a un permis d'origine
+        if (hasPermisOrigine) {
+          return (
+            <CandidatFormStep
+              candidatData={candidatData}
+              loading={loading}
+              onCandidatDataChange={setCandidatData}
+              onCreateCandidat={handleCreateCandidat}
+              error={error}
+            />
+          );
+        } else {
+          return (
+            <FinalisationStep
+              formationData={formationData}
+              referentiels={referentiels}
+              loadingReferentiels={loadingReferentiels}
+              loading={loading}
+              onFormationDataChange={setFormationData}
+              onSubmit={handleSubmit}
+              error={error}
+            />
+          );
+        }
+      }
+      // Finalisation (étape 7 si permis d'origine affiché)
+      return (
+        <FinalisationStep
+          formationData={formationData}
+          referentiels={referentiels}
+          loadingReferentiels={loadingReferentiels}
+          loading={loading}
+          onFormationDataChange={setFormationData}
+          onSubmit={handleSubmit}
+          error={error}
         />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <FormControl fullWidth required>
-          <InputLabel>Type de pièce</InputLabel>
-          <Select
-            value={candidatData.type_piece}
-            onChange={(e) => setCandidatData({ ...candidatData, type_piece: e.target.value })}
-            label="Type de pièce"
-            disabled={loading}
-          >
-            <MenuItem value="CNI">Carte Nationale d'Identité</MenuItem>
-            <MenuItem value="Passeport">Passeport</MenuItem>
-            <MenuItem value="Permis_conduire">Permis de conduire</MenuItem>
-          </Select>
-        </FormControl>
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField
-          label="Numéro de pièce"
-          value={candidatData.numero_piece}
-          onChange={(e) => setCandidatData({ ...candidatData, numero_piece: e.target.value })}
-          fullWidth
-          required
-          disabled={loading}
-        />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField
-          label="Nationalité"
-          value={candidatData.nationalite}
-          onChange={(e) => setCandidatData({ ...candidatData, nationalite: e.target.value })}
-          fullWidth
-          disabled={loading}
-        />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <FormControl fullWidth required>
-          <InputLabel>Genre</InputLabel>
-          <Select
-            value={candidatData.genre}
-            onChange={(e) => setCandidatData({ ...candidatData, genre: e.target.value })}
-            label="Genre"
-            disabled={loading}
-          >
-            <MenuItem value="M">Masculin</MenuItem>
-            <MenuItem value="F">Féminin</MenuItem>
-          </Select>
-        </FormControl>
-      </Grid>
-    </Grid>
-  );
+      );
+    }
+  };
+
 
   return (
     <Box sx={{ mb: 3 }}>
@@ -1129,7 +2497,7 @@ const CreateDossierForm: React.FC<CreateDossierFormProps> = ({ onSuccess }) => {
               {activeStep > 0 && (
                 <Button
                   onClick={handleBack}
-                  disabled={loading}
+                  disabled={loading || verifyingPermis}
                   startIcon={<ArrowBack />}
                 >
                   Précédent
@@ -1138,26 +2506,17 @@ const CreateDossierForm: React.FC<CreateDossierFormProps> = ({ onSuccess }) => {
             </Box>
 
             <Box sx={{ display: 'flex', gap: 2 }}>
-              {activeStep < steps.length - 1 ? (
+              {activeStep < steps.length - 1 && !isPersonneFormStep(activeStep) && !isCandidatRecapStep(activeStep) && !isCandidatFormStep(activeStep) && (
                 <Button
                   onClick={handleNext}
                   variant="contained"
-                  disabled={loading}
-                  endIcon={loading ? <CircularProgress size={20} /> : <ArrowForward />}
+                  disabled={loading || verifyingPermis || verifyingPermisPrincipal || verifyingPermisOrigine}
+                  endIcon={(loading || verifyingPermis || verifyingPermisPrincipal || verifyingPermisOrigine) ? <CircularProgress size={20} /> : <ArrowForward />}
                 >
-                  {loading 
+                  {verifyingPermis ? 'Vérification du permis B...' : verifyingPermisPrincipal ? 'Vérification du permis...' : verifyingPermisOrigine ? 'Vérification du permis d\'origine...' : loading 
                     ? (getRealStepIndex(activeStep) === (isNouveauPermis ? 2 : 1) ? 'Enregistrement...' : getRealStepIndex(activeStep) === (isNouveauPermis ? 3 : 2) ? 'Création du candidat...' : 'Suivant')
                     : (activeStep === 0 ? 'Suivant' : getRealStepIndex(activeStep) === (isNouveauPermis ? 2 : 1) ? 'Créer le compte' : getRealStepIndex(activeStep) === (isNouveauPermis ? 3 : 2) ? 'Créer le candidat' : 'Suivant')
                   }
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleSubmit}
-                  variant="contained"
-                  disabled={loading || loadingFormations || loadingTypeDemandes}
-                  startIcon={loading ? <CircularProgress size={20} /> : <CheckCircle />}
-                >
-                  {loading ? 'Création en cours...' : 'Finaliser la création'}
                 </Button>
               )}
             </Box>

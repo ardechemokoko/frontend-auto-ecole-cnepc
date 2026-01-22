@@ -5,6 +5,7 @@ import {
   CandidatExamenListPage,
   SessionExamenListPage,
   PlanificationPage,
+  EpreuvePage,
 } from './pages';
 import { CandidatExamenDemo } from './demo';
 
@@ -15,6 +16,7 @@ const CandidatExamenRoutes: React.FC = () => {
       <Route path="/candidats" element={<CandidatExamenListPage />} />
       <Route path="/sessions" element={<SessionExamenListPage />} />
       <Route path="/planification" element={<PlanificationPage />} />
+      <Route path="/epreuves/:id" element={<EpreuvePage />} />
       <Route path="/demo" element={<CandidatExamenDemo />} />
     </Routes>
   );

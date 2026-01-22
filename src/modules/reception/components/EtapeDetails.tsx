@@ -18,8 +18,7 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem,
-  Divider
+  MenuItem
 } from '@mui/material';
 import {
   Upload,
@@ -30,10 +29,11 @@ import {
 import {
   circuitSuiviService,
   EtapeCircuit,
-  Document,
-  PieceEtape
+  Document
 } from '../services/circuit-suivi.service';
 import axiosClient from '../../../shared/environment/envdev';
+import { EpreuveStatut, EpreuveAttempt } from '../types';
+import { computeOverall, computeGeneral } from '../tables/ReceptionDossierTypeTable/utils';
 
 interface EtapeDetailsProps {
   etape: EtapeCircuit;
@@ -75,6 +75,105 @@ const EtapeDetails: React.FC<EtapeDetailsProps> = ({
   const [uploading, setUploading] = useState(false);
   const [transmitting, setTransmitting] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [dateExamenDialogOpen, setDateExamenDialogOpen] = useState(false);
+  const [dateExamen, setDateExamen] = useState<string>('');
+  const [dateExamenError, setDateExamenError] = useState<string>('');
+  const [epreuvesStatus, setEpreuvesStatus] = useState<EpreuveStatut | null>(null);
+  const [loadingEpreuves, setLoadingEpreuves] = useState(false);
+  const [programmeSessionCreated, setProgrammeSessionCreated] = useState(false);
+
+  // Fonction pour charger le mapping depuis localStorage
+  const loadMappingFromStorage = React.useCallback(() => {
+    try {
+      const stored = localStorage.getItem('document_piece_mapping');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const mapping = new Map<string, string>();
+        // Filtrer uniquement les mappings pour cette étape
+        Object.entries(parsed).forEach(([docId, data]: [string, any]) => {
+          if (data.etape_id === etape.id && data.piece_justification_id) {
+            mapping.set(docId, data.piece_justification_id);
+          }
+        });
+        return mapping;
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur lors du chargement du mapping depuis localStorage:', error);
+    }
+    return new Map<string, string>();
+  }, [etape.id]);
+  
+  // Fonction pour sauvegarder le mapping dans localStorage
+  const saveMappingToStorage = React.useCallback((docId: string, pieceJustificationId: string, etapeId: string) => {
+    try {
+      const stored = localStorage.getItem('document_piece_mapping');
+      const parsed = stored ? JSON.parse(stored) : {};
+      
+      // IMPORTANT: Ne pas écraser les mappings existants, seulement ajouter/mettre à jour celui-ci
+      parsed[docId] = {
+        piece_justification_id: pieceJustificationId,
+        etape_id: etapeId,
+        timestamp: Date.now(),
+      };
+      
+      localStorage.setItem('document_piece_mapping', JSON.stringify(parsed));
+      
+      console.log('💾 Mapping sauvegardé dans localStorage:', {
+        documentId: docId,
+        pieceJustificationId: pieceJustificationId,
+        etapeId: etapeId,
+        totalMappings: Object.keys(parsed).length
+      });
+    } catch (error) {
+      console.warn('⚠️ Erreur lors de la sauvegarde du mapping dans localStorage:', error);
+    }
+  }, []);
+
+  // Fonction helper pour obtenir le piece_justification_id d'un document (priorité au mapping localStorage)
+  const getDocumentPieceId = React.useCallback((doc: Document): string | null => {
+    // 1. PRIORITÉ: Utiliser le piece_justification_id déjà normalisé dans le document (depuis CircuitEtapesView)
+    // Les documents sont déjà normalisés avec le mapping localStorage dans CircuitEtapesView
+    if (doc.piece_justification_id) {
+      return doc.piece_justification_id;
+    }
+    
+    // 2. Si le document n'a pas de piece_justification_id, essayer de le récupérer depuis localStorage
+    if (doc.id) {
+      try {
+        const stored = localStorage.getItem('document_piece_mapping');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const mappingData = parsed[doc.id];
+          if (mappingData && mappingData.piece_justification_id) {
+            // Utiliser le mapping même si l'etape_id est différent, car le piece_justification_id est la source de vérité
+            return mappingData.piece_justification_id;
+          }
+        }
+      } catch (error) {
+        // Ignorer les erreurs de parsing
+      }
+    }
+    
+    return null;
+  }, []);
+
+  // Écouter les événements de document uploadé pour stocker le mapping original
+  React.useEffect(() => {
+    const handleDocumentUploaded = (event: CustomEvent) => {
+      const { document_id, piece_justification_id_original, etape_id } = event.detail || {};
+      // Sauvegarder le mapping pour TOUS les documents uploadés, même s'ils ne sont pas pour cette étape
+      // car le piece_justification_id est la source de vérité pour associer le document à une pièce
+      if (document_id && piece_justification_id_original) {
+        // Sauvegarder dans localStorage pour persister après rechargement
+        saveMappingToStorage(document_id, piece_justification_id_original, etape_id || etape.id);
+        console.log('💾 Mapping sauvegardé pour document:', document_id, '->', piece_justification_id_original, 'pour étape:', etape_id || etape.id);
+      }
+    };
+    window.addEventListener('documentUploaded', handleDocumentUploaded as EventListener);
+    return () => {
+      window.removeEventListener('documentUploaded', handleDocumentUploaded as EventListener);
+    };
+  }, [etape.id, saveMappingToStorage]);
 
   // Charger les types de documents
   useEffect(() => {
@@ -126,6 +225,182 @@ const EtapeDetails: React.FC<EtapeDetailsProps> = ({
     }
   }, []);
 
+  // Vérifier si l'étape est "ENVOI DU DOSSIER POUR EXAMEN"
+  const isEnvoiDossierExamen = etape.libelle?.toUpperCase().includes('ENVOI DU DOSSIER POUR EXAMEN') || 
+                               etape.code?.toUpperCase().includes('ENVOI_DOSSIER_EXAMEN');
+
+  // Charger le statut des résultats pour l'étape "ENVOI DOSSIER POUR EXAMEN"
+  useEffect(() => {
+    const loadEpreuvesStatus = async () => {
+      if (!isEnvoiDossierExamen || !dossierId) {
+        setEpreuvesStatus(null);
+        return;
+      }
+
+      try {
+        setLoadingEpreuves(true);
+        console.log('📋 Chargement du statut des épreuves pour le dossier:', dossierId);
+        
+        const response = await axiosClient.get('/resultats', {
+          params: { dossier_id: dossierId }
+        });
+        
+        const resultats = Array.isArray(response.data?.data) ? response.data.data : [];
+        
+        if (resultats.length === 0) {
+          setEpreuvesStatus('non_saisi');
+          setLoadingEpreuves(false);
+          return;
+        }
+        
+        // Organiser les résultats par type d'examen
+        const creneauxAttempts: EpreuveAttempt[] = [];
+        const codeConduiteAttempts: EpreuveAttempt[] = [];
+        const tourVilleAttempts: EpreuveAttempt[] = [];
+        
+        resultats.forEach((resultat: any) => {
+          const attempt: EpreuveAttempt = {
+            result: resultat.statut as EpreuveStatut,
+            date: resultat.date,
+            note: resultat.commentaire || ''
+          };
+          
+          const typeExamen = (resultat.typeExamen || '').toLowerCase().trim();
+          
+          if (typeExamen.includes('creneau') || typeExamen === 'creneaux') {
+            creneauxAttempts.push(attempt);
+          } else if (typeExamen.includes('code') || typeExamen === 'codeconduite' || typeExamen === 'code_conduite') {
+            codeConduiteAttempts.push(attempt);
+          } else if (typeExamen.includes('ville') || typeExamen === 'tourville' || typeExamen === 'tour_ville') {
+            tourVilleAttempts.push(attempt);
+          }
+        });
+        
+        // Trier par date
+        creneauxAttempts.sort((a, b) => {
+          const dateA = a.date ? new Date(a.date).getTime() : 0;
+          const dateB = b.date ? new Date(b.date).getTime() : 0;
+          return dateA - dateB;
+        });
+        codeConduiteAttempts.sort((a, b) => {
+          const dateA = a.date ? new Date(a.date).getTime() : 0;
+          const dateB = b.date ? new Date(b.date).getTime() : 0;
+          return dateA - dateB;
+        });
+        tourVilleAttempts.sort((a, b) => {
+          const dateA = a.date ? new Date(a.date).getTime() : 0;
+          const dateB = b.date ? new Date(b.date).getTime() : 0;
+          return dateA - dateB;
+        });
+        
+        // Calculer les statuts
+        const creneauxStatus = computeOverall(creneauxAttempts);
+        const codeStatus = computeOverall(codeConduiteAttempts);
+        const villeStatus = computeOverall(tourVilleAttempts);
+        const generalStatus = computeGeneral(creneauxStatus, codeStatus, villeStatus);
+        
+        setEpreuvesStatus(generalStatus);
+        console.log('✅ Statut des épreuves chargé:', {
+          creneaux: creneauxStatus,
+          code: codeStatus,
+          ville: villeStatus,
+          general: generalStatus
+        });
+      } catch (error: any) {
+        console.error('❌ Erreur lors du chargement du statut des épreuves:', error);
+        setEpreuvesStatus('non_saisi');
+      } finally {
+        setLoadingEpreuves(false);
+      }
+    };
+
+    loadEpreuvesStatus();
+  }, [isEnvoiDossierExamen, dossierId]);
+
+  // Écouter l'événement de création de programme session
+  useEffect(() => {
+    const handleProgrammeSessionCreated = (event: CustomEvent) => {
+      if (event.detail?.dossierId === dossierId) {
+        setProgrammeSessionCreated(true);
+        // Recharger le statut des épreuves après un délai
+        setTimeout(() => {
+          if (dossierId) {
+            // Recharger le statut
+            const loadEpreuvesStatus = async () => {
+              try {
+                setLoadingEpreuves(true);
+                const response = await axiosClient.get('/resultats', {
+                  params: { dossier_id: dossierId }
+                });
+                const resultats = Array.isArray(response.data?.data) ? response.data.data : [];
+                
+                if (resultats.length === 0) {
+                  setEpreuvesStatus('non_saisi');
+                  return;
+                }
+                
+                const creneauxAttempts: EpreuveAttempt[] = [];
+                const codeConduiteAttempts: EpreuveAttempt[] = [];
+                const tourVilleAttempts: EpreuveAttempt[] = [];
+                
+                resultats.forEach((resultat: any) => {
+                  const attempt: EpreuveAttempt = {
+                    result: resultat.statut as EpreuveStatut,
+                    date: resultat.date,
+                    note: resultat.commentaire || ''
+                  };
+                  
+                  const typeExamen = (resultat.typeExamen || '').toLowerCase().trim();
+                  
+                  if (typeExamen.includes('creneau') || typeExamen === 'creneaux') {
+                    creneauxAttempts.push(attempt);
+                  } else if (typeExamen.includes('code') || typeExamen === 'codeconduite' || typeExamen === 'code_conduite') {
+                    codeConduiteAttempts.push(attempt);
+                  } else if (typeExamen.includes('ville') || typeExamen === 'tourville' || typeExamen === 'tour_ville') {
+                    tourVilleAttempts.push(attempt);
+                  }
+                });
+                
+                creneauxAttempts.sort((a, b) => {
+                  const dateA = a.date ? new Date(a.date).getTime() : 0;
+                  const dateB = b.date ? new Date(b.date).getTime() : 0;
+                  return dateA - dateB;
+                });
+                codeConduiteAttempts.sort((a, b) => {
+                  const dateA = a.date ? new Date(a.date).getTime() : 0;
+                  const dateB = b.date ? new Date(b.date).getTime() : 0;
+                  return dateA - dateB;
+                });
+                tourVilleAttempts.sort((a, b) => {
+                  const dateA = a.date ? new Date(a.date).getTime() : 0;
+                  const dateB = b.date ? new Date(b.date).getTime() : 0;
+                  return dateA - dateB;
+                });
+                
+                const creneauxStatus = computeOverall(creneauxAttempts);
+                const codeStatus = computeOverall(codeConduiteAttempts);
+                const villeStatus = computeOverall(tourVilleAttempts);
+                const generalStatus = computeGeneral(creneauxStatus, codeStatus, villeStatus);
+                
+                setEpreuvesStatus(generalStatus);
+              } catch (error) {
+                console.error('Erreur lors du rechargement du statut:', error);
+              } finally {
+                setLoadingEpreuves(false);
+              }
+            };
+            loadEpreuvesStatus();
+          }
+        }, 1000);
+      }
+    };
+    
+    window.addEventListener('programmeSessionCreated', handleProgrammeSessionCreated as EventListener);
+    return () => {
+      window.removeEventListener('programmeSessionCreated', handleProgrammeSessionCreated as EventListener);
+    };
+  }, [dossierId]);
+
   // Vérifier si l'utilisateur est autorisé
   const isUserAuthorized = (etapeRoles?: string[]): boolean => {
     if (!etapeRoles || etapeRoles.length === 0) return true;
@@ -142,11 +417,70 @@ const EtapeDetails: React.FC<EtapeDetailsProps> = ({
   const requiredPieces = etape.pieces?.filter(p => p.obligatoire) || [];
   const optionalPieces = etape.pieces?.filter(p => !p.obligatoire) || [];
 
+  // Log pour déboguer - afficher les informations de l'étape et des documents
+  React.useEffect(() => {
+    console.log('📊 EtapeDetails - Informations de l\'étape:', {
+      etapeId: etape.id,
+      etapeLibelle: etape.libelle,
+      piecesObligatoires: requiredPieces.map(p => ({
+        libelle: p.libelle,
+        type_document: p.type_document
+      })),
+      piecesOptionnelles: optionalPieces.map(p => ({
+        libelle: p.libelle,
+        type_document: p.type_document
+      })),
+      documentsReçus: uploadedDocuments.map(d => ({
+        id: d.id,
+        nom: d.nom_fichier,
+        pieceId: getDocumentPieceId(d),
+        apiPieceId: d.piece_justification_id,
+        typeDocumentId: d.type_document_id
+      })),
+      nombreDocuments: uploadedDocuments.length
+    });
+    
+    // Vérifier les correspondances entre documents et pièces
+    requiredPieces.forEach(piece => {
+      const matchingDocs = uploadedDocuments.filter(d => {
+        const docPieceId = getDocumentPieceId(d);
+        return docPieceId === piece.type_document ||
+               d.piece_justification_id === piece.type_document ||
+               d.type_document_id === piece.type_document;
+      });
+      
+      if (matchingDocs.length > 0) {
+        console.log('✅ Correspondance trouvée pour pièce obligatoire:', {
+          pieceLibelle: piece.libelle,
+          pieceTypeDocument: piece.type_document,
+          documents: matchingDocs.map(d => ({
+            id: d.id,
+            nom: d.nom_fichier,
+            pieceId: getDocumentPieceId(d)
+          }))
+        });
+      } else {
+        console.log('❌ Aucune correspondance pour pièce obligatoire:', {
+          pieceLibelle: piece.libelle,
+          pieceTypeDocument: piece.type_document,
+          documentsDisponibles: uploadedDocuments.map(d => ({
+            id: d.id,
+            nom: d.nom_fichier,
+            pieceId: getDocumentPieceId(d),
+            apiPieceId: d.piece_justification_id
+          }))
+        });
+      }
+    });
+  }, [etape.id, etape.libelle, requiredPieces, optionalPieces, uploadedDocuments, getDocumentPieceId]);
+
   // Vérifier si tous les documents obligatoires sont validés
   const allRequiredDocumentsValidated = requiredPieces.every(piece => {
     const doc = uploadedDocuments.find(d => {
-      // Utiliser piece_justification_id en priorité (selon LIAISON_PIECE_DOCUMENT.md)
-      const typeMatch = d.piece_justification_id === piece.type_document ||
+      // Utiliser le mapping localStorage en priorité, puis piece_justification_id de l'API
+      const docPieceId = getDocumentPieceId(d);
+      const typeMatch = docPieceId === piece.type_document ||
+                       d.piece_justification_id === piece.type_document ||
                        d.type_document_id === piece.type_document ||
                        d.nom_fichier?.toLowerCase().includes(piece.type_document.toLowerCase());
       return typeMatch && d.valide;
@@ -157,12 +491,43 @@ const EtapeDetails: React.FC<EtapeDetailsProps> = ({
   // Vérifier si tous les documents obligatoires sont uploadés
   const allRequiredDocumentsUploaded = requiredPieces.every(piece => {
     const doc = uploadedDocuments.find(d => {
-      // Utiliser piece_justification_id en priorité (selon LIAISON_PIECE_DOCUMENT.md)
-      const typeMatch = d.piece_justification_id === piece.type_document ||
+      // Utiliser le mapping localStorage en priorité, puis piece_justification_id de l'API
+      const docPieceId = getDocumentPieceId(d);
+      const typeMatch = docPieceId === piece.type_document ||
+                       d.piece_justification_id === piece.type_document ||
                        d.type_document_id === piece.type_document ||
                        d.nom_fichier?.toLowerCase().includes(piece.type_document.toLowerCase());
+      
+      // Log pour déboguer
+      if (typeMatch) {
+        console.log('✅ Document trouvé pour pièce:', {
+          pieceLibelle: piece.libelle,
+          pieceTypeDocument: piece.type_document,
+          documentId: d.id,
+          documentNom: d.nom_fichier,
+          docPieceId: docPieceId,
+          apiPieceId: d.piece_justification_id,
+          typeDocumentId: d.type_document_id
+        });
+      }
+      
       return typeMatch;
     });
+    
+    if (!doc) {
+      console.log('⚠️ Aucun document trouvé pour pièce:', {
+        pieceLibelle: piece.libelle,
+        pieceTypeDocument: piece.type_document,
+        documentsDisponibles: uploadedDocuments.map(d => ({
+          id: d.id,
+          nom: d.nom_fichier,
+          pieceId: getDocumentPieceId(d),
+          apiPieceId: d.piece_justification_id,
+          typeDocumentId: d.type_document_id
+        }))
+      });
+    }
+    
     return !!doc;
   });
 
@@ -198,22 +563,84 @@ const EtapeDetails: React.FC<EtapeDetailsProps> = ({
         return;
       }
 
-      // Upload du document
-      await circuitSuiviService.uploadDocument(
+      // selectedDocumentType correspond à piece.type_document qui est le piece_justification_id
+      const pieceJustificationId = selectedDocumentType || undefined;
+
+      // Vérifier que le piece_justification_id correspond à une pièce de l'étape
+      const allPieces = [...requiredPieces, ...optionalPieces];
+      const matchingPiece = allPieces.find(p => p.type_document === pieceJustificationId);
+      
+      if (pieceJustificationId && !matchingPiece) {
+        console.warn('⚠️ Le piece_justification_id sélectionné ne correspond à aucune pièce de l\'étape:', {
+          pieceJustificationId,
+          etapeId: etape.id,
+          etapeLibelle: etape.libelle,
+          piecesDisponibles: allPieces.map(p => ({ libelle: p.libelle, type_document: p.type_document }))
+        });
+      }
+
+      // Upload du document avec piece_justification_id
+      const formData = new FormData();
+      formData.append('documentable_id', dossierId);
+      formData.append('documentable_type', 'App\\Models\\Dossier');
+      formData.append('valide', '0');
+      formData.append('commentaires', commentaires || '');
+      formData.append('fichier', file, file.name.trim());
+      
+      if (pieceJustificationId) {
+        formData.append('piece_justification_id', pieceJustificationId);
+      }
+      
+      // etape_id est obligatoire selon l'API
+      if (etape.id) {
+        formData.append('etape_id', String(etape.id));
+      }
+
+      console.log('📤 Upload document avec piece_justification_id:', {
         dossierId,
-        file,
-        selectedDocumentType || undefined,
-        commentaires
-      );
+        pieceJustificationId: pieceJustificationId,
+        fileName: file.name,
+        etapeId: etape.id,
+        etapeLibelle: etape.libelle,
+        pieceLibelle: matchingPiece?.libelle || 'Aucune pièce correspondante'
+      });
+
+      const response = await axiosClient.post('/documents', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        timeout: 300000 // 5 minutes
+      });
+
+      // Gérer les différents formats de réponse
+      let document: Document | null = null;
+      
+      if (response.data && 'id' in response.data) {
+        document = response.data as Document;
+      } else if (response.data && typeof response.data === 'object' && 'data' in response.data && (response.data as any).data && 'id' in (response.data as any).data) {
+        document = (response.data as any).data as Document;
+      } else if (response.data && typeof response.data === 'object' && 'success' in response.data && (response.data as any).data && 'id' in (response.data as any).data) {
+        document = (response.data as any).data as Document;
+      }
+
+      if (!document || !document.id) {
+        throw new Error('Format de réponse inattendu lors de l\'upload du document');
+      }
 
       // Recharger les documents
       if (onDocumentUploaded) {
         onDocumentUploaded();
       }
 
-      // Émettre l'événement
+      // Émettre l'événement avec les informations nécessaires pour le mapping
       window.dispatchEvent(new CustomEvent('documentUploaded', {
-        detail: { dossierId }
+        detail: { 
+          dossierId,
+          document_id: document.id,
+          piece_justification_id_original: pieceJustificationId || null,
+          piece_justification_id_received: document.piece_justification_id || null,
+          etape_id: etape.id || null,
+        }
       }));
 
       setUploadDialogOpen(false);
@@ -230,9 +657,242 @@ const EtapeDetails: React.FC<EtapeDetailsProps> = ({
     }
   };
 
+  // Fonction pour vérifier si une date est un mercredi (3) ou samedi (6)
+  const isMercrediOuSamedi = (dateString: string): boolean => {
+    if (!dateString) return false;
+    const date = new Date(dateString);
+    const dayOfWeek = date.getDay(); // 0 = Dimanche, 1 = Lundi, ..., 6 = Samedi
+    return dayOfWeek === 3 || dayOfWeek === 6; // 3 = Mercredi, 6 = Samedi
+  };
+
+  // Fonction pour obtenir le prochain mercredi ou samedi disponible
+  const getNextAvailableDate = (): string => {
+    const today = new Date();
+    const daysUntilWednesday = (3 - today.getDay() + 7) % 7 || 7;
+    const daysUntilSaturday = (6 - today.getDay() + 7) % 7 || 7;
+    
+    const nextWednesday = new Date(today);
+    nextWednesday.setDate(today.getDate() + daysUntilWednesday);
+    
+    const nextSaturday = new Date(today);
+    nextSaturday.setDate(today.getDate() + daysUntilSaturday);
+    
+    // Retourner le plus proche
+    return nextWednesday <= nextSaturday 
+      ? nextWednesday.toISOString().split('T')[0]
+      : nextSaturday.toISOString().split('T')[0];
+  };
+
+  const handleDateExamenChange = (value: string) => {
+    setDateExamen(value);
+    setDateExamenError('');
+    
+    if (value && !isMercrediOuSamedi(value)) {
+      setDateExamenError('La date doit être un mercredi ou un samedi');
+    }
+  };
+
+  const handleOpenDateExamenDialog = () => {
+    setDateExamen(getNextAvailableDate());
+    setDateExamenError('');
+    setDateExamenDialogOpen(true);
+  };
+
+  const handleConfirmDateExamen = async () => {
+    if (!dateExamen) {
+      setDateExamenError('Veuillez sélectionner une date');
+      return;
+    }
+
+    if (!isMercrediOuSamedi(dateExamen)) {
+      setDateExamenError('La date doit être un mercredi ou un samedi');
+      return;
+    }
+
+    setDateExamenDialogOpen(false);
+    await createProgrammeSession(dateExamen);
+  };
+
+  const createProgrammeSession = async (dateExamenValue: string) => {
+    if (!dossierId) return;
+
+    try {
+      setTransmitting(true);
+      
+      console.log('📤 Création du programme session pour l\'étape ENVOI DU DOSSIER POUR EXAMEN...', {
+        etapeId: etape.id,
+        etapeLibelle: etape.libelle,
+        dossierId,
+        dateExamen: dateExamenValue
+      });
+
+      // Formater la date au format attendu par l'API
+      // Formater la date au format attendu par l'API
+      // Utiliser le format ISO 8601 comme dans les autres parties du code
+      let formattedDateExamen = dateExamenValue;
+      if (dateExamenValue && dateExamenValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // Créer un objet Date et le formater en ISO 8601
+        const dateObj = new Date(dateExamenValue);
+        dateObj.setHours(8, 0, 0, 0); // 08:00:00
+        formattedDateExamen = dateObj.toISOString();
+        
+        console.log('📅 Formatage de la date:', {
+          original: dateExamenValue,
+          dateObj: dateObj,
+          isoString: formattedDateExamen
+        });
+      }
+
+      const payload = {
+        dossier_id: dossierId,
+        date_examen: formattedDateExamen
+      };
+
+      console.log('📤 Payload envoyé à l\'API:', {
+        ...payload,
+        date_examen_original: dateExamenValue,
+        date_examen_formatted: formattedDateExamen
+      });
+
+      const response = await axiosClient.post('/programme-sessions', payload);
+
+      if (response.data?.success || response.data?.programme_session) {
+        console.log('✅ Programme session créé avec succès:', response.data);
+        
+        setProgrammeSessionCreated(true);
+        
+        // Émettre l'événement pour la création de programme session
+        window.dispatchEvent(new CustomEvent('programmeSessionCreated', {
+          detail: {
+            etapeId: etape.id,
+            circuitId,
+            dossierId,
+            programmeSession: response.data?.programme_session
+          }
+        }));
+
+        // Ne pas passer automatiquement à l'étape suivante
+        // L'utilisateur devra cliquer sur "Passer à l'étape suivante" après validation
+
+        if (onDocumentUploaded) {
+          onDocumentUploaded();
+        }
+
+        alert('Dossier envoyé à l\'examen avec succès ! Vous pouvez maintenant passer à l\'étape suivante une fois les résultats validés.');
+      } else {
+        throw new Error('Format de réponse inattendu');
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur lors de la création du programme session:', error);
+      
+      // Afficher tous les détails de l'erreur
+      const errorDetails: any = {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        message: error.message,
+        request: {
+          url: error.config?.url,
+          method: error.config?.method,
+          data: error.config?.data,
+          headers: error.config?.headers
+        }
+      };
+      
+      // Afficher le contenu complet de la réponse
+      if (error.response?.data) {
+        errorDetails.responseData = error.response.data;
+        console.error('❌ Contenu complet de la réponse d\'erreur:', JSON.stringify(error.response.data, null, 2));
+      }
+      
+      console.error('❌ Détails de l\'erreur:', errorDetails);
+      
+      let errorMessage = 'Erreur lors de la création du programme session';
+      
+      // Gestion des erreurs détaillée
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        
+        // Message principal
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+        
+        // Analyser l'erreur spécifique
+        if (errorData.error && typeof errorData.error === 'string') {
+          // Si l'erreur mentionne "email" sur null, c'est un bug backend connu
+          if (errorData.error.includes('email') && errorData.error.includes('null')) {
+            errorMessage = 'Erreur serveur : Problème de chargement des données du dossier.\n\n' +
+                          'Le serveur n\'arrive pas à charger les relations du dossier (candidat, personne, email).\n\n' +
+                          'Ceci est un problème technique côté serveur. Veuillez :\n' +
+                          '1. Vérifier que le dossier a bien un candidat et une personne associés\n' +
+                          '2. Recharger la page et réessayer\n' +
+                          '3. Si le problème persiste, contacter l\'administrateur système\n\n' +
+                          'Note : Le format de la requête est correct, le problème vient du traitement côté serveur.';
+          } else {
+            errorMessage = errorData.error;
+          }
+        }
+        
+        // Erreurs de validation
+        if (errorData.errors) {
+          const validationErrors = Object.entries(errorData.errors)
+            .map(([field, messages]: [string, any]) => {
+              const fieldLabel = field === 'date_examen' ? 'Date d\'examen' : field;
+              return `${fieldLabel}: ${Array.isArray(messages) ? messages.join(', ') : messages}`;
+            })
+            .join('\n');
+          errorMessage += `\n\nErreurs de validation:\n${validationErrors}`;
+        }
+        
+        // Détails supplémentaires pour les erreurs 500
+        if (error.response.status === 500) {
+          if (!errorMessage.includes('Données du dossier incomplètes')) {
+            errorMessage += '\n\nErreur serveur (500). Veuillez vérifier les logs du serveur ou contacter l\'administrateur.';
+          }
+          if (errorData.exception || errorData.trace) {
+            console.error('❌ Détails techniques de l\'erreur serveur:', {
+              exception: errorData.exception,
+              trace: errorData.trace
+            });
+          }
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Afficher l'erreur dans une alerte avec plus de détails
+      alert(`Erreur: ${errorMessage}\n\nCode d'erreur: ${error.response?.status || 'N/A'}`);
+    } finally {
+      setTransmitting(false);
+    }
+  };
+
+  const handleSendToExamen = () => {
+    if (!dossierId) return;
+    // Ouvrir le modal pour sélectionner la date d'examen
+    handleOpenDateExamenDialog();
+  };
+
   const handleTransmitEtape = async () => {
     if (!canTransition || !dossierId) return;
 
+    // Pour l'étape "ENVOI DU DOSSIER POUR EXAMEN", vérifier que le statut est "reussi"
+    if (isEnvoiDossierExamen) {
+      if (epreuvesStatus !== 'reussi') {
+        alert('Vous ne pouvez pas passer à l\'étape suivante tant que le statut global des épreuves n\'est pas "Validé".');
+        return;
+      }
+      
+      // Vérifier aussi que le programme session a été créé
+      if (!programmeSessionCreated) {
+        alert('Veuillez d\'abord envoyer le dossier à l\'examen.');
+        return;
+      }
+    }
+
+    // Comportement normal pour les autres étapes
     try {
       setTransmitting(true);
       const response = await circuitSuiviService.transmettreEtape(
@@ -261,9 +921,34 @@ const EtapeDetails: React.FC<EtapeDetailsProps> = ({
       }
     } catch (error: any) {
       console.error('Erreur lors de la transmission:', error);
-      alert(`Erreur lors de la transmission: ${error.message}`);
+      const errorMessage = error.response?.data?.message || error.message || 'Erreur lors de la transmission';
+      alert(`Erreur lors de la transmission: ${errorMessage}`);
     } finally {
       setTransmitting(false);
+    }
+  };
+
+  // Fonction pour obtenir le libellé du statut
+  const getStatutLabel = (statut: EpreuveStatut | null): string => {
+    if (!statut) return 'Non chargé';
+    switch (statut) {
+      case 'reussi': return 'Validé';
+      case 'echoue': return 'Échoué';
+      case 'absent': return 'Absent';
+      case 'non_saisi':
+      default: return 'Non saisi';
+    }
+  };
+
+  // Fonction pour obtenir la couleur du statut
+  const getStatutColor = (statut: EpreuveStatut | null): 'success' | 'error' | 'warning' | 'default' => {
+    if (!statut) return 'default';
+    switch (statut) {
+      case 'reussi': return 'success';
+      case 'echoue': return 'error';
+      case 'absent': return 'warning';
+      case 'non_saisi':
+      default: return 'default';
     }
   };
 
@@ -306,13 +991,50 @@ const EtapeDetails: React.FC<EtapeDetailsProps> = ({
           </Typography>
           <List>
             {requiredPieces.map((piece, index) => {
+              // Log pour déboguer - afficher toutes les informations de la pièce
+              console.log('🔍 Recherche document pour pièce obligatoire:', {
+                pieceLibelle: piece.libelle,
+                pieceTypeDocument: piece.type_document,
+                etapeId: etape.id,
+                documentsDisponibles: uploadedDocuments.map(d => ({
+                  id: d.id,
+                  nom: d.nom_fichier,
+                  docPieceId: getDocumentPieceId(d),
+                  apiPieceId: d.piece_justification_id,
+                  typeDocumentId: d.type_document_id
+                }))
+              });
+              
               const doc = uploadedDocuments.find(d => {
-                // Utiliser piece_justification_id en priorité (selon LIAISON_PIECE_DOCUMENT.md)
-                const typeMatch = d.piece_justification_id === piece.type_document ||
+                // Utiliser le mapping localStorage en priorité, puis piece_justification_id de l'API
+                const docPieceId = getDocumentPieceId(d);
+                const typeMatch = docPieceId === piece.type_document ||
+                                 d.piece_justification_id === piece.type_document ||
                                  d.type_document_id === piece.type_document ||
                                  d.nom_fichier?.toLowerCase().includes(piece.type_document.toLowerCase());
+                
+                // Log pour déboguer
+                if (typeMatch) {
+                  console.log('✅ Document trouvé pour pièce obligatoire:', {
+                    pieceLibelle: piece.libelle,
+                    pieceTypeDocument: piece.type_document,
+                    documentId: d.id,
+                    documentNom: d.nom_fichier,
+                    docPieceId: docPieceId,
+                    apiPieceId: d.piece_justification_id,
+                    typeDocumentId: d.type_document_id
+                  });
+                }
+                
                 return typeMatch;
               });
+              
+              if (!doc) {
+                console.log('❌ Aucun document trouvé pour pièce obligatoire:', {
+                  pieceLibelle: piece.libelle,
+                  pieceTypeDocument: piece.type_document
+                });
+              }
 
               return (
                 <ListItem key={index}>
@@ -353,10 +1075,26 @@ const EtapeDetails: React.FC<EtapeDetailsProps> = ({
           <List>
             {optionalPieces.map((piece, index) => {
               const doc = uploadedDocuments.find(d => {
-                // Utiliser piece_justification_id en priorité (selon LIAISON_PIECE_DOCUMENT.md)
-                const typeMatch = d.piece_justification_id === piece.type_document ||
+                // Utiliser le mapping localStorage en priorité, puis piece_justification_id de l'API
+                const docPieceId = getDocumentPieceId(d);
+                const typeMatch = docPieceId === piece.type_document ||
+                                 d.piece_justification_id === piece.type_document ||
                                  d.type_document_id === piece.type_document ||
                                  d.nom_fichier?.toLowerCase().includes(piece.type_document.toLowerCase());
+                
+                // Log pour déboguer
+                if (typeMatch) {
+                  console.log('✅ Document trouvé pour pièce optionnelle:', {
+                    pieceLibelle: piece.libelle,
+                    pieceTypeDocument: piece.type_document,
+                    documentId: d.id,
+                    documentNom: d.nom_fichier,
+                    docPieceId: docPieceId,
+                    apiPieceId: d.piece_justification_id,
+                    typeDocumentId: d.type_document_id
+                  });
+                }
+                
                 return typeMatch;
               });
 
@@ -425,8 +1163,50 @@ const EtapeDetails: React.FC<EtapeDetailsProps> = ({
         </Paper>
       )}
 
+      {/* Statut des résultats pour l'étape ENVOI DOSSIER POUR EXAMEN */}
+      {isEnvoiDossierExamen && (
+        <Paper sx={{ p: 2, mb: 2, backgroundColor: 'background.default' }}>
+          <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+            Statut des résultats d'examen
+          </Typography>
+          {loadingEpreuves ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CircularProgress size={20} />
+              <Typography variant="body2" color="text.secondary">
+                Chargement du statut...
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
+              <Chip
+                label={getStatutLabel(epreuvesStatus)}
+                color={getStatutColor(epreuvesStatus)}
+                size="medium"
+                variant={epreuvesStatus === 'non_saisi' ? 'outlined' : 'filled'}
+              />
+              <Typography variant="body2" color="text.secondary">
+                {epreuvesStatus === 'reussi' && '✅ Toutes les épreuves sont validées'}
+                {epreuvesStatus === 'echoue' && '❌ Au moins une épreuve est échouée'}
+                {epreuvesStatus === 'absent' && '⚠️ Au moins un candidat est absent'}
+                {epreuvesStatus === 'non_saisi' && '📝 En attente de saisie des résultats'}
+              </Typography>
+            </Box>
+          )}
+          {!programmeSessionCreated && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              Veuillez envoyer le dossier à l'examen pour commencer le processus.
+            </Alert>
+          )}
+          {programmeSessionCreated && epreuvesStatus !== 'reussi' && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              Le dossier a été envoyé à l'examen. Vous devez attendre que toutes les épreuves soient validées avant de pouvoir passer à l'étape suivante.
+            </Alert>
+          )}
+        </Paper>
+      )}
+
       {/* Actions */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
         <Button
           variant="outlined"
           startIcon={<Upload />}
@@ -436,11 +1216,27 @@ const EtapeDetails: React.FC<EtapeDetailsProps> = ({
           Ajouter un document
         </Button>
 
+        {/* Bouton "Envoyer à l'examen" pour l'étape ENVOI DOSSIER POUR EXAMEN */}
+        {isEnvoiDossierExamen && !programmeSessionCreated && (
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleSendToExamen}
+            disabled={!dossierId || transmitting}
+          >
+            {transmitting ? <CircularProgress size={20} /> : 'Envoyer à l\'examen'}
+          </Button>
+        )}
+
+        {/* Bouton "Passer à l'étape suivante" */}
         {canTransition && (
           <Button
             variant="contained"
             onClick={handleTransmitEtape}
-            disabled={transmitting}
+            disabled={
+              transmitting || 
+              (isEnvoiDossierExamen && (!programmeSessionCreated || epreuvesStatus !== 'reussi'))
+            }
           >
             {transmitting ? <CircularProgress size={20} /> : 'Passer à l\'étape suivante'}
           </Button>
@@ -503,6 +1299,50 @@ const EtapeDetails: React.FC<EtapeDetailsProps> = ({
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setUploadDialogOpen(false)}>Annuler</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog de sélection de date d'examen */}
+      <Dialog open={dateExamenDialogOpen} onClose={() => setDateExamenDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Sélectionner la date d'examen</DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Veuillez sélectionner une date d'examen. Seuls les mercredis et samedis sont autorisés.
+          </Alert>
+          <TextField
+            fullWidth
+            label="Date d'examen"
+            type="date"
+            value={dateExamen}
+            onChange={(e) => handleDateExamenChange(e.target.value)}
+            error={!!dateExamenError}
+            helperText={dateExamenError || 'Sélectionnez un mercredi ou un samedi'}
+            InputLabelProps={{ shrink: true }}
+            inputProps={{
+              min: new Date().toISOString().split('T')[0],
+            }}
+            sx={{ mt: 2 }}
+          />
+          {dateExamen && isMercrediOuSamedi(dateExamen) && (
+            <Alert severity="success" sx={{ mt: 2 }}>
+              Date valide : {new Date(dateExamen).toLocaleDateString('fr-FR', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDateExamenDialogOpen(false)}>Annuler</Button>
+          <Button
+            variant="contained"
+            onClick={handleConfirmDateExamen}
+            disabled={!dateExamen || !!dateExamenError || !isMercrediOuSamedi(dateExamen)}
+          >
+            Confirmer
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
