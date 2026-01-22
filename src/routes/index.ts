@@ -24,10 +24,11 @@ import CircuitDetailPage from '../modules/circuit/pages/CircuitDetailPage';
 import StatutPage from '../modules/statut/pages/StatutPage';
 
 import { CandidateDetailsPage, TypeDemandePage, GestionDossierPage, UsagerDossierPage } from '../modules/cnepc/pages';
+import { CandidatDetailsPage } from '../modules/user';
 import CreateDossierFlowPage from '../modules/cnepc/pages/CreateDossierFlowPage';
 import { PieceJustificativePage } from '../modules/pieces-justificatives/pages';
 import SettingsPage from '../modules/settings/pages/SettingsPage';
-import UserManagementPage from '../modules/settings/pages/UserManagementPage';
+import { UserManagementPage } from '../modules/user';
 import AutoEcolePage from './AutoEcolePage';
 import ResetPasswordForm from '../modules/auth/forms/resetpassword';
 import PageChangePassWord from '../modules/cnepc/forms/changePassword';
@@ -175,7 +176,7 @@ const AppRoutes: React.FC = () => {
     React.createElement(Route, { 
       path: ROUTES.CANDIDAT_DETAILS, 
       element: React.createElement(ProtectedRoute, null, 
-        React.createElement(AppLayout, null, React.createElement(CandidateDetailsPage))
+        React.createElement(AppLayout, null, React.createElement(CandidatDetailsPage))
       ) 
     }),
     React.createElement(Route, { 
