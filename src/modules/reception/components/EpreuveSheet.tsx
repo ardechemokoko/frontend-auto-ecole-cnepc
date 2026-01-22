@@ -958,6 +958,182 @@ const EpreuveSheet: React.FC<EpreuveSheetProps> = ({ open, onClose, dossier, onS
           </Button>
         </DialogActions>
       </Dialog>
+      </Box>
+    );
+  }
+
+  return (
+    <Drawer
+      anchor="right"
+      open={open}
+      onClose={onClose}
+      variant="temporary"
+      hideBackdrop
+      ModalProps={{
+        keepMounted: true,
+        disableEnforceFocus: true,
+        disableScrollLock: true,
+      }}
+      PaperProps={{ sx: { width: { xs: '100%', md: 720 } } }}
+    >
+      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box>
+            <Typography variant="h6">Résultats d'épreuves</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {dossier ? `${dossier.candidatNom} ${dossier.candidatPrenom} • ${dossier.reference}` : ''}
+          </Typography>
+        </Box>
+        <IconButton onClick={onClose}>
+          <CloseIcon />
+        </IconButton>
+      </Box>
+      <Divider />
+      <Box sx={{ p: 2, display: 'grid', gap: 3 }}>
+        {error && (
+          <Alert severity="error" onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+        {loading && (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 4 }}>
+            <CircularProgress size={24} sx={{ mr: 2 }} />
+            <Typography variant="body2" color="text.secondary">
+              Chargement des résultats depuis l'API...
+            </Typography>
+          </Box>
+        )}
+        {!loading && (
+          <>
+          <Box>
+          <Typography variant="subtitle1" gutterBottom>Résultat global</Typography>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Chip
+              label={statutGlobalInfo.label}
+              color={statutGlobalInfo.color}
+              size="medium"
+              variant={overallGeneral === 'non_saisi' ? 'outlined' : 'filled'}
+            />
+            <Typography variant="body2" color="text.secondary">
+              ({overallGeneral})
+            </Typography>
+          </Stack>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            {overallGeneral === 'reussi' && '✅ Toutes les épreuves sont validées'}
+            {overallGeneral === 'echoue' && '❌ Au moins une épreuve est échouée'}
+            {overallGeneral === 'absent' && '⚠️ Au moins un candidat est absent'}
+            {overallGeneral === 'non_saisi' && '📝 En attente de saisie des résultats'}
+          </Typography>
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              <strong>Créneaux:</strong> {overallCreneaux} | 
+              <strong> Code:</strong> {overallCode} | 
+              <strong> Tour de ville:</strong> {overallVille}
+            </Typography>
+          </Box>
+        </Box>
+        <Divider />
+        <EpreuveRow
+          label={`Créneaux (statut: ${overallCreneaux})`}
+          attempts={values.creneauxAttempts || []}
+          onAdd={addAttempt('creneauxAttempts')}
+          onChange={setAttempt('creneauxAttempts')}
+          onLock={handleLockAttempt('creneaux')}
+          lockedAttempts={lockedAttempts.creneaux}
+          disabled={creneauxLocked}
+        />
+        <Divider />
+        <EpreuveRow
+          label={`Code de conduite (statut: ${overallCode})`}
+          attempts={values.codeConduiteAttempts || []}
+          onAdd={addAttempt('codeConduiteAttempts')}
+          onChange={setAttempt('codeConduiteAttempts')}
+          onLock={handleLockAttempt('codeConduite')}
+          lockedAttempts={lockedAttempts.codeConduite}
+          disabled={codeLocked}
+        />
+        <Divider />
+        <EpreuveRow
+          label={`Tour de ville (statut: ${overallVille})`}
+          attempts={values.tourVilleAttempts || []}
+          onAdd={addAttempt('tourVilleAttempts')}
+          onChange={setAttempt('tourVilleAttempts')}
+          onLock={handleLockAttempt('tourVille')}
+          lockedAttempts={lockedAttempts.tourVille}
+          disabled={villeLocked}
+        />
+        <Divider />
+        <TextField
+          label="Notes générales"
+          value={values.notes || ''}
+          onChange={(e) => setValues(v => ({ ...v, notes: e.target.value }))}
+          multiline
+          minRows={3}
+        />
+        <Stack direction="row" justifyContent="flex-end" spacing={1}>
+          <Button onClick={onClose}>Fermer</Button>
+          <Button variant="contained" onClick={handleSave} disabled={saving || loading}>
+            {saving ? 'Enregistrement…' : 'Enregistrer'}
+          </Button>
+        </Stack>
+          </>
+        )}
+      </Box>
+      
+      {/* Dialog de confirmation pour le verrouillage automatique (réussite) */}
+      <Dialog
+        open={lockConfirmation.open}
+        onClose={() => handleLockConfirmation(false)}
+        aria-labelledby="lock-confirmation-dialog-title"
+        aria-describedby="lock-confirmation-dialog-description"
+      >
+        <DialogTitle id="lock-confirmation-dialog-title">
+          Confirmer le verrouillage de l'épreuve
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="lock-confirmation-dialog-description">
+            L'épreuve "{lockConfirmation.type === 'creneaux' ? 'Créneaux' : lockConfirmation.type === 'codeConduite' ? 'Code de conduite' : 'Tour de ville'}" a été réussie.
+            <br />
+            <br />
+            Voulez-vous verrouiller cette épreuve pour empêcher toute modification ultérieure ?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => handleLockConfirmation(false)} color="inherit">
+            Annuler
+          </Button>
+          <Button onClick={() => handleLockConfirmation(true)} variant="contained" color="primary" autoFocus>
+            Verrouiller
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Dialog de confirmation pour l'échec définitif (3 tentatives échouées) */}
+      <Dialog
+        open={failureConfirmation.open}
+        onClose={() => handleFailureConfirmation(false)}
+        aria-labelledby="failure-confirmation-dialog-title"
+        aria-describedby="failure-confirmation-dialog-description"
+      >
+        <DialogTitle id="failure-confirmation-dialog-title">
+          Confirmer l'échec définitif de l'épreuve
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="failure-confirmation-dialog-description">
+            L'épreuve "{failureConfirmation.type === 'creneaux' ? 'Créneaux' : failureConfirmation.type === 'codeConduite' ? 'Code de conduite' : 'Tour de ville'}" a échoué 3 fois.
+            <br />
+            <br />
+            Voulez-vous verrouiller cette épreuve pour confirmer qu'elle est définitivement échouée ?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => handleFailureConfirmation(false)} color="inherit">
+            Annuler
+          </Button>
+          <Button onClick={() => handleFailureConfirmation(true)} variant="contained" color="error" autoFocus>
+            Confirmer l'échec
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Drawer>
   );
 };

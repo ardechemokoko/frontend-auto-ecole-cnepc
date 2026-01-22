@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ReceptionDossier, EpreuveStatut, EpreuveAttempt } from '../types';
 import axiosClient from '../../../shared/environment/envdev';
 import { circuitSuiviService, CircuitSuivi } from '../services/circuit-suivi.service';
@@ -40,6 +40,8 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
   const [loadingCircuit, setLoadingCircuit] = useState(false);
   const [typeDocuments, setTypeDocuments] = useState<any[]>([]);
   const [loadingTypeDocuments, setLoadingTypeDocuments] = useState(false);
+  // Map pour corréler piece_justification_id -> { type_document_id, libelle }
+  const [pieceJustificationTypeMap, setPieceJustificationTypeMap] = useState<Map<string, { libelle: string }>>(new Map());
   const [documentsFromApi, setDocumentsFromApi] = useState<any[]>([]);
 
   const formatFileSize = (bytes: number): string => {
@@ -56,20 +58,16 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
 
     try {
       setLoading(true);
-      console.log('📋 Chargement du dossier:', id);
       
       // Utiliser directement l'endpoint /dossiers/{id}
       let dossierData: any = null;
-      let typeDemandeName = '';
       
       try {
         const response = await axiosClient.get(`/dossiers/${id}`);
         dossierData = response.data?.data || response.data;
-        console.log('✅ Dossier récupéré depuis /dossiers/{id}');
       } catch (error: any) {
         // Si 404, essayer de récupérer depuis la liste /dossiers comme fallback
         if (error?.response?.status === 404) {
-          console.log('⚠️ Dossier non trouvé via /dossiers/{id}, tentative depuis la liste...');
           try {
             const listResponse = await axiosClient.get('/dossiers');
             let dossiersList: any[] = [];
@@ -91,36 +89,12 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
             if (!dossierData) {
               throw new Error('Dossier non trouvé');
             }
-            console.log('✅ Dossier trouvé dans la liste');
           } catch (listError: any) {
-            console.error('❌ Impossible de récupérer le dossier:', listError);
             throw new Error('Dossier non trouvé ou non accessible');
           }
         } else {
           throw error;
         }
-      }
-      
-      // Vérifier le type de demande
-      if (dossierData?.type_demande_id) {
-        try {
-          const typeDemande = await typeDemandeService.getTypeDemandeById(dossierData.type_demande_id);
-          typeDemandeName = typeDemande.name || '';
-          console.log('📋 Type de demande:', typeDemandeName);
-        } catch (err) {
-          console.warn('⚠️ Impossible de charger le type de demande:', err);
-        }
-      }
-      
-      // Si le type de demande n'est pas "NOUVEAU PERMIS", ne pas charger les détails complets
-      const isPermisType = typeDemandeName && (
-        typeDemandeName.toUpperCase().includes('PERMIS') || 
-        typeDemandeName.toUpperCase().includes('NOUVEAU') ||
-        typeDemandeName.toUpperCase() === 'PERMIS_CONDUIRE'
-      );
-      
-      if (!isPermisType) {
-        console.log('ℹ️ Type de demande non-permis, utilisation des données de base uniquement (pas d\'auto-école/formation/épreuves)');
       }
       
       setDossierComplet(dossierData);
@@ -142,8 +116,6 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
       };
       
       setDossier(receptionDossier);
-      
-      console.log('✅ Dossier chargé:', receptionDossier.reference);
       
       // Retourner les données du dossier pour les utiliser dans le chargement du circuit
       // Cela évite les problèmes de synchronisation d'état
@@ -167,21 +139,12 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
           type_document_id: doc.type_document_id || doc.type_document?.id // ← Clé de corrélation selon CORRELATION_DOCUMENTS_PIECES.md
         }));
         
-        console.log('✅ Documents chargés depuis dossier complet:', mappedFromDossier.length);
-        console.log('📋 Documents avec type_document_id:', mappedFromDossier.filter(d => d.type_document_id).length);
-        mappedFromDossier.forEach(doc => {
-          if (!doc.type_document_id) {
-            console.warn('⚠️ Document sans type_document_id:', doc.id, doc.nom);
-          }
-        });
-        
         setDocumentsFromApi(mappedFromDossier);
       }
       
       // Retourner les données du dossier pour les utiliser dans le chargement du circuit
       return dossierData;
     } catch (error: any) {
-      console.error('❌ Erreur lors du chargement du dossier:', error);
       throw error;
     } finally {
       setLoading(false);
@@ -194,7 +157,6 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
     
     // Ne charger les épreuves que si le dossier a un type de demande permis
     if (!dossierComplet?.type_demande_id) {
-      console.log('ℹ️ Pas de type_demande_id, pas de chargement des épreuves');
       setEpreuvesStatus('non_saisi');
       return;
     }
@@ -211,7 +173,6 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
       );
       
       if (!isPermisType) {
-        console.log('ℹ️ Type de demande non-permis, pas de chargement des épreuves');
         setEpreuvesStatus('non_saisi');
         setLoadingEpreuves(false);
         return;
@@ -279,7 +240,6 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
       
       setEpreuvesStatus(generalStatus);
     } catch (err: any) {
-      console.error('❌ Erreur lors du chargement du statut des épreuves:', err);
       if (err?.response?.status === 404) {
         setEpreuvesStatus('non_saisi');
       } else {
@@ -343,15 +303,13 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
           hasMore = types.length === 100;
           page++;
         } catch (err) {
-          console.warn('⚠️ Erreur lors du chargement des référentiels type_document:', err);
           hasMore = false;
         }
       }
 
-      console.log('✅ Référentiels chargés:', allTypes.length, 'types');
       setTypeDocuments(allTypes);
     } catch (err: any) {
-      console.error('❌ Erreur lors du chargement des référentiels:', err);
+      // Erreur silencieuse
     } finally {
       setLoadingTypeDocuments(false);
     }
@@ -361,7 +319,6 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
   const chargerCircuit = async (dossierData?: any) => {
     try {
       setLoadingCircuit(true);
-      console.log('🔄 Début du chargement du circuit...');
 
       // Utiliser les données passées en paramètre ou celles de l'état
       const dossierDataToUse = dossierData || dossierComplet;
@@ -372,25 +329,19 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
       // Méthode 1: Utiliser le circuit déjà présent dans le dossier
       if (dossierDataToUse?.circuit) {
         circuitData = dossierDataToUse.circuit;
-        console.log('✅ Circuit trouvé dans le dossier complet');
       }
       // Méthode 2: Utiliser type_demande_id si disponible
       else if (dossierDataToUse?.type_demande_id) {
-        console.log('📋 Type demande ID:', dossierDataToUse.type_demande_id);
-        
         const typeDemande = await typeDemandeService.getTypeDemandeById(dossierDataToUse.type_demande_id);
-        console.log('📋 Type demande:', typeDemande);
         
         if (typeDemande?.name) {
           const nomEntite = typeDemande.name;
-          console.log('📋 Nom entité:', nomEntite);
           circuitData = await circuitSuiviService.getCircuitByNomEntite(nomEntite);
         }
       }
       // Méthode 3: Utiliser type_demande.name directement si disponible
       else if (dossierDataToUse?.type_demande?.name) {
         const nomEntite = dossierDataToUse.type_demande.name;
-        console.log('📋 Nom entité depuis type_demande:', nomEntite);
         circuitData = await circuitSuiviService.getCircuitByNomEntite(nomEntite);
       }
       // Méthode 4: Utiliser le dossier de base si disponible
@@ -398,70 +349,47 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
         const dossierBase = dossierToUse.details.dossier_complet;
         if (dossierBase.circuit) {
           circuitData = dossierBase.circuit;
-          console.log('✅ Circuit trouvé dans dossier.details.dossier_complet');
         } else if (dossierBase.type_demande_id) {
           try {
             const typeDemande = await typeDemandeService.getTypeDemandeById(dossierBase.type_demande_id);
             if (typeDemande?.name) {
               circuitData = await circuitSuiviService.getCircuitByNomEntite(typeDemande.name);
-              console.log('✅ Circuit chargé via dossier.details.type_demande_id');
             }
           } catch (err) {
-            console.warn('⚠️ Impossible de charger le type de demande depuis dossier.details:', err);
+            // Erreur silencieuse
           }
         }
       }
       // Méthode 5: Fallback - utiliser le circuit unique si un seul existe
       if (!circuitData) {
-        console.log('⚠️ Tentative de chargement du circuit par défaut (unique disponible)...');
         try {
           const circuits = await circuitSuiviService.getCircuits();
           const circuitsActifs = circuits.filter(c => c.actif);
           if (circuitsActifs.length === 1) {
             circuitData = circuitsActifs[0];
-            console.log('✅ Circuit par défaut utilisé (unique disponible):', circuitData.libelle);
           }
         } catch (err) {
-          console.warn('⚠️ Impossible de charger les circuits pour le fallback:', err);
+          // Erreur silencieuse
         }
       }
       
       if (circuitData) {
-        console.log('✅ Circuit chargé:', {
-          id: circuitData.id,
-          libelle: circuitData.libelle,
-          nom_entite: circuitData.nom_entite,
-          etapesCount: circuitData.etapes?.length || 0,
-          etapes: circuitData.etapes
-        });
-        
         // Si le circuit n'a pas d'étapes, les charger séparément selon CIRCUIT_SUIVI_SERVICE.md
         if (circuitData.id && (!circuitData.etapes || circuitData.etapes.length === 0)) {
-          console.log('⚠️ Circuit sans étapes, chargement depuis l\'API...');
           try {
             const etapes = await circuitSuiviService.getEtapesByCircuitId(circuitData.id);
             if (etapes.length > 0) {
               circuitData.etapes = etapes;
-              console.log('✅ Étapes chargées et ajoutées au circuit:', etapes.length);
             }
           } catch (err: any) {
-            console.warn('⚠️ Impossible de charger les étapes:', err.message);
+            // Erreur silencieuse
           }
         }
         
         setCircuit(circuitData);
-      } else {
-        console.warn('⚠️ Aucun circuit trouvé avec les méthodes disponibles');
-        console.log('📋 Dossier complet utilisé:', dossierDataToUse);
-        console.log('📋 Dossier utilisé:', dossierToUse);
       }
     } catch (err: any) {
-      console.error('❌ Erreur lors du chargement du circuit:', err);
-      console.error('❌ Détails de l\'erreur:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status
-      });
+      // Erreur silencieuse
     } finally {
       setLoadingCircuit(false);
     }
@@ -477,12 +405,51 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
     await chargerCircuit(dossierData);
   };
 
-  // Fonction pour charger les documents depuis l'API
+  // Fonction helper pour charger le mapping depuis localStorage
+  const loadPieceJustificationMapping = React.useCallback(() => {
+    try {
+      const stored = localStorage.getItem('document_piece_mapping');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const mapping = new Map<string, string>();
+        Object.entries(parsed).forEach(([docId, data]: [string, any]) => {
+          if (data && data.piece_justification_id) {
+            mapping.set(docId, data.piece_justification_id);
+          }
+        });
+        return mapping;
+      }
+    } catch (error) {
+      // Erreur silencieuse
+    }
+    return new Map<string, string>();
+  }, []);
+
+  // Fonction pour charger les documents depuis l'API et localStorage (documents simulés)
   const chargerDocuments = async () => {
     if (!id) return;
 
     try {
       setLoadingDocuments(true);
+      
+      // Charger le mapping depuis localStorage au début de chaque chargement de documents
+      const pieceJustificationMapping = loadPieceJustificationMapping();
+      
+      // Charger les documents simulés depuis localStorage
+      let simulatedDocuments: any[] = [];
+      try {
+        const storedDocs = localStorage.getItem('simulated_documents');
+        if (storedDocs) {
+          const parsedDocs = JSON.parse(storedDocs);
+          // Filtrer les documents simulés pour ce dossier
+          simulatedDocuments = Object.values(parsedDocs).filter((doc: any) => 
+            doc.documentable_id === id
+          ) as any[];
+          console.log('📦 Documents simulés chargés depuis localStorage:', simulatedDocuments.length);
+        }
+      } catch (error) {
+        console.warn('⚠️ Erreur lors du chargement des documents simulés:', error);
+      }
       
       // Utiliser les mêmes paramètres que circuit-suivi.service.ts pour filtrer par dossier spécifique
       const response = await axiosClient.get('/documents', {
@@ -512,62 +479,150 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
         documents = response.data.data;
       }
 
-      if (documents.length > 0) {
-        const mappedDocuments = documents.map((doc: any) => ({
+      // Fusionner les documents de l'API avec les documents simulés
+      const allDocuments = [...documents, ...simulatedDocuments];
+      
+      if (allDocuments.length > 0) {
+        const mappedDocuments = allDocuments.map((doc: any) => {
+          // IMPORTANT: Le mapping est la source de vérité car c'est ce qui a été envoyé lors de l'upload
+          // L'API peut retourner un mauvais piece_justification_id, donc on priorise le mapping
+          const apiPieceId = doc.piece_justification_id || null;
+          const mappedPieceId = doc.id ? pieceJustificationMapping.get(doc.id) : null;
+          // PRIORISER le mapping (source de vérité) au lieu de l'API
+          const restoredPieceJustificationId = mappedPieceId || apiPieceId || null;
+          
+          // Vérifier si c'est un document simulé
+          const isSimulated = doc.id && doc.id.startsWith('sim_');
+          
+          return {
+            id: doc.id,
+            nom: doc.nom_fichier || doc.nom,
+            nom_fichier: doc.nom_fichier || doc.nom,
+            chemin_fichier: isSimulated ? 'simulated' : doc.chemin_fichier,
+            url: isSimulated ? null : doc.chemin_fichier, // Les documents simulés n'ont pas d'URL
+            taille: doc.taille_fichier_formate || formatFileSize(doc.taille_fichier || 0),
+            taille_fichier: doc.taille_fichier,
+            type_mime: doc.type_mime,
+            type: doc.type_mime,
+            valide: doc.valide !== undefined ? doc.valide : false,
+            valide_libelle: doc.valide_libelle || (doc.valide ? 'Validé' : 'Non validé'),
+            dateUpload: doc.created_at || doc.date_upload,
+            created_at: doc.created_at,
+            commentaires: doc.commentaires,
+            type_document_id: doc.type_document_id,
+            piece_justification_id: restoredPieceJustificationId,
+            documentable_id: doc.documentable_id || id,
+            documentable_type: doc.documentable_type || 'App\\Models\\Dossier',
+            etape_id: doc.etape_id || null,
+            is_simulated: isSimulated // Flag pour identifier les documents simulés
+          };
+        });
+
+        // Remplacer les documents existants par les nouveaux (mise à jour complète)
+        // Cela évite les doublons et garantit que les données sont à jour
+        setDocumentsFromApi(mappedDocuments);
+        
+        // Charger les PieceJustificative pour créer la map piece_justification_id -> type_document_id
+        await chargerPieceJustifications(mappedDocuments);
+      } else if (simulatedDocuments.length > 0) {
+        // Si seulement des documents simulés, les traiter quand même
+        const mappedSimulated = simulatedDocuments.map((doc: any) => ({
           id: doc.id,
           nom: doc.nom_fichier || doc.nom,
           nom_fichier: doc.nom_fichier || doc.nom,
-          chemin_fichier: doc.chemin_fichier,
-          url: doc.chemin_fichier,
+          chemin_fichier: 'simulated',
+          url: null,
           taille: doc.taille_fichier_formate || formatFileSize(doc.taille_fichier || 0),
           taille_fichier: doc.taille_fichier,
           type_mime: doc.type_mime,
           type: doc.type_mime,
-          valide: doc.valide,
-          valide_libelle: doc.valide_libelle || (doc.valide ? 'Validé' : 'Non validé'),
-          dateUpload: doc.created_at || doc.date_upload,
+          valide: doc.valide !== undefined ? doc.valide : true,
+          valide_libelle: doc.valide_libelle || 'Validé',
+          dateUpload: doc.created_at,
           created_at: doc.created_at,
           commentaires: doc.commentaires,
-          type_document_id: doc.type_document_id, // ← Clé de corrélation secondaire (fallback)
-          piece_justification_id: doc.piece_justification_id || null, // ← Clé de corrélation principale selon LIAISON_PIECE_DOCUMENT.md
-          documentable_id: doc.documentable_id || id, // ← ID du dossier (CRITIQUE pour le filtrage)
-          documentable_type: doc.documentable_type || 'App\\Models\\Dossier' // ← Type du documentable
+          type_document_id: doc.type_document_id,
+          piece_justification_id: doc.piece_justification_id,
+          documentable_id: doc.documentable_id || id,
+          documentable_type: doc.documentable_type || 'App\\Models\\Dossier',
+          etape_id: doc.etape_id || null,
+          is_simulated: true
         }));
-
-        console.log('✅ Documents chargés depuis /documents pour dossier:', id, mappedDocuments.length);
-        console.log('📋 Documents avec type_document_id:', mappedDocuments.filter(d => d.type_document_id).length);
-        console.log('📋 Documents avec piece_justification_id:', mappedDocuments.filter(d => d.piece_justification_id).length);
-        console.log('📋 Documents avec documentable_id:', mappedDocuments.filter(d => d.documentable_id).length);
-        console.log('📋 Documents avec documentable_id correspondant au dossier:', mappedDocuments.filter(d => d.documentable_id === id).length);
-        
-        // Log des documents pour débogage
-        mappedDocuments.forEach(doc => {
-          if (!doc.piece_justification_id && !doc.type_document_id) {
-            console.warn('⚠️ Document sans piece_justification_id ni type_document_id:', doc.id, doc.nom, 'documentable_id:', doc.documentable_id, 'Données complètes:', doc);
-          } else {
-            console.log('✅ Document:', doc.nom, {
-              piece_justification_id: doc.piece_justification_id || 'N/A',
-              type_document_id: doc.type_document_id || 'N/A',
-              documentable_id: doc.documentable_id || 'N/A',
-              correspond_au_dossier: doc.documentable_id === id
-            });
-          }
-        });
-        
-        // Remplacer les documents existants par les nouveaux (mise à jour complète)
-        // Cela évite les doublons et garantit que les données sont à jour
-        setDocumentsFromApi(mappedDocuments);
-      } else {
-        console.log('⚠️ Aucun document trouvé dans la réponse API');
-        // Ne pas écraser les documents existants si la réponse est vide
-        // setDocumentsFromApi([]); // Commenté pour préserver les documents existants
+        setDocumentsFromApi(mappedSimulated);
+        await chargerPieceJustifications(mappedSimulated);
       }
     } catch (error: any) {
-      console.error('❌ Erreur lors du chargement des documents:', error);
+      // Erreur silencieuse
       // Ne pas écraser les documents existants en cas d'erreur
       // setDocumentsFromApi([]); // Commenté pour préserver les documents existants
     } finally {
       setLoadingDocuments(false);
+    }
+  };
+
+  // Fonction pour charger les PieceJustificative et créer la map piece_justification_id -> { type_document_id, libelle }
+  // Cette map permet de comparer les libelles : PieceJustificative.libelle avec Referentiel.libelle
+  const chargerPieceJustifications = async (documents: any[]) => {
+    try {
+      // Collecter tous les piece_justification_id uniques
+      const pieceJustificationIds = new Set<string>();
+      documents.forEach(doc => {
+        if (doc.piece_justification_id) {
+          pieceJustificationIds.add(doc.piece_justification_id);
+        }
+      });
+
+      if (pieceJustificationIds.size === 0) {
+        setPieceJustificationTypeMap(new Map());
+        return;
+      }
+
+      // Charger toutes les PieceJustificative en parallèle
+      const piecePromises = Array.from(pieceJustificationIds).map(async (pieceId) => {
+        try {
+          const response = await axiosClient.get(`/pieces-justificatives/${pieceId}`);
+          let piece = null;
+          
+          // Gérer différentes structures de réponse
+          if (response.data) {
+            if (response.data.data) {
+              piece = Array.isArray(response.data.data) ? response.data.data[0] : response.data.data;
+            } else if (Array.isArray(response.data)) {
+              piece = response.data.length > 0 ? response.data[0] : null;
+            } else {
+              piece = response.data;
+            }
+          }
+          
+          if (!piece || !piece.libelle) {
+            return null;
+          }
+          
+          return { 
+            pieceId, 
+            libelle: piece.libelle
+          };
+        } catch (error: any) {
+          return null;
+        }
+      });
+
+      const results = await Promise.all(piecePromises);
+      
+      // Créer la map piece_justification_id -> { libelle }
+      const newMap = new Map<string, { libelle: string }>();
+      results.forEach(result => {
+        if (result && result.libelle) {
+          newMap.set(result.pieceId, {
+            libelle: result.libelle
+          });
+        }
+      });
+
+      setPieceJustificationTypeMap(newMap);
+    } catch (error: any) {
+      // Erreur silencieuse
+      setPieceJustificationTypeMap(new Map());
     }
   };
 
@@ -581,12 +636,6 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
       doc.piece_justification_id === pieceJustificationId &&
       (!doc.documentable_id || doc.documentable_id === id) // Filtrer par dossier
     );
-    console.log(`🔍 getDocumentsByPiece pour piece_justification_id=${pieceJustificationId}, dossier=${id}:`, {
-      totalDocuments: documentsFromApi.length,
-      documentsAvecPieceId: documentsFromApi.filter(doc => doc.piece_justification_id === pieceJustificationId).length,
-      documentsFiltres: filtered.length,
-      documentableIds: filtered.map(d => d.documentable_id)
-    });
     return filtered;
   };
 
@@ -633,7 +682,6 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
   // Cela garantit que chaque dossier a ses propres documents
   useEffect(() => {
     if (id) {
-      console.log('🔄 Réinitialisation des documents pour le nouveau dossier:', id);
       setDocumentsFromApi([]); // Réinitialiser les documents avant de charger les nouveaux
     }
   }, [id]);
@@ -647,8 +695,8 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
         chargerCircuitEtTypesDocuments(dossierData);
         // Charger les épreuves seulement après que le dossier soit chargé
         chargerEpreuvesStatus();
-      }).catch((error) => {
-        console.error('❌ Erreur lors du chargement initial:', error);
+      }).catch(() => {
+        // Erreur silencieuse
       });
     }
   }, [id]);
@@ -659,13 +707,60 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
     // Utiliser un timeout pour éviter les appels multiples rapides
     const timer = setTimeout(() => {
       if (dossierComplet && !circuit && !loadingCircuit && id) {
-        console.log('🔄 Rechargement du circuit car dossierComplet a changé et aucun circuit n\'est chargé');
         chargerCircuit(dossierComplet);
       }
     }, 100); // Petit délai pour laisser le temps au chargement initial de se terminer
 
     return () => clearTimeout(timer);
   }, [dossierComplet?.id, id]); // Utiliser dossierComplet?.id pour éviter les re-renders inutiles
+
+  // Écouter les événements de document uploadé pour recharger les documents
+  useEffect(() => {
+    const handleDocumentUploaded = async (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail || {};
+      
+      // Vérifier que l'événement concerne ce dossier
+      if (detail.documentable_id && detail.documentable_id !== id) {
+        return;
+      }
+      
+      if (id) {
+        // Attendre un peu pour laisser le temps au backend de sauvegarder
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Recharger les documents avec le mapping localStorage
+        await chargerDocuments();
+      }
+    };
+
+    const handleCircuitReload = async (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail || {};
+      
+      // Vérifier que l'événement concerne ce dossier
+      if (detail.dossierId && detail.dossierId !== id) {
+        return;
+      }
+      
+      if (id && dossierComplet) {
+        console.log('🔄 Rechargement du circuit après finalisation de la dernière étape');
+        // Attendre un peu pour laisser le temps au backend de mettre à jour le statut
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Recharger le circuit et les documents
+        await chargerCircuitEtTypesDocuments(dossierComplet);
+        await chargerDocuments();
+      }
+    };
+
+    window.addEventListener('documentUploaded', handleDocumentUploaded as EventListener);
+    window.addEventListener('circuitReload', handleCircuitReload as EventListener);
+    return () => {
+      window.removeEventListener('documentUploaded', handleDocumentUploaded as EventListener);
+      window.removeEventListener('circuitReload', handleCircuitReload as EventListener);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, dossierComplet]); // chargerDocuments utilise loadPieceJustificationMapping en interne
 
   return {
     loading,
@@ -686,7 +781,8 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
     getDocumentsByPiece,
     getDocumentsForPiece,
     isDocumentValidated,
-    isDocumentValidatedForPiece
+    isDocumentValidatedForPiece,
+    pieceJustificationTypeMap // Map piece_justification_id -> type_document_id
   };
 };
 

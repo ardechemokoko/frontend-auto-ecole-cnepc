@@ -459,7 +459,7 @@ const CircuitDetailPage: React.FC = () => {
       {/* === Informations du circuit === */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h5" gutterBottom>
-          Détails du circuit
+          Détails du circuits
         </Typography>
         <Divider sx={{ mb: 3 }} />
 

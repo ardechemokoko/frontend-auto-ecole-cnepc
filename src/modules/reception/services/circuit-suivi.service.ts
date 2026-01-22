@@ -17,6 +17,7 @@ export interface EtapeCircuit {
   id: string;
   code: string;
   libelle: string;
+  ordre?: number;
   roles?: string[];
   pieces?: PieceEtape[];
   statut_libelle?: string;
@@ -222,12 +223,19 @@ class CircuitSuiviService {
         etapes = (response.data as any).data;
       }
       
-      // Trier les étapes par code
+      // Trier les étapes par ordre (si disponible), sinon par code
       etapes.sort((a, b) => {
+        // Priorité à l'ordre si disponible
+        if (a.ordre !== undefined && b.ordre !== undefined) {
+          return a.ordre - b.ordre;
+        }
+        if (a.ordre !== undefined) return -1;
+        if (b.ordre !== undefined) return 1;
+        // Fallback sur le code si pas d'ordre
         return (a.code || '').localeCompare(b.code || '');
       });
       
-      console.log(`✅ Étapes récupérées avec succès: ${etapes.length}`);
+      console.log(`✅ Étapes récupérées avec succès: ${etapes.length}`, etapes.map(e => ({ id: e.id, libelle: e.libelle, ordre: e.ordre })));
       return etapes;
     } catch (error: any) {
       console.error('❌ Erreur lors de la récupération des étapes:', error);

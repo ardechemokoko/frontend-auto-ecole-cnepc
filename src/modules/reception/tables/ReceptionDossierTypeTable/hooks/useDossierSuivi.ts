@@ -27,33 +27,19 @@ export function useDossierSuivi(
         // Étape 1: Charger le circuit UNE SEULE FOIS pour tous les dossiers
         let circuit: CircuitSuivi | null = null;
         
-        console.log('🔍 ReceptionDossierTypeTable - Paramètres reçus:', {
-          typeDemandeName,
-          typeDemandeId,
-          circuitProp: circuitProp ? 'présent' : 'absent',
-          nombreDossiers: dossiers.length
-        });
-        
-        if (dossiers.length > 0) {
-          console.log('📄 JSON complet du premier dossier:', JSON.stringify(dossiers[0], null, 2));
-        }
-        
         // Si le circuit est déjà passé en prop, l'utiliser directement
         if (circuitProp) {
           circuit = circuitProp;
           if (circuit.id && (!circuit.etapes || circuit.etapes.length === 0)) {
             try {
-              console.log(`📋 Chargement des étapes pour le circuit ${circuit.id}...`);
               const etapes = await circuitSuiviService.getEtapesByCircuitId(circuit.id);
               if (etapes.length > 0) {
                 circuit.etapes = etapes;
-                console.log(`✅ ${etapes.length} étapes chargées pour le circuit ${circuit.libelle}`);
               }
             } catch (err: any) {
               console.warn(`⚠️ Impossible de charger les étapes pour le circuit ${circuit.id}:`, err.message);
             }
           }
-          console.log('✅ Circuit utilisé depuis la prop:', JSON.stringify(circuit, null, 2));
         } else {
           // Sinon, charger le circuit
           if (typeDemandeName) {
@@ -61,17 +47,14 @@ export function useDossierSuivi(
               circuit = await circuitSuiviService.getCircuitByNomEntite(typeDemandeName);
               if (circuit && circuit.id && (!circuit.etapes || circuit.etapes.length === 0)) {
                 try {
-                  console.log(`📋 Chargement des étapes pour le circuit ${circuit.id}...`);
                   const etapes = await circuitSuiviService.getEtapesByCircuitId(circuit.id);
                   if (etapes.length > 0) {
                     circuit.etapes = etapes;
-                    console.log(`✅ ${etapes.length} étapes chargées pour le circuit ${circuit.libelle}`);
                   }
                 } catch (err) {
                   console.warn(`⚠️ Impossible de charger les étapes pour le circuit ${circuit.id}:`, err);
                 }
               }
-              console.log('✅ Circuit chargé avec typeDemandeName:', JSON.stringify(circuit, null, 2));
             } catch (err) {
               console.warn('⚠️ Impossible de charger le circuit avec typeDemandeName:', err);
             }
@@ -80,22 +63,18 @@ export function useDossierSuivi(
           if (!circuit && typeDemandeId && typeDemandeId !== 'non_specifie' && typeDemandeId !== 'null' && typeDemandeId !== 'undefined') {
             try {
               const typeDemande = await typeDemandeService.getTypeDemandeById(typeDemandeId);
-              console.log('📋 Type de demande chargé:', JSON.stringify(typeDemande, null, 2));
               if (typeDemande?.name) {
                 circuit = await circuitSuiviService.getCircuitByNomEntite(typeDemande.name);
                 if (circuit && circuit.id && (!circuit.etapes || circuit.etapes.length === 0)) {
                   try {
-                    console.log(`📋 Chargement des étapes pour le circuit ${circuit.id}...`);
                     const etapes = await circuitSuiviService.getEtapesByCircuitId(circuit.id);
                     if (etapes.length > 0) {
                       circuit.etapes = etapes;
-                      console.log(`✅ ${etapes.length} étapes chargées pour le circuit ${circuit.libelle}`);
                     }
                   } catch (err) {
                     console.warn(`⚠️ Impossible de charger les étapes pour le circuit ${circuit.id}:`, err);
                   }
                 }
-                console.log('✅ Circuit chargé avec typeDemandeId:', JSON.stringify(circuit, null, 2));
               }
             } catch (err) {
               if (err && typeof err === 'object' && 'response' in err && (err as any).response?.status !== 404) {
@@ -104,135 +83,195 @@ export function useDossierSuivi(
             }
           }
         }
+
+        // Étape 2: Charger les documents de manière asynchrone en parallèle pour tous les dossiers
+        // Filtrer les dossiers qui ont été envoyés au CNEDDT pour ne pas charger leur suivi
+        const dossiersArray = Array.from(dossiers).filter((dossier) => {
+          const storageKey = `cneddt_sent_${dossier.id}`;
+          return localStorage.getItem(storageKey) !== 'true';
+        });
         
-        if (circuit) {
-          console.log('🎯 Circuit final utilisé:', JSON.stringify(circuit, null, 2));
-        } else {
-          console.warn('⚠️ Aucun circuit trouvé pour les paramètres:', { typeDemandeName, typeDemandeId });
-        }
+        // Charger tous les dossiers en parallèle pour améliorer les performances
+        await Promise.all(
+          dossiersArray.map(async (dossier) => {
+            try {
+              const documents = await circuitSuiviService.getDocumentsByDossier(dossier.id);
+              
+              const documentsForDossier = documents.filter((doc: any) => {
+                return !doc.documentable_id || doc.documentable_id === dossier.id;
+              });
+              
+              const documentsValides = documentsForDossier.filter((d: any) => d.valide).length;
 
-        // Étape 2: Charger les documents de manière asynchrone et progressive (par batch)
-        const BATCH_SIZE = 5;
-        const dossiersArray = Array.from(dossiers);
-        
-        for (let i = 0; i < dossiersArray.length; i += BATCH_SIZE) {
-          const batch = dossiersArray.slice(i, i + BATCH_SIZE);
-          
-          await Promise.all(
-            batch.map(async (dossier) => {
-              try {
-                console.log(`📄 JSON complet du dossier ${dossier.id}:`, JSON.stringify(dossier, null, 2));
-                
-                const documents = await circuitSuiviService.getDocumentsByDossier(dossier.id);
-                
-                const documentsForDossier = documents.filter((doc: any) => {
-                  return !doc.documentable_id || doc.documentable_id === dossier.id;
-                });
-                
-                const documentsValides = documentsForDossier.filter((d: any) => d.valide).length;
+              // Calculer la progression en utilisant la même logique que useEtapeCompletion
+              let progress = 0;
+              let currentEtape = null;
+              let status: 'pending' | 'in_progress' | 'completed' | 'blocked' = 'pending';
+              let etapesCompletes = 0;
 
-                // Calculer la progression
-                let progress = 0;
-                let currentEtape = null;
-                let status: 'pending' | 'in_progress' | 'completed' | 'blocked' = 'pending';
-
-                if (circuit && circuit.etapes && circuit.etapes.length > 0) {
-                  const totalEtapes = circuit.etapes.length;
+              if (circuit && circuit.etapes && circuit.etapes.length > 0) {
+                const totalEtapes = circuit.etapes.length;
+                
+                // Fonction pour vérifier si toutes les pièces d'une étape sont validées
+                const areAllPiecesValidatedForEtape = (etape: any): boolean => {
+                  if (!etape.pieces || etape.pieces.length === 0) {
+                    return false;
+                  }
                   
-                  const etapesCompletes = circuit.etapes.filter(etape => {
-                    if (!etape.pieces || etape.pieces.length === 0) {
-                      return true;
-                    }
-                    
-                    return etape.pieces.every(piece => {
-                      const docsForPiece = documentsForDossier.filter((doc: any) => 
-                        doc.piece_justification_id === piece.type_document
-                      );
-                      
-                      if (docsForPiece.length === 0) {
-                        const docsByType = documentsForDossier.filter((doc: any) => 
-                          doc.type_document_id === piece.type_document
-                        );
-                        return docsByType.length > 0 && docsByType.some((doc: any) => doc.valide);
-                      }
-                      
-                      return docsForPiece.some((doc: any) => doc.valide === true);
-                    });
-                  }).length;
-
-                  progress = totalEtapes > 0 ? Math.round((etapesCompletes / totalEtapes) * 100) : 0;
-                  
-                  const etapeActuelle = circuit.etapes.find(etape => {
-                    if (!etape.pieces || etape.pieces.length === 0) {
-                      return false;
-                    }
-                    
-                    return !etape.pieces.every(piece => {
-                      const docsForPiece = documentsForDossier.filter((doc: any) => 
-                        doc.piece_justification_id === piece.type_document
-                      );
-                      
-                      if (docsForPiece.length === 0) {
-                        const docsByType = documentsForDossier.filter((doc: any) => 
-                          doc.type_document_id === piece.type_document
-                        );
-                        return docsByType.length > 0 && docsByType.some((doc: any) => doc.valide);
-                      }
-                      
-                      return docsForPiece.some((doc: any) => doc.valide === true);
-                    });
+                  return etape.pieces.every((piece: any) => {
+                    const docsForPiece = documentsForDossier.filter((doc: any) => 
+                      doc.piece_justification_id === piece.type_document
+                    );
+                    return docsForPiece.length > 0 && docsForPiece.some((doc: any) => doc.valide === true);
                   });
-
-                  currentEtape = etapeActuelle?.libelle || null;
+                };
+                
+                // Calculer les étapes complétées en respectant l'ordre (même logique que useEtapeCompletion)
+                const completedEtapes = new Set<string>();
+                
+                for (let idx = 0; idx < circuit.etapes.length; idx++) {
+                  const etape = circuit.etapes[idx];
                   
-                  if (progress === 100) {
-                    status = 'completed';
-                  } else if (progress > 0) {
-                    status = 'in_progress';
+                  // Première étape
+                  if (idx === 0) {
+                    if (!etape.pieces || etape.pieces.length === 0) {
+                      // Étape sans pièces : ne pas marquer automatiquement
+                    } else {
+                      const allPiecesValidated = areAllPiecesValidatedForEtape(etape);
+                      if (allPiecesValidated) {
+                        completedEtapes.add(etape.id);
+                      }
+                    }
+                    continue;
+                  }
+                  
+                  // Étapes suivantes
+                  const previousEtape = circuit.etapes[idx - 1];
+                  if (!previousEtape) {
+                    continue;
+                  }
+                  
+                  let previousCompleted = completedEtapes.has(previousEtape.id);
+                  
+                  if (!previousCompleted) {
+                    if (!previousEtape.pieces || previousEtape.pieces.length === 0) {
+                      // Étape précédente sans pièces : vérifier récursivement
+                      let allBeforeCompleted = true;
+                      for (let i = 0; i < idx - 1; i++) {
+                        const beforeEtape = circuit.etapes[i];
+                        if (!beforeEtape) {
+                          allBeforeCompleted = false;
+                          break;
+                        }
+                        if (!completedEtapes.has(beforeEtape.id)) {
+                          if (!beforeEtape.pieces || beforeEtape.pieces.length === 0) {
+                            let canBeCompleted = true;
+                            for (let j = 0; j < i; j++) {
+                              const beforeBeforeEtape = circuit.etapes[j];
+                              if (!beforeBeforeEtape) {
+                                canBeCompleted = false;
+                                break;
+                              }
+                              if (!completedEtapes.has(beforeBeforeEtape.id)) {
+                                if (beforeBeforeEtape.pieces && beforeBeforeEtape.pieces.length > 0) {
+                                  if (!areAllPiecesValidatedForEtape(beforeBeforeEtape)) {
+                                    canBeCompleted = false;
+                                    break;
+                                  }
+                                }
+                              }
+                            }
+                            if (canBeCompleted) {
+                              completedEtapes.add(beforeEtape.id);
+                            } else {
+                              allBeforeCompleted = false;
+                              break;
+                            }
+                          } else {
+                            if (areAllPiecesValidatedForEtape(beforeEtape)) {
+                              completedEtapes.add(beforeEtape.id);
+                            } else {
+                              allBeforeCompleted = false;
+                              break;
+                            }
+                          }
+                        }
+                      }
+                      if (allBeforeCompleted) {
+                        completedEtapes.add(previousEtape.id);
+                        previousCompleted = true;
+                      }
+                    } else {
+                      const previousAllPiecesValidated = areAllPiecesValidatedForEtape(previousEtape);
+                      if (previousAllPiecesValidated) {
+                        completedEtapes.add(previousEtape.id);
+                        previousCompleted = true;
+                      }
+                    }
+                  }
+                  
+                  if (!previousCompleted) {
+                    continue;
+                  }
+                  
+                  // Si l'étape précédente est complétée, vérifier si cette étape peut être complétée
+                  if (!etape.pieces || etape.pieces.length === 0) {
+                    if (previousCompleted) {
+                      completedEtapes.add(etape.id);
+                    }
                   } else {
-                    status = 'pending';
+                    const allPiecesValidated = areAllPiecesValidatedForEtape(etape);
+                    if (allPiecesValidated) {
+                      completedEtapes.add(etape.id);
+                    }
                   }
                 }
-
-                newSuiviMap.set(dossier.id, {
-                  dossierId: dossier.id,
-                  circuit,
-                  currentEtape,
-                  progress,
-                  documentsCount: documentsForDossier.length,
-                  documentsValides,
-                  status
-                });
                 
-                console.log(`✅ Suivi calculé pour dossier ${dossier.id}:`, {
-                  totalDocuments: documents.length,
-                  documentsForDossier: documentsForDossier.length,
-                  documentsValides,
-                  progress,
-                  currentEtape,
-                  status
+                etapesCompletes = completedEtapes.size;
+                progress = totalEtapes > 0 ? Math.round((etapesCompletes / totalEtapes) * 100) : 0;
+                
+                // Trouver l'étape actuelle (première étape non complétée)
+                const etapeActuelle = circuit.etapes.find((etape: any) => {
+                  return !completedEtapes.has(etape.id);
                 });
-              } catch (err: any) {
-                console.error(`❌ Erreur lors du chargement du suivi pour dossier ${dossier.id}:`, err);
-                newSuiviMap.set(dossier.id, {
-                  dossierId: dossier.id,
-                  circuit,
-                  currentEtape: null,
-                  progress: 0,
-                  documentsCount: 0,
-                  documentsValides: 0,
-                  status: 'pending'
-                });
+
+                currentEtape = etapeActuelle?.libelle || null;
+                
+                if (progress === 100) {
+                  status = 'completed';
+                } else if (progress > 0) {
+                  status = 'in_progress';
+                } else {
+                  status = 'pending';
+                }
               }
-            })
-          );
-          
-          setSuiviMap(new Map(newSuiviMap));
-          
-          if (i + BATCH_SIZE < dossiersArray.length) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
-        }
+
+              newSuiviMap.set(dossier.id, {
+                dossierId: dossier.id,
+                circuit,
+                currentEtape,
+                progress,
+                documentsCount: documentsForDossier.length,
+                documentsValides,
+                status
+              });
+            } catch (err: any) {
+              console.error(`❌ Erreur lors du chargement du suivi pour dossier ${dossier.id}:`, err);
+              newSuiviMap.set(dossier.id, {
+                dossierId: dossier.id,
+                circuit,
+                currentEtape: null,
+                progress: 0,
+                documentsCount: 0,
+                documentsValides: 0,
+                status: 'pending'
+              });
+            }
+          })
+        );
+        
+        // Mettre à jour le state une seule fois à la fin pour éviter les re-renders multiples
+        setSuiviMap(newSuiviMap);
       } catch (err: any) {
         console.error('❌ Erreur lors du chargement du circuit:', err);
       } finally {

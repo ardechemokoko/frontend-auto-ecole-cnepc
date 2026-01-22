@@ -16,14 +16,27 @@ export const useCircuitEtapes = (
       return;
     }
 
-    // Si le circuit a des étapes, les utiliser directement
+    // Si le circuit a des étapes, les utiliser directement (après tri par ordre)
     if (circuit?.etapes && circuit.etapes.length > 0) {
+      // Trier les étapes par ordre (si disponible), sinon par code
+      const sortedEtapes = [...circuit.etapes].sort((a, b) => {
+        // Priorité à l'ordre si disponible
+        if (a.ordre !== undefined && b.ordre !== undefined) {
+          return a.ordre - b.ordre;
+        }
+        if (a.ordre !== undefined) return -1;
+        if (b.ordre !== undefined) return 1;
+        // Fallback sur le code si pas d'ordre
+        return (a.code || '').localeCompare(b.code || '');
+      });
+      
       console.log('✅ useCircuitEtapes - Synchronisation des étapes depuis le circuit:', {
         circuitId: circuit.id,
         circuitLibelle: circuit.libelle,
-        etapesCount: circuit.etapes.length
+        etapesCount: sortedEtapes.length,
+        etapesOrdres: sortedEtapes.map(e => ({ id: e.id, libelle: e.libelle, ordre: e.ordre }))
       });
-      setEtapes(circuit.etapes);
+      setEtapes(sortedEtapes);
       setErrorEtapes(null);
       return;
     }
