@@ -3,14 +3,6 @@ import {
   Box,
   Paper,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
-  IconButton,
   Button,
   TextField,
   InputAdornment,
@@ -20,17 +12,22 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
+  Tabs,
+  Tab,
+  Card,
+  CardContent,
+  Grid,
+  IconButton,
+  Chip,
 } from '@mui/material';
 import {
   Search,
   Add,
-  MoreVert,
   Edit,
   Delete,
+  Description,
+  CalendarToday,
+  Fingerprint,
 } from '@mui/icons-material';
 import { TypeDemande, TypeDemandeListResponse } from '../types/type-demande';
 import { typeDemandeService } from '../services/type-demande.service';
@@ -44,10 +41,9 @@ const TypeDemandeTable: React.FC<TypeDemandeTableProps> = ({ refreshTrigger }) =
   const [typeDemandes, setTypeDemandes] = useState<TypeDemande[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(15);
-  const [total, setTotal] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentTab, setCurrentTab] = useState(0);
+  const [filteredTypeDemandes, setFilteredTypeDemandes] = useState<TypeDemande[]>([]);
 
   // États pour les modales
   const [formOpen, setFormOpen] = useState(false);
@@ -55,24 +51,20 @@ const TypeDemandeTable: React.FC<TypeDemandeTableProps> = ({ refreshTrigger }) =
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [typeDemandeToDelete, setTypeDemandeToDelete] = useState<TypeDemande | null>(null);
 
-  // Menu contextuel
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
-
-  // Charger les types de demande
+  // Charger tous les types de demande (sans pagination pour les onglets)
   const loadTypeDemandes = async () => {
     setLoading(true);
     setError(null);
 
     try {
+      // Charger tous les types de demande (avec un nombre élevé de résultats par page)
       const response: TypeDemandeListResponse = await typeDemandeService.getTypeDemandes(
-        page + 1,
-        rowsPerPage,
+        1,
+        1000, // Charger beaucoup de résultats pour avoir tous les types
         { search: searchTerm }
       );
 
       setTypeDemandes(response.data);
-      setTotal(response.meta.total);
     } catch (err: any) {
       console.error('Erreur lors du chargement des types de demande:', err);
       setError(err.response?.data?.message || 'Erreur lors du chargement des types de demande');
@@ -84,52 +76,47 @@ const TypeDemandeTable: React.FC<TypeDemandeTableProps> = ({ refreshTrigger }) =
   // Effet pour charger les données
   useEffect(() => {
     loadTypeDemandes();
-  }, [page, rowsPerPage, searchTerm, refreshTrigger]);
+  }, [searchTerm, refreshTrigger]);
 
-  // Gestion de la pagination
-  const handleChangePage = (_event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
+  // Filtrer les types de demande selon le terme de recherche
+  useEffect(() => {
+    if (searchTerm) {
+      const filtered = typeDemandes.filter((td) =>
+        td.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredTypeDemandes(filtered);
+      // Réinitialiser l'onglet actuel si nécessaire
+      setCurrentTab((prevTab) => {
+        if (filtered.length > 0 && prevTab >= filtered.length) {
+          return 0;
+        }
+        return prevTab;
+      });
+    } else {
+      setFilteredTypeDemandes(typeDemandes);
+    }
+  }, [searchTerm, typeDemandes]);
 
   // Gestion de la recherche
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
-    setPage(0);
+    setCurrentTab(0);
   };
 
-  // Gestion du menu contextuel
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, typeDemandeId: string) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedRowId(typeDemandeId);
+  // Gestion des onglets
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setCurrentTab(newValue);
   };
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedRowId(null);
+  // Actions
+  const handleEdit = (typeDemande: TypeDemande) => {
+    setSelectedTypeDemande(typeDemande);
+    setFormOpen(true);
   };
 
-  // Actions du menu
-  const handleEdit = () => {
-    const typeDemande = typeDemandes.find((td) => td.id === selectedRowId);
-    if (typeDemande) {
-      setSelectedTypeDemande(typeDemande);
-      setFormOpen(true);
-    }
-    handleMenuClose();
-  };
-
-  const handleDelete = () => {
-    const typeDemande = typeDemandes.find((td) => td.id === selectedRowId);
-    if (typeDemande) {
-      setTypeDemandeToDelete(typeDemande);
-      setDeleteDialogOpen(true);
-    }
-    handleMenuClose();
+  const handleDelete = (typeDemande: TypeDemande) => {
+    setTypeDemandeToDelete(typeDemande);
+    setDeleteDialogOpen(true);
   };
 
   // Confirmer la suppression
@@ -140,7 +127,7 @@ const TypeDemandeTable: React.FC<TypeDemandeTableProps> = ({ refreshTrigger }) =
       await typeDemandeService.deleteTypeDemande(typeDemandeToDelete.id);
       setDeleteDialogOpen(false);
       setTypeDemandeToDelete(null);
-      loadTypeDemandes();
+      await loadTypeDemandes();
     } catch (err: any) {
       console.error('Erreur lors de la suppression:', err);
       setError(err.response?.data?.message || 'Erreur lors de la suppression');
@@ -164,12 +151,54 @@ const TypeDemandeTable: React.FC<TypeDemandeTableProps> = ({ refreshTrigger }) =
     setFormOpen(true);
   };
 
+  // Liste des types de demande à afficher (filtrée ou complète)
+  const displayList = searchTerm ? filteredTypeDemandes : typeDemandes;
+  const currentTypeDemande = displayList[currentTab];
+
   return (
     <Box>
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6">Types de demande</Typography>
-          <Button variant="contained" startIcon={<Add />} onClick={handleAddNew}>
+      <Paper
+        sx={{
+          p: 3,
+          mb: 3,
+          borderRadius: 3,
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+          background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)',
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 700,
+              background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
+          >
+            Types de demande
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={handleAddNew}
+            sx={{
+              background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+              boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
+              borderRadius: 2,
+              px: 3,
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: 'none',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
+                boxShadow: '0 6px 16px rgba(25, 118, 210, 0.4)',
+                transform: 'translateY(-2px)',
+              },
+            }}
+          >
             Ajouter
           </Button>
         </Box>
@@ -183,11 +212,24 @@ const TypeDemandeTable: React.FC<TypeDemandeTableProps> = ({ refreshTrigger }) =
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <Search />
+                <Search sx={{ color: 'primary.main' }} />
               </InputAdornment>
             ),
           }}
-          sx={{ mb: 2 }}
+          sx={{
+            mb: 3,
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2,
+              background: 'white',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+              },
+              '&.Mui-focused': {
+                boxShadow: '0 4px 12px rgba(25, 118, 210, 0.2)',
+              },
+            },
+          }}
         />
 
         {error && (
@@ -196,79 +238,307 @@ const TypeDemandeTable: React.FC<TypeDemandeTableProps> = ({ refreshTrigger }) =
           </Alert>
         )}
 
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Nom</TableCell>
-                <TableCell>Date de création</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={3} align="center">
-                    <CircularProgress />
-                  </TableCell>
-                </TableRow>
-              ) : typeDemandes.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} align="center">
-                    <Typography variant="body2" color="text.secondary">
-                      Aucun type de demande trouvé
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                typeDemandes.map((typeDemande) => (
-                  <TableRow key={typeDemande.id} hover>
-                    <TableCell>{typeDemande.name}</TableCell>
-                    <TableCell>
-                      {new Date(typeDemande.created_at).toLocaleDateString('fr-FR')}
-                    </TableCell>
-                    <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        onClick={(e) => handleMenuOpen(e, typeDemande.id)}
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : displayList.length === 0 ? (
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              Aucun type de demande trouvé
+            </Typography>
+          </Box>
+        ) : (
+          <>
+            <Tabs
+              value={currentTab}
+              onChange={handleTabChange}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                borderBottom: 2,
+                borderColor: 'divider',
+                mb: 3,
+                '& .MuiTab-root': {
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.95rem',
+                  minHeight: 48,
+                  borderRadius: '8px 8px 0 0',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: 'rgba(25, 118, 210, 0.08)',
+                  },
+                  '&.Mui-selected': {
+                    color: 'primary.main',
+                    background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.1) 0%, rgba(66, 165, 245, 0.05) 100%)',
+                  },
+                },
+                '& .MuiTabs-indicator': {
+                  height: 3,
+                  borderRadius: '3px 3px 0 0',
+                  background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)',
+                },
+              }}
+            >
+              {displayList.map((typeDemande, index) => (
+                <Tab
+                  key={typeDemande.id}
+                  label={typeDemande.name}
+                  value={index}
+                />
+              ))}
+            </Tabs>
+
+            {currentTypeDemande && (
+              <Card
+                sx={{
+                  position: 'relative',
+                  overflow: 'hidden',
+                  borderRadius: 3,
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+                  transition: 'all 0.3s ease-in-out',
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+                  '&:hover': {
+                    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.16)',
+                    transform: 'translateY(-2px)',
+                  },
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 4,
+                    background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 50%, #90caf9 100%)',
+                  },
+                }}
+              >
+                <CardContent sx={{ p: 4 }}>
+                  {/* Header Section */}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      mb: 3,
+                      pb: 3,
+                      borderBottom: '2px solid',
+                      borderColor: 'divider',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box
+                        sx={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 2,
+                          background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
+                        }}
                       >
-                        <MoreVert />
+                        <Description sx={{ color: 'white', fontSize: 28 }} />
+                      </Box>
+                      <Box>
+                        <Typography
+                          variant="h4"
+                          sx={{
+                            fontWeight: 700,
+                            background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                            backgroundClip: 'text',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            mb: 1,
+                          }}
+                        >
+                          {currentTypeDemande.name}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                          <Chip
+                            icon={<CalendarToday sx={{ fontSize: 16 }} />}
+                            label={`Créé le ${new Date(currentTypeDemande.created_at).toLocaleDateString('fr-FR', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            })}`}
+                            size="small"
+                            sx={{
+                              background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+                              color: '#1565c0',
+                              fontWeight: 500,
+                              border: '1px solid rgba(25, 118, 210, 0.2)',
+                            }}
+                          />
+                          {currentTypeDemande.updated_at !== currentTypeDemande.created_at && (
+                            <Chip
+                              icon={<CalendarToday sx={{ fontSize: 16 }} />}
+                              label={`Modifié le ${new Date(currentTypeDemande.updated_at).toLocaleDateString('fr-FR', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                              })}`}
+                              size="small"
+                              sx={{
+                                background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+                                color: '#e65100',
+                                fontWeight: 500,
+                                border: '1px solid rgba(255, 152, 0, 0.2)',
+                              }}
+                            />
+                          )}
+                        </Box>
+                      </Box>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <IconButton
+                        onClick={() => handleEdit(currentTypeDemande)}
+                        aria-label="Modifier"
+                        sx={{
+                          background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                          color: 'white',
+                          width: 48,
+                          height: 48,
+                          boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
+                            transform: 'scale(1.1)',
+                            boxShadow: '0 6px 16px rgba(25, 118, 210, 0.4)',
+                          },
+                        }}
+                      >
+                        <Edit />
                       </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                      <IconButton
+                        onClick={() => handleDelete(currentTypeDemande)}
+                        aria-label="Supprimer"
+                        sx={{
+                          background: 'linear-gradient(135deg, #d32f2f 0%, #f44336 100%)',
+                          color: 'white',
+                          width: 48,
+                          height: 48,
+                          boxShadow: '0 4px 12px rgba(211, 47, 47, 0.3)',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            background: 'linear-gradient(135deg, #c62828 0%, #d32f2f 100%)',
+                            transform: 'scale(1.1)',
+                            boxShadow: '0 6px 16px rgba(211, 47, 47, 0.4)',
+                          },
+                        }}
+                      >
+                        <Delete />
+                      </IconButton>
+                    </Box>
+                  </Box>
 
-        <TablePagination
-          component="div"
-          count={total}
-          page={page}
-          onPageChange={handleChangePage}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-          rowsPerPageOptions={[5, 10, 15, 25, 50]}
-          labelRowsPerPage="Lignes par page:"
-        />
+                  {/* Details Section */}
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                      <Box
+                        sx={{
+                          p: 2.5,
+                          borderRadius: 2,
+                          background: 'linear-gradient(135deg, #f5f5f5 0%, #ffffff 100%)',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            background: 'linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%)',
+                            borderColor: 'primary.main',
+                            transform: 'translateX(4px)',
+                          },
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                          <Fingerprint
+                            sx={{
+                              color: 'primary.main',
+                              fontSize: 20,
+                            }}
+                          />
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: 'text.secondary',
+                              fontWeight: 600,
+                              textTransform: 'uppercase',
+                              letterSpacing: 0.5,
+                              fontSize: '0.75rem',
+                            }}
+                          >
+                            Identifiant
+                          </Typography>
+                        </Box>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 600,
+                            color: 'text.primary',
+                            fontFamily: 'monospace',
+                            letterSpacing: 1,
+                          }}
+                        >
+                          {currentTypeDemande.id}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Box
+                        sx={{
+                          p: 2.5,
+                          borderRadius: 2,
+                          background: 'linear-gradient(135deg, #f5f5f5 0%, #ffffff 100%)',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            background: 'linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%)',
+                            borderColor: 'primary.main',
+                            transform: 'translateX(4px)',
+                          },
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                          <Description
+                            sx={{
+                              color: 'primary.main',
+                              fontSize: 20,
+                            }}
+                          />
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: 'text.secondary',
+                              fontWeight: 600,
+                              textTransform: 'uppercase',
+                              letterSpacing: 0.5,
+                              fontSize: '0.75rem',
+                            }}
+                          >
+                            Nom du Type
+                          </Typography>
+                        </Box>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 600,
+                            color: 'text.primary',
+                          }}
+                        >
+                          {currentTypeDemande.name}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
       </Paper>
-
-      {/* Menu contextuel */}
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-        <MenuItem onClick={handleEdit}>
-          <ListItemIcon>
-            <Edit fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Modifier</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={handleDelete}>
-          <ListItemIcon>
-            <Delete fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Supprimer</ListItemText>
-        </MenuItem>
-      </Menu>
 
       {/* Formulaire */}
       <TypeDemandeForm

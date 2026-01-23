@@ -41,12 +41,15 @@ export const getNextEtape = (
 
 /**
  * Vérifie si toutes les pièces d'une étape sont validées
+ * Utilise la corrélation par libellé entre PieceJustificative et Referentiel
  */
 export const areAllPiecesValidated = (
   etape: EtapeCircuit,
   documentsForCurrentDossier: any[],
   completedEtapes: Set<string>,
-  computedCompletedEtapes: Set<string>
+  computedCompletedEtapes: Set<string>,
+  typeDocuments: any[] = [],
+  piecesJustificativesMap: Map<string, any> = new Map()
 ): boolean => {
   // Les étapes sans pièces ne sont pas automatiquement considérées comme validées
   if (!etape.pieces || etape.pieces.length === 0) {
@@ -55,9 +58,61 @@ export const areAllPiecesValidated = (
 
   // Vérifier que toutes les pièces ont au moins un document validé
   const allValidated = etape.pieces.every(piece => {
-    const docsForPiece = documentsForCurrentDossier.filter(doc => 
-      doc.piece_justification_id === piece.type_document
-    );
+    const pieceTypeDocument = piece.type_document; // C'est le type_document_id (référentiel)
+    
+    // Récupérer le Referentiel correspondant à pieceTypeDocument pour obtenir son libelle
+    const referentiel = typeDocuments.find(td => td.id === pieceTypeDocument);
+    const referentielLibelle = referentiel?.libelle || referentiel?.name || null;
+    
+    if (!referentielLibelle) {
+      // Si on ne trouve pas le référentiel, fallback sur l'ancienne logique
+      const docsForPiece = documentsForCurrentDossier.filter(doc => 
+        doc.piece_justification_id === pieceTypeDocument || doc.type_document_id === pieceTypeDocument
+      );
+      return docsForPiece.length > 0 && docsForPiece.some(doc => doc.valide === true);
+    }
+    
+    // Trouver les documents qui correspondent à cette pièce
+    const docsForPiece = documentsForCurrentDossier.filter(doc => {
+      // Filtrer par etape_id si disponible (optimisation)
+      if (doc.etape_id && doc.etape_id !== etape.id) {
+        return false; // Le document appartient à une autre étape
+      }
+      
+      // Utiliser directement piece_justification_id
+      const docPieceId = doc.piece_justification_id;
+      
+      // Pour les documents simulés, vérifier directement par piece_justification_id
+      // car ils ont déjà le bon ID depuis le mapping localStorage
+      if (doc.is_simulated && docPieceId) {
+        // Pour les documents simulés, piece.type_document peut être soit:
+        // 1. L'ID de la PieceJustificative (pieceJustificationId)
+        // 2. Le type_document_id (référentiel)
+        // On vérifie d'abord par piece_justification_id direct
+        if (String(docPieceId) === String(pieceTypeDocument)) {
+          return true;
+        }
+      }
+      
+      // Récupérer les données de la PieceJustificative depuis la map
+      const pieceJustificativeData = docPieceId ? piecesJustificativesMap.get(docPieceId) : null;
+      const docPieceJustificationLibelle = pieceJustificativeData?.libelle || null;
+      
+      // Comparaison par libelle : PieceJustificative.libelle === Referentiel.libelle
+      if (docPieceJustificationLibelle && referentielLibelle && 
+          docPieceJustificationLibelle.toLowerCase().trim() === referentielLibelle.toLowerCase().trim()) {
+        return true;
+      }
+      
+      // Fallback: Comparaison directe par piece_justification_id ou type_document_id
+      if (docPieceId && (String(docPieceId) === String(pieceTypeDocument) || 
+          doc.type_document_id === pieceTypeDocument)) {
+        return true;
+      }
+      
+      return false;
+    });
+    
     return docsForPiece.length > 0 && docsForPiece.some(doc => doc.valide === true);
   });
 
@@ -95,10 +150,18 @@ export const getEtapeStatus = (
   }
 
   // Vérifier si tous les documents obligatoires sont validés
+  // Note: Cette fonction n'a pas accès à typeDocuments et piecesJustificativesMap
+  // On utilise donc une logique simplifiée qui fonctionne avec les données disponibles
   const allObligatoryValidated = piecesObligatoires.every(piece => {
-    const docsForPiece = documentsForCurrentDossier.filter(doc => 
-      doc.piece_justification_id === piece.type_document
-    );
+    const pieceTypeDocument = piece.type_document;
+    const docsForPiece = documentsForCurrentDossier.filter(doc => {
+      // Filtrer par etape_id si disponible
+      if (doc.etape_id && doc.etape_id !== etape.id) {
+        return false;
+      }
+      // Comparaison directe (fallback si pas de corrélation disponible)
+      return doc.piece_justification_id === pieceTypeDocument || doc.type_document_id === pieceTypeDocument;
+    });
     return docsForPiece.some(doc => doc.valide === true);
   });
 
@@ -108,9 +171,15 @@ export const getEtapeStatus = (
 
   // Vérifier si au moins un document obligatoire est fourni
   const hasAnyObligatoryDoc = piecesObligatoires.some(piece => {
-    const docsForPiece = documentsForCurrentDossier.filter(doc => 
-      doc.piece_justification_id === piece.type_document
-    );
+    const pieceTypeDocument = piece.type_document;
+    const docsForPiece = documentsForCurrentDossier.filter(doc => {
+      // Filtrer par etape_id si disponible
+      if (doc.etape_id && doc.etape_id !== etape.id) {
+        return false;
+      }
+      // Comparaison directe (fallback si pas de corrélation disponible)
+      return doc.piece_justification_id === pieceTypeDocument || doc.type_document_id === pieceTypeDocument;
+    });
     return docsForPiece.length > 0;
   });
 

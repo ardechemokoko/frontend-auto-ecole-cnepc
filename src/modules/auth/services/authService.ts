@@ -66,14 +66,20 @@ export class AuthService {
     telephone?: string;
     adresse?: string;
     role: string;
+    captcha_id?: string;
+    captcha_code?: string;
   }): Promise<any> {
     try {
       logger.log('📝 Tentative d\'enregistrement:', { 
         email: data.email, 
         nom: data.nom, 
         prenom: data.prenom, 
-        role: data.role 
+        role: data.role,
+        captcha_id: data.captcha_id ? 'présent' : 'absent',
+        captcha_code: data.captcha_code ? 'présent' : 'absent'
       });
+      
+      logger.log('📤 Données complètes envoyées:', JSON.stringify(data, null, 2));
       
       const response = await axiosClient.post("/auth/register", data);
       logger.log('✅ Enregistrement réussi');

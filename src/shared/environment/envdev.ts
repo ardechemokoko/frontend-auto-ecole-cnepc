@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // URL de base de l'API
-export const baseURL = "https://backend.permis.transports.gouv.ga/api";
+export const baseURL = "http://127.0.0.1:8000/api";
 
 // Configuration silencieuse - les logs sont gérés par le logger utilitaire
 

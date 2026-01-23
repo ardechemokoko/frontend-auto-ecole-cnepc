@@ -24,6 +24,8 @@ import AddIcon from '@mui/icons-material/Add'
 import { Circuit } from '../types/circuit'
 import { circuitService } from '../services/circuit.service'
 import { typePermisService } from '../services/type-permis.service'
+import { typeDemandeService } from '../../cnepc/services'
+import { TypeDemande } from '../../cnepc/types/type-demande'
 import CircuitTable from '../components/CircuitTable'
 import { Referentiel } from '../../../shared/model/referentiel'
 
@@ -40,6 +42,9 @@ const CircuitPage: React.FC = () => {
   })
   const [circuits, setCircuits] = useState<Circuit[]>([])
   const [typePermis, setTypePermis] = useState<Referentiel[]>([])
+  const [typeDemandes, setTypeDemandes] = useState<TypeDemande[]>([])
+  const [loadingTypeDemandes, setLoadingTypeDemandes] = useState(false)
+  const [selectedTypeDemandeId, setSelectedTypeDemandeId] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = React.useState(false);
@@ -66,7 +71,19 @@ const CircuitPage: React.FC = () => {
       const res = await typePermisService.getAll({
         type_ref: "type_permis"
       })
-      setTypePermis(res?.data)      
+      // Gérer différents formats de réponse
+      if (Array.isArray(res)) {
+        setTypePermis(res)
+      } else if (res && typeof res === 'object' && 'data' in res) {
+        const resWithData = res as { data: Referentiel[] }
+        if (Array.isArray(resWithData.data)) {
+          setTypePermis(resWithData.data)
+        } else {
+          setTypePermis([])
+        }
+      } else {
+        setTypePermis([])
+      }
     } catch (err: any) {
       console.log(err);
       setTypePermis([]);
@@ -75,9 +92,24 @@ const CircuitPage: React.FC = () => {
     }
   }
 
+  // === Charger la liste des types de demande===
+  const fetchTypeDemandes = async () => {
+    setLoadingTypeDemandes(true)
+    try {
+      const response = await typeDemandeService.getTypeDemandes(1, 1000)
+      setTypeDemandes(response.data || [])
+    } catch (err: any) {
+      console.error('Erreur lors du chargement des types de demande:', err)
+      setTypeDemandes([])
+    } finally {
+      setLoadingTypeDemandes(false)
+    }
+  }
+
   useEffect(() => {
     fetchCircuits();
     fetchTypePermis();
+    fetchTypeDemandes();
     setEtrangerValues([
       "",
       "OUI",
@@ -86,9 +118,22 @@ const CircuitPage: React.FC = () => {
   }, [])
 
   // === Ouvrir / fermer le dialog ===
-  const handleOpenDialog = (circuit?: Circuit) => {
+  const handleOpenDialog = async (circuit?: Circuit) => {
+    // S'assurer que les types de demande sont chargés avant d'ouvrir le dialog
+    if (typeDemandes.length === 0 && !loadingTypeDemandes) {
+      await fetchTypeDemandes()
+    }
+    
     if (circuit) {
       setEditingCircuit(circuit)
+      // Trouver le type de demande correspondant au nom_entite
+      // Le nom_entite peut être en majuscules sans espaces, donc on compare de manière flexible
+      const circuitNomEntiteNormalized = circuit.nom_entite?.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9_-]/g, '') || ''
+      const matchingTypeDemande = typeDemandes.find(td => {
+        const tdNameNormalized = td.name.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9_-]/g, '')
+        return tdNameNormalized === circuitNomEntiteNormalized || td.name === circuit.nom_entite || td.name.toUpperCase() === circuit.nom_entite
+      })
+      setSelectedTypeDemandeId(matchingTypeDemande?.id || '')
       setFormData({
         libelle: circuit.libelle,
         description: circuit.description,
@@ -99,6 +144,7 @@ const CircuitPage: React.FC = () => {
       })
     } else {
       setEditingCircuit(null)
+      setSelectedTypeDemandeId('')
       setFormData({
         libelle: '',
         description: '',
@@ -114,6 +160,7 @@ const CircuitPage: React.FC = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false)
     setEditingCircuit(null)
+    setSelectedTypeDemandeId('')
     setFormData({
       libelle: '',
       description: '',
@@ -124,18 +171,104 @@ const CircuitPage: React.FC = () => {
     })
   }
 
+  // === Gérer la sélection d'un type de demande ===
+  const handleTypeDemandeChange = (typeDemandeId: string) => {
+    setSelectedTypeDemandeId(typeDemandeId)
+    const selectedTypeDemande = typeDemandes.find(td => td.id === typeDemandeId)
+    if (selectedTypeDemande) {
+      // Utiliser le nom du type de demande tel quel pour remplir nom_entite
+      // Le backend attend probablement le nom original, pas transformé
+      setFormData({ ...formData, nom_entite: selectedTypeDemande.name })
+    }
+  }
+
   // === Soumission du formulaire ===
   const handleSubmit = async () => {
     try {
+      setError(null)
+      
+      // Validation des champs requis
+      if (!formData.libelle || formData.libelle.trim() === '') {
+        setError('Le nom du circuit est requis')
+        return
+      }
+      
+      if (!formData.nom_entite || formData.nom_entite.trim() === '') {
+        setError('L\'entité concernée est requise')
+        return
+      }
+      
+      // Utiliser le nom_entite tel quel (le backend attend probablement le nom du type de demande tel quel)
+      const nomEntite = formData.nom_entite.trim()
+      
+      // Préparer le payload selon les paramètres attendus par l'API
+      // Pour POST: l'API attend libelle
+      // Pour PUT: l'API attend peut-être nom (même si la colonne en base s'appelle libelle)
+      let payload: Record<string, any> = {}
+      
       if (editingCircuit) {
-        await circuitService.update(editingCircuit.id, formData)
+        // Pour PUT: mapper libelle vers nom car le backend attend nom pour PUT
+        payload = {
+          libelle: formData.libelle.trim(),
+          actif: formData.actif ?? true,
+          nom_entite: nomEntite
+        }
       } else {
-        await circuitService.create(formData)
+        // Pour POST: utiliser libelle directement
+        payload = {
+          libelle: formData.libelle.trim(),
+          actif: formData.actif ?? true,
+          nom_entite: nomEntite
+        }
+      }
+      
+      // Ajouter nationalite seulement si elle a une valeur
+      if (formData.nationalite && formData.nationalite.trim() !== '') {
+        payload.nationalite = formData.nationalite.trim()
+      }
+      
+      // Ajouter type_permis seulement s'il a une valeur
+      if (formData.type_permis && formData.type_permis.trim() !== '') {
+        payload.type_permis = formData.type_permis.trim()
+      }
+      
+      console.log('📤 Payload de mise à jour du circuit:', payload)
+      console.log('📤 ID du circuit à modifier:', editingCircuit?.id)
+      
+      if (editingCircuit) {
+        // Utiliser PUT pour la mise à jour - le payload contient nom (mappé depuis libelle)
+        const result = await circuitService.update(editingCircuit.id, payload)
+        console.log('✅ Circuit mis à jour:', result)
+      } else {
+        await circuitService.create(payload)
       }
       await fetchCircuits()
       handleCloseDialog()
     } catch (err: any) {
-      setError(err.message ?? 'Erreur lors de la sauvegarde du circuit')
+      console.error('❌ Erreur lors de la sauvegarde du circuit:', err)
+      console.error('❌ Détails de l\'erreur:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      })
+      
+      // Afficher un message d'erreur plus détaillé
+      let errorMessage = 'Erreur lors de la sauvegarde du circuit'
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message
+      } else if (err.message) {
+        errorMessage = err.message
+      }
+      
+      // Ajouter les erreurs de validation si présentes
+      if (err.response?.data?.errors) {
+        const validationErrors = Object.entries(err.response.data.errors)
+          .map(([field, messages]: [string, any]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+          .join('; ')
+        errorMessage += ` - ${validationErrors}`
+      }
+      
+      setError(errorMessage)
     }
   }
 
@@ -229,18 +362,32 @@ const CircuitPage: React.FC = () => {
               }}
               margin="normal"
             />
-            <TextField
-              fullWidth
-              label="Entité concernée"
-              value={formData.nom_entite ?? ''}
-              onChange={(e) => {
-                let value = e.target.value.toUpperCase()
-                value = value.replace(/\s+/g, '')
-                value = value.replace(/[^A-Z0-9_-]/g, '')
-                setFormData({ ...formData, nom_entite: value })
-              }}
-              margin="normal"
-            />
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Type de demande (Entité concernée)</InputLabel>
+              <Select
+                value={selectedTypeDemandeId}
+                label="Type de demande (Entité concernée)"
+                onChange={(e) => handleTypeDemandeChange(e.target.value as string)}
+                disabled={loadingTypeDemandes}
+              >
+                {loadingTypeDemandes ? (
+                  <MenuItem disabled>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <CircularProgress size={16} />
+                      <Typography variant="body2">Chargement...</Typography>
+                    </Box>
+                  </MenuItem>
+                ) : typeDemandes.length > 0 ? (
+                  typeDemandes.map((typeDemande) => (
+                    <MenuItem key={typeDemande.id} value={typeDemande.id}>
+                      {typeDemande.name}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>Aucun type de demande disponible</MenuItem>
+                )}
+              </Select>
+            </FormControl>
 
             <FormControl fullWidth margin="normal">
               <InputLabel>Type de permis</InputLabel>

@@ -75,6 +75,7 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [sendingToCNEDDT, setSendingToCNEDDT] = useState(false);
+  const [sentToCNEDDT, setSentToCNEDDT] = useState(false);
   const [documentsFromApi, setDocumentsFromApi] = useState<any[]>([]);
   const [dossierComplet, setDossierComplet] = useState<any>(null);
   const [epreuvesStatus, setEpreuvesStatus] = useState<EpreuveStatut | null>(null);
@@ -97,6 +98,17 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
+
+  // Charger l'état d'envoi CNEDDT depuis localStorage
+  useEffect(() => {
+    if (dossier?.reference) {
+      const storageKey = `cneddt_sent_${dossier.reference}`;
+      const storedValue = localStorage.getItem(storageKey);
+      if (storedValue === 'true') {
+        setSentToCNEDDT(true);
+      }
+    }
+  }, [dossier?.reference]);
 
   // Charger les données complètes du dossier quand le sheet s'ouvre
   useEffect(() => {
@@ -875,9 +887,16 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
       const response = await axiosClient.post('/dossiers/transfert', payload);
       console.log('✅ Réponse CNEDDT:', response.data);
       
+      // Marquer le dossier comme envoyé avec succès et sauvegarder dans localStorage
+      setSentToCNEDDT(true);
+      if (dossier?.reference) {
+        const storageKey = `cneddt_sent_${dossier.reference}`;
+        localStorage.setItem(storageKey, 'true');
+      }
+      
       setSnackbar({
         open: true,
-        message: 'Dossier envoyé à la CNEDDT avec succès',
+        message: 'DOSSIER ENVOYÉ POUR IMPRESSION DE LA CARTE',
         severity: 'success'
       });
     } catch (error: any) {
@@ -1332,27 +1351,40 @@ const CandidatDetailsSheet: React.FC<CandidatDetailsSheetProps> = ({
 
         {/* Actions */}
         <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Stack direction="row" spacing={2} justifyContent="flex-end">
-            <Button variant="outlined" onClick={onClose} className="font-primary">
-              Fermer
-            </Button>
-            <Tooltip 
-              title={epreuvesStatus !== 'reussi' ? 'Toutes les épreuves doivent être validées pour envoyer à la CNEDDT' : 'Envoyer le dossier à la CNEDDT'}
-            >
-              <span>
-                <Button
-                  variant="contained"
-                  size="small"
-                  color="secondary"
-                  startIcon={sendingToCNEDDT ? <CircularProgress size={16} /> : <PaperAirplaneIcon className="w-4 h-4" />}
-                  onClick={handleSendToCNEDDT}
-                  disabled={sendingToCNEDDT || !dossier?.reference || epreuvesStatus !== 'reussi' || loadingEpreuves}
-                  className="font-primary"
-                >
-                  CNEDDT
+          <Stack direction="row" spacing={2} justifyContent="flex-end" alignItems="center">
+            {sentToCNEDDT ? (
+              <Alert 
+                severity="success" 
+                sx={{ width: '100%', mb: 0 }}
+              >
+                <Typography variant="body1" fontWeight="bold" className="font-display">
+                  DOSSIER ENVOYÉ POUR IMPRESSION DE LA CARTE
+                </Typography>
+              </Alert>
+            ) : (
+              <>
+                <Button variant="outlined" onClick={onClose} className="font-primary">
+                  Fermer
                 </Button>
-              </span>
-            </Tooltip>
+                <Tooltip 
+                  title={epreuvesStatus !== 'reussi' ? 'Toutes les épreuves doivent être validées pour envoyer à la CNEDDT' : 'Envoyer le dossier à la CNEDDT'}
+                >
+                  <span>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      color="secondary"
+                      startIcon={sendingToCNEDDT ? <CircularProgress size={16} /> : <PaperAirplaneIcon className="w-4 h-4" />}
+                      onClick={handleSendToCNEDDT}
+                      disabled={sendingToCNEDDT || !dossier?.reference || epreuvesStatus !== 'reussi' || loadingEpreuves}
+                      className="font-primary"
+                    >
+                      CNEDDT
+                    </Button>
+                  </span>
+                </Tooltip>
+              </>
+            )}
           </Stack>
         </Box>
       </Box>

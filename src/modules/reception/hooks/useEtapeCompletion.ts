@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { EtapeCircuit, CircuitSuivi } from '../services/circuit-suivi.service';
+import { areAllPiecesValidated } from '../utils/etapeHelpers';
 
 /**
  * Hook pour gérer la complétion des étapes du circuit
@@ -8,168 +9,167 @@ export const useEtapeCompletion = (
   etapes: EtapeCircuit[],
   circuit: CircuitSuivi | null,
   documentsForCurrentDossier: any[],
-  dossierId?: string
+  dossierId?: string,
+  typeDocuments: any[] = [],
+  piecesJustificativesMap: Map<string, any> = new Map()
 ) => {
-  const [completedEtapes, setCompletedEtapes] = useState<Set<string>>(new Set());
-
-  // Réinitialiser les étapes complétées quand le dossier change
-  useEffect(() => {
-    if (dossierId) {
-      console.log('🔄 Réinitialisation des étapes complétées pour le dossier:', dossierId);
-      setCompletedEtapes(new Set());
+  // Fonction pour charger les étapes complétées depuis localStorage
+  const loadCompletedEtapesFromStorage = useCallback((dossierId: string): Set<string> => {
+    try {
+      const stored = localStorage.getItem(`completed_etapes_${dossierId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const completedSet = new Set<string>(parsed);
+        console.log(`📦 Étapes complétées chargées depuis localStorage pour dossier ${dossierId}:`, completedSet.size);
+        return completedSet;
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur lors du chargement des étapes complétées depuis localStorage:', error);
     }
-  }, [dossierId]);
+    return new Set<string>();
+  }, []);
 
-  // Calculer dynamiquement les étapes complétées basées sur les documents du dossier actuel
-  const getCompletedEtapesForDossier = useCallback((etapes: EtapeCircuit[]): Set<string> => {
-    const completed = new Set<string>();
+  // Fonction pour sauvegarder les étapes complétées dans localStorage
+  const saveCompletedEtapesToStorage = useCallback((dossierId: string, completedEtapes: Set<string>) => {
+    try {
+      const array = Array.from(completedEtapes);
+      localStorage.setItem(`completed_etapes_${dossierId}`, JSON.stringify(array));
+      console.log(`💾 Étapes complétées sauvegardées dans localStorage pour dossier ${dossierId}:`, array.length);
+    } catch (error) {
+      console.warn('⚠️ Erreur lors de la sauvegarde des étapes complétées dans localStorage:', error);
+    }
+  }, []);
+
+  // Initialiser avec les étapes complétées depuis localStorage si disponible
+  const [completedEtapes, setCompletedEtapes] = useState<Set<string>>(() => {
+    if (dossierId) {
+      return loadCompletedEtapesFromStorage(dossierId);
+    }
+    return new Set();
+  });
+
+  // Effet consolidé pour charger et maintenir les étapes complétées
+  // Combine : localStorage, circuit statut_libelle, et validation par documents
+  useEffect(() => {
+    if (!dossierId) return;
     
-    const getEtapeIndex = (etape: EtapeCircuit): number => {
-      if (!circuit || !circuit.etapes) return -1;
-      return circuit.etapes.findIndex(e => e.id === etape.id);
-    };
+    console.log('🔄 Recalcul des étapes complétées pour le dossier:', dossierId);
     
-    const areAllPiecesValidatedForEtape = (etape: EtapeCircuit): boolean => {
-      if (!etape.pieces || etape.pieces.length === 0) {
-        return false;
+    // 1. Charger depuis localStorage
+    const storedCompleted = loadCompletedEtapesFromStorage(dossierId);
+    
+    // 2. Charger depuis le circuit (statut_libelle)
+    const completedFromStatut = new Set<string>();
+    if (circuit && circuit.etapes) {
+      circuit.etapes.forEach(etape => {
+        if (etape.statut_libelle && (
+          etape.statut_libelle.toLowerCase().includes('complété') ||
+          etape.statut_libelle.toLowerCase().includes('complete') ||
+          etape.statut_libelle.toLowerCase().includes('terminé') ||
+          etape.statut_libelle.toLowerCase().includes('termine')
+        )) {
+          completedFromStatut.add(etape.id);
+        }
+      });
+    }
+    
+    // 3. Vérifier les étapes stockées dans localStorage sont toujours valides
+    // (basées sur les documents disponibles)
+    const validatedFromDocuments = new Set<string>();
+    if (etapes.length > 0 && documentsForCurrentDossier.length > 0) {
+      storedCompleted.forEach(etapeId => {
+        const etape = etapes.find(e => e.id === etapeId);
+        if (etape) {
+          // Vérifier si toutes les pièces de cette étape sont toujours validées
+          const allValidated = areAllPiecesValidated(
+            etape,
+            documentsForCurrentDossier,
+            new Set([etapeId]),
+            new Set([etapeId]),
+            typeDocuments,
+            piecesJustificativesMap
+          );
+          
+          if (allValidated) {
+            validatedFromDocuments.add(etapeId);
+            console.log(`✅ Étape ${etape.libelle} toujours complétée (documents validés présents)`);
+          } else {
+            console.log(`⚠️ Étape ${etape.libelle} n'est plus complétée (documents manquants ou non validés)`);
+          }
+        } else {
+          // Si l'étape n'existe plus dans le circuit, la conserver quand même
+          validatedFromDocuments.add(etapeId);
+        }
+      });
+    } else {
+      // Si pas encore de documents ou d'étapes, utiliser celles de localStorage
+      storedCompleted.forEach(id => validatedFromDocuments.add(id));
+    }
+    
+    // 4. Fusionner toutes les sources (localStorage validées + circuit)
+    const merged = new Set([...validatedFromDocuments, ...completedFromStatut]);
+    
+    // 5. Ne mettre à jour que si les étapes complétées ont changé
+    setCompletedEtapes(prev => {
+      // Comparer les sets pour éviter les mises à jour inutiles
+      const prevArray = Array.from(prev).sort();
+      const mergedArray = Array.from(merged).sort();
+      const hasChanged = prevArray.length !== mergedArray.length || 
+        prevArray.some((id, idx) => id !== mergedArray[idx]);
+      
+      if (hasChanged) {
+        console.log(`📋 Étapes complétées fusionnées: ${merged.size} (${validatedFromDocuments.size} depuis localStorage validées, ${completedFromStatut.size} depuis circuit)`);
+        // Sauvegarder la version fusionnée
+        saveCompletedEtapesToStorage(dossierId, merged);
+        return merged;
       }
       
-      const allValidated = etape.pieces.every(piece => {
-        const docsForPiece = documentsForCurrentDossier.filter(doc => 
-          doc.piece_justification_id === piece.type_document
-        );
-        const isValidated = docsForPiece.length > 0 && docsForPiece.some(doc => doc.valide === true);
-        
-        if (!isValidated) {
-          console.log(`🔍 areAllPiecesValidatedForEtape - Pièce non validée dans ${etape.libelle}:`, {
-            pieceLibelle: piece.libelle,
-            pieceTypeDocument: piece.type_document,
-            documentsCount: docsForPiece.length
-          });
-        }
-        
-        return isValidated;
-      });
-      
-      return allValidated;
-    };
+      return prev;
+    });
+  }, [
+    dossierId, 
+    circuit?.id, 
+    circuit?.etapes?.map(e => `${e.id}-${e.statut_libelle}`).join(','),
+    etapes.map(e => e.id).join(','),
+    // Utiliser une clé basée sur les IDs des documents pour éviter les re-renders inutiles
+    documentsForCurrentDossier.map(d => `${d.id}-${d.valide}`).join(','),
+    typeDocuments.map(td => td.id).join(','),
+    Array.from(piecesJustificativesMap.keys()).join(','),
+    loadCompletedEtapesFromStorage,
+    saveCompletedEtapesToStorage
+  ]);
+
+  // Calculer les étapes complétées UNIQUEMENT depuis statut_libelle (pas de validation automatique)
+  // Les étapes ne sont marquées comme complétées que via le bouton "Passer à l'étape suivante"
+  const getCompletedEtapesForDossier = useCallback((etapes: EtapeCircuit[]): Set<string> => {
+    const completed = new Set<string>();
     
     const etapesOrdered = (circuit && circuit.etapes && circuit.etapes.length > 0) 
       ? circuit.etapes 
       : etapes;
     
+    // Ne marquer comme complétées QUE les étapes qui ont un statut_libelle indiquant qu'elles sont complétées
+    // (c'est-à-dire qu'elles ont été validées manuellement via le bouton "Passer à l'étape suivante")
     for (let idx = 0; idx < etapesOrdered.length; idx++) {
       const etape = etapesOrdered[idx];
-      const etapeIndex = getEtapeIndex(etape);
       
-      if (etapeIndex === -1) {
-        continue;
-      }
+      // Vérifier si l'étape est déjà marquée comme complétée via statut_libelle
+      // C'est la seule source de vérité pour déterminer si une étape est complétée
+      const isCompletedFromStatut = etape.statut_libelle && (
+        etape.statut_libelle.toLowerCase().includes('complété') ||
+        etape.statut_libelle.toLowerCase().includes('complete') ||
+        etape.statut_libelle.toLowerCase().includes('terminé') ||
+        etape.statut_libelle.toLowerCase().includes('termine')
+      );
       
-      // Première étape
-      if (etapeIndex === 0) {
-        if (!etape.pieces || etape.pieces.length === 0) {
-          // Étape sans pièces : ne pas marquer automatiquement
-        } else {
-          const allPiecesValidated = areAllPiecesValidatedForEtape(etape);
-          if (allPiecesValidated) {
-            completed.add(etape.id);
-          }
-        }
-        continue;
-      }
-      
-      // Étapes suivantes
-      if (!circuit || !circuit.etapes || etapeIndex <= 0) {
-        continue;
-      }
-      
-      const previousEtape = circuit.etapes[etapeIndex - 1];
-      if (!previousEtape) {
-        continue;
-      }
-      
-      let previousCompleted = completed.has(previousEtape.id);
-      
-      if (!previousCompleted) {
-        if (!previousEtape.pieces || previousEtape.pieces.length === 0) {
-          // Étape précédente sans pièces : vérifier récursivement
-          let allBeforeCompleted = true;
-          for (let i = 0; i < etapeIndex - 1; i++) {
-            const beforeEtape = circuit.etapes[i];
-            if (!beforeEtape) {
-              allBeforeCompleted = false;
-              break;
-            }
-            if (!completed.has(beforeEtape.id)) {
-              if (!beforeEtape.pieces || beforeEtape.pieces.length === 0) {
-                let canBeCompleted = true;
-                for (let j = 0; j < i; j++) {
-                  const beforeBeforeEtape = circuit.etapes[j];
-                  if (!beforeBeforeEtape) {
-                    canBeCompleted = false;
-                    break;
-                  }
-                  if (!completed.has(beforeBeforeEtape.id)) {
-                    if (beforeBeforeEtape.pieces && beforeBeforeEtape.pieces.length > 0) {
-                      if (!areAllPiecesValidatedForEtape(beforeBeforeEtape)) {
-                        canBeCompleted = false;
-                        break;
-                      }
-                    }
-                  }
-                }
-                if (canBeCompleted) {
-                  completed.add(beforeEtape.id);
-                } else {
-                  allBeforeCompleted = false;
-                  break;
-                }
-              } else {
-                if (areAllPiecesValidatedForEtape(beforeEtape)) {
-                  completed.add(beforeEtape.id);
-                } else {
-                  allBeforeCompleted = false;
-                  break;
-                }
-              }
-            }
-          }
-          if (allBeforeCompleted) {
-            completed.add(previousEtape.id);
-            previousCompleted = true;
-            console.log(`✅ Étape précédente sans pièces ${previousEtape.libelle} - MARQUÉE automatiquement`);
-          }
-        } else {
-          const previousAllPiecesValidated = areAllPiecesValidatedForEtape(previousEtape);
-          if (previousAllPiecesValidated) {
-            completed.add(previousEtape.id);
-            previousCompleted = true;
-          }
-        }
-      }
-      
-      if (!previousCompleted) {
-        continue;
-      }
-      
-      // Si l'étape précédente est complétée, vérifier si cette étape peut être complétée
-      if (!etape.pieces || etape.pieces.length === 0) {
-        if (previousCompleted) {
-          completed.add(etape.id);
-          console.log(`✅ Étape sans pièces ${etape.libelle} - MARQUÉE automatiquement`);
-        }
-      } else {
-        const allPiecesValidated = areAllPiecesValidatedForEtape(etape);
-        if (allPiecesValidated) {
-          completed.add(etape.id);
-          console.log(`✅ Étape avec pièces ${etape.libelle} - MARQUÉE comme complétée`);
-        }
+      if (isCompletedFromStatut) {
+        completed.add(etape.id);
+        console.log(`✅ Étape complétée détectée depuis statut_libelle: ${etape.libelle} (${etape.statut_libelle})`);
       }
     }
 
     return completed;
-  }, [documentsForCurrentDossier, circuit]);
+  }, [circuit]);
 
   // Calculer les étapes complétées pour le dossier actuel
   const computedCompletedEtapes = useMemo(() => {
@@ -193,12 +193,33 @@ export const useEtapeCompletion = (
     const progression = Math.round((etapesCompletes / etapes.length) * 100);
     const allEtapesCompleted = etapes.every(etape => computedCompletedEtapes.has(etape.id));
     
+    console.log('🔍 Calcul allEtapesCompleted:', {
+      totalEtapes: etapes.length,
+      etapesCompletes,
+      progression,
+      allEtapesCompleted,
+      completedEtapesIds: Array.from(computedCompletedEtapes),
+      etapesIds: etapes.map(e => e.id)
+    });
+    
     return { etapesCompletes, allEtapesCompleted, progression };
   }, [etapes, computedCompletedEtapes]);
 
-  const markEtapeAsCompleted = (etapeId: string) => {
-    setCompletedEtapes(prev => new Set([...prev, etapeId]));
-  };
+
+  const markEtapeAsCompleted = useCallback((etapeId: string) => {
+    console.log('🎯 markEtapeAsCompleted appelé pour:', etapeId);
+    setCompletedEtapes(prev => {
+      const newSet = new Set([...prev, etapeId]);
+      console.log('✅ Étape ajoutée à completedEtapes. Total:', newSet.size);
+      
+      // Sauvegarder dans localStorage si on a un dossierId
+      if (dossierId) {
+        saveCompletedEtapesToStorage(dossierId, newSet);
+      }
+      
+      return newSet;
+    });
+  }, [dossierId, saveCompletedEtapesToStorage]);
 
   return {
     completedEtapes,

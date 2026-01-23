@@ -23,10 +23,12 @@ import CircuitPage from '../modules/circuit/pages/CircuitPage';
 import CircuitDetailPage from '../modules/circuit/pages/CircuitDetailPage';
 import StatutPage from '../modules/statut/pages/StatutPage';
 
-import { CandidateDetailsPage, TypeDemandePage, GestionDossierPage } from '../modules/cnepc/pages';
+import { CandidateDetailsPage, TypeDemandePage, GestionDossierPage, UsagerDossierPage } from '../modules/cnepc/pages';
+import { CandidatDetailsPage } from '../modules/user';
+import CreateDossierFlowPage from '../modules/cnepc/pages/CreateDossierFlowPage';
 import { PieceJustificativePage } from '../modules/pieces-justificatives/pages';
 import SettingsPage from '../modules/settings/pages/SettingsPage';
-import UserManagementPage from '../modules/settings/pages/UserManagementPage';
+import { UserManagementPage } from '../modules/user';
 import AutoEcolePage from './AutoEcolePage';
 import ResetPasswordForm from '../modules/auth/forms/resetpassword';
 import PageChangePassWord from '../modules/cnepc/forms/changePassword';
@@ -36,6 +38,7 @@ import {
   CandidatExamenListPage,
   SessionExamenListPage,
   PlanificationPage,
+  EpreuvePage,
   TestPage
 } from '../modules/candidat_examen/pages';
 import { ReceptionDossiersPage } from '../modules/reception';
@@ -153,6 +156,18 @@ const AppRoutes: React.FC = () => {
       ) 
     }),
     React.createElement(Route, { 
+      path: ROUTES.USAGER_DOSSIER, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(UsagerDossierPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.CREATE_DOSSIER, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, { hideSidebar: true, fullWidth: true }, React.createElement(CreateDossierFlowPage))
+      ) 
+    }),
+    React.createElement(Route, { 
       path: ROUTES.PIECES_JUSTIFICATIVES, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(PieceJustificativePage))
@@ -161,7 +176,7 @@ const AppRoutes: React.FC = () => {
     React.createElement(Route, { 
       path: ROUTES.CANDIDAT_DETAILS, 
       element: React.createElement(ProtectedRoute, null, 
-        React.createElement(AppLayout, null, React.createElement(CandidateDetailsPage))
+        React.createElement(AppLayout, null, React.createElement(CandidatDetailsPage))
       ) 
     }),
     React.createElement(Route, { 
@@ -266,6 +281,12 @@ const AppRoutes: React.FC = () => {
       path: ROUTES.CANDIDATS_EXAMEN_PLANIFICATION, 
       element: React.createElement(ProtectedRoute, null, 
         React.createElement(AppLayout, null, React.createElement(PlanificationPage))
+      ) 
+    }),
+    React.createElement(Route, { 
+      path: ROUTES.CANDIDATS_EXAMEN_EPREUVES, 
+      element: React.createElement(ProtectedRoute, null, 
+        React.createElement(AppLayout, null, React.createElement(EpreuvePage))
       ) 
     }),
     // Route de test temporaire

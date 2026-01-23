@@ -46,8 +46,15 @@ const CircuitEtapesView: React.FC<CircuitEtapesViewProps> = ({
         setLoading(true);
         // Si le circuit a déjà des étapes, les utiliser
         if (circuit.etapes && circuit.etapes.length > 0) {
-          // Trier les étapes par code
+          // Trier les étapes par ordre (si disponible), sinon par code
           const sortedEtapes = [...circuit.etapes].sort((a, b) => {
+            // Priorité à l'ordre si disponible
+            if (a.ordre !== undefined && b.ordre !== undefined) {
+              return a.ordre - b.ordre;
+            }
+            if (a.ordre !== undefined) return -1;
+            if (b.ordre !== undefined) return 1;
+            // Fallback sur le code si pas d'ordre
             return (a.code || '').localeCompare(b.code || '');
           });
           setEtapes(sortedEtapes);
@@ -60,6 +67,13 @@ const CircuitEtapesView: React.FC<CircuitEtapesViewProps> = ({
             const data = response.data;
             const sortedEtapes = Array.isArray(data) ? data : (data.data || []);
             sortedEtapes.sort((a: EtapeCircuit, b: EtapeCircuit) => {
+              // Priorité à l'ordre si disponible
+              if (a.ordre !== undefined && b.ordre !== undefined) {
+                return a.ordre - b.ordre;
+              }
+              if (a.ordre !== undefined) return -1;
+              if (b.ordre !== undefined) return 1;
+              // Fallback sur le code si pas d'ordre
               return (a.code || '').localeCompare(b.code || '');
             });
             setEtapes(sortedEtapes);
@@ -78,6 +92,26 @@ const CircuitEtapesView: React.FC<CircuitEtapesViewProps> = ({
     loadEtapes();
   }, [circuit]);
 
+  // Fonction helper pour charger le mapping depuis localStorage
+  const loadPieceJustificationMapping = React.useCallback(() => {
+    try {
+      const stored = localStorage.getItem('document_piece_mapping');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const mapping = new Map<string, string>();
+        Object.entries(parsed).forEach(([docId, data]: [string, any]) => {
+          if (data && data.piece_justification_id) {
+            mapping.set(docId, data.piece_justification_id);
+          }
+        });
+        return mapping;
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur lors du chargement du mapping depuis localStorage:', error);
+    }
+    return new Map<string, string>();
+  }, []);
+
   // Charger les documents du dossier
   useEffect(() => {
     const loadDocuments = async () => {
@@ -87,8 +121,59 @@ const CircuitEtapesView: React.FC<CircuitEtapesViewProps> = ({
       }
 
       try {
+        // Charger le mapping depuis localStorage au début de chaque chargement de documents
+        const pieceJustificationMapping = loadPieceJustificationMapping();
+        console.log('🔄 Rechargement des documents - Mapping chargé:', {
+          nombreMappings: pieceJustificationMapping.size,
+          mappings: Array.from(pieceJustificationMapping.entries()).map(([docId, pieceId]) => ({ docId, pieceId }))
+        });
+
         const docs = await circuitSuiviService.getDocumentsByDossier(dossierId);
-        setDocuments(docs);
+        
+        // Normaliser les documents pour restaurer piece_justification_id depuis le mapping si manquant
+        const normalizedDocs = docs.map((doc: any) => {
+          // IMPORTANT: Le mapping est la source de vérité car c'est ce qui a été envoyé lors de l'upload
+          // L'API peut retourner un mauvais piece_justification_id, donc on priorise le mapping
+          const apiPieceId = doc.piece_justification_id || null;
+          const mappedPieceId = doc.id ? pieceJustificationMapping.get(doc.id) : null;
+          // PRIORISER le mapping (source de vérité) au lieu de l'API
+          const restoredPieceJustificationId = mappedPieceId || apiPieceId || null;
+          
+          // Log pour debug si on utilise le mapping au lieu de l'API
+          if (mappedPieceId && apiPieceId && mappedPieceId !== apiPieceId && doc.id) {
+            console.log('🔧 Utilisation du mapping au lieu de l\'API:', {
+              documentId: doc.id,
+              nomFichier: doc.nom_fichier || doc.nom,
+              apiPieceId: apiPieceId,
+              mappedPieceId: mappedPieceId,
+              etapeId: doc.etape_id
+            });
+          } else if (!apiPieceId && mappedPieceId && doc.id) {
+            console.log('🔧 Restauration piece_justification_id depuis le mapping:', {
+              documentId: doc.id,
+              nomFichier: doc.nom_fichier || doc.nom,
+              pieceJustificationId: mappedPieceId,
+              etapeId: doc.etape_id
+            });
+          }
+          
+          return {
+            ...doc,
+            // Restaurer piece_justification_id depuis le mapping si manquant
+            piece_justification_id: restoredPieceJustificationId,
+          };
+        });
+        
+        console.log('📋 Documents normalisés avec piece_justification_id:', 
+          normalizedDocs.map(d => ({
+            id: d.id,
+            nom: d.nom_fichier,
+            piece_justification_id: d.piece_justification_id,
+            etape_id: d.etape_id
+          }))
+        );
+        
+        setDocuments(normalizedDocs);
       } catch (err: any) {
         console.error('Erreur lors du chargement des documents:', err);
         setDocuments([]);
@@ -96,22 +181,49 @@ const CircuitEtapesView: React.FC<CircuitEtapesViewProps> = ({
     };
 
     loadDocuments();
-  }, [dossierId]);
+  }, [dossierId, loadPieceJustificationMapping]);
 
   // Écouter les événements de document uploadé
   useEffect(() => {
-    const handleDocumentUploaded = async () => {
+    const handleDocumentUploaded = async (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail || {};
+      
+      // Vérifier que l'événement concerne ce dossier
+      if (detail.documentable_id && detail.documentable_id !== dossierId) {
+        return;
+      }
+      
       if (dossierId) {
+        // Attendre un peu pour laisser le temps au backend de sauvegarder
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Charger le mapping depuis localStorage
+        const pieceJustificationMapping = loadPieceJustificationMapping();
+        
         const docs = await circuitSuiviService.getDocumentsByDossier(dossierId);
-        setDocuments(docs);
+        
+        // Normaliser les documents pour restaurer piece_justification_id depuis le mapping si manquant
+        const normalizedDocs = docs.map((doc: any) => {
+          const apiPieceId = doc.piece_justification_id || null;
+          const mappedPieceId = doc.id ? pieceJustificationMapping.get(doc.id) : null;
+          const restoredPieceJustificationId = mappedPieceId || apiPieceId || null;
+          
+          return {
+            ...doc,
+            piece_justification_id: restoredPieceJustificationId,
+          };
+        });
+        
+        setDocuments(normalizedDocs);
       }
     };
 
-    window.addEventListener('documentUploaded', handleDocumentUploaded);
+    window.addEventListener('documentUploaded', handleDocumentUploaded as EventListener);
     return () => {
-      window.removeEventListener('documentUploaded', handleDocumentUploaded);
+      window.removeEventListener('documentUploaded', handleDocumentUploaded as EventListener);
     };
-  }, [dossierId]);
+  }, [dossierId, loadPieceJustificationMapping]);
 
   // Détecter l'étape active (première étape en attente ou en cours)
   useEffect(() => {
@@ -130,8 +242,27 @@ const CircuitEtapesView: React.FC<CircuitEtapesViewProps> = ({
 
   const handleDocumentUploaded = async () => {
     if (dossierId) {
+      // Attendre un peu pour laisser le temps au backend de sauvegarder
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Charger le mapping depuis localStorage
+      const pieceJustificationMapping = loadPieceJustificationMapping();
+      
       const docs = await circuitSuiviService.getDocumentsByDossier(dossierId);
-      setDocuments(docs);
+      
+      // Normaliser les documents pour restaurer piece_justification_id depuis le mapping si manquant
+      const normalizedDocs = docs.map((doc: any) => {
+        const apiPieceId = doc.piece_justification_id || null;
+        const mappedPieceId = doc.id ? pieceJustificationMapping.get(doc.id) : null;
+        const restoredPieceJustificationId = mappedPieceId || apiPieceId || null;
+        
+        return {
+          ...doc,
+          piece_justification_id: restoredPieceJustificationId,
+        };
+      });
+      
+      setDocuments(normalizedDocs);
     }
   };
 

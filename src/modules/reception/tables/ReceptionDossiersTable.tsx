@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ReceptionDossier, EpreuveStatut, EpreuveAttempt } from '../types';
-import { Box, Button, Table, TableBody, TableCell, TableHead, TableRow, Typography, Chip, Snackbar, Alert, TableContainer, Paper } from '@mui/material';
+import { Box, Button, Typography, Chip, Snackbar, Alert, Paper, Tabs, Tab, Card, CardContent, Grid, Divider } from '@mui/material';
 import EpreuveSheet from '../components/EpreuveSheet';
 import { EyeIcon } from '@heroicons/react/24/outline';
 import { ROUTES } from '../../../shared/constants';
@@ -42,6 +42,7 @@ function computeGeneral(
 
 const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossiers, onReceive, onOpenDocuments }) => {
   const navigate = useNavigate();
+  const [currentTab, setCurrentTab] = React.useState(0);
   // État pour stocker les épreuves de chaque dossier
   const [epreuvesMap, setEpreuvesMap] = React.useState<Map<string, EpreuveStatut>>(new Map());
 
@@ -149,6 +150,15 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
     loadEpreuvesStatus();
   }, [dossiers]);
 
+  // Réinitialiser l'onglet si la liste change
+  React.useEffect(() => {
+    if (dossiers.length > 0 && currentTab >= dossiers.length) {
+      setCurrentTab(Math.max(0, dossiers.length - 1));
+    } else if (dossiers.length === 0) {
+      setCurrentTab(0);
+    }
+  }, [dossiers.length, currentTab]);
+
   React.useEffect(() => {
     try {
       // Log compact de la liste
@@ -217,6 +227,11 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
     } catch {}
   };
 
+  // Gestion des onglets
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setCurrentTab(newValue);
+  };
+
   // Fonction pour obtenir le libellé et la couleur du statut des épreuves
   const getStatutEpreuveInfo = (statut: EpreuveStatut | undefined) => {
     switch (statut) {
@@ -232,6 +247,8 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
     }
   };
 
+  const currentDossier = dossiers[currentTab];
+
   return (
     <Box sx={{ 
       backgroundColor: 'white', 
@@ -240,297 +257,87 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
       border: '1px solid rgba(0, 0, 0, 0.08)'
     }}>
-      <TableContainer component={Paper} sx={{ 
-        backgroundColor: 'white', 
-        boxShadow: 'none',
-        borderRadius: 2
-      }}>
-        <Table sx={{ 
-          backgroundColor: 'white',
-          '& .MuiTableCell-root': {
-            borderColor: 'rgba(0, 0, 0, 0.08)'
-          }
-        }}>
-          <TableHead>
-            <TableRow sx={{ 
-              backgroundColor: 'white',
-              borderBottom: '2px solid rgba(0, 0, 0, 0.12)'
-            }}>
-              <TableCell sx={{ 
-                fontWeight: 700, 
-                color: '#1a1a1a', 
-                py: 2,
-                fontSize: '0.875rem',
-                letterSpacing: '0.02em',
-                backgroundColor: 'white'
-              }}>
-                Référence
-              </TableCell>
-              <TableCell sx={{ 
-                fontWeight: 700, 
-                color: '#1a1a1a', 
-                py: 2,
-                fontSize: '0.875rem',
-                letterSpacing: '0.02em',
-                backgroundColor: 'white'
-              }}>
-                Candidat
-              </TableCell>
-              <TableCell sx={{ 
-                fontWeight: 700, 
-                color: '#1a1a1a', 
-                py: 2,
-                fontSize: '0.875rem',
-                letterSpacing: '0.02em',
-                backgroundColor: 'white'
-              }}>
-                Formation
-              </TableCell>
-              <TableCell sx={{ 
-                fontWeight: 700, 
-                color: '#1a1a1a', 
-                py: 2,
-                fontSize: '0.875rem',
-                letterSpacing: '0.02em',
-                backgroundColor: 'white'
-              }}>
-                Auto-école
-              </TableCell>
-              <TableCell sx={{ 
-                fontWeight: 700, 
-                color: '#1a1a1a', 
-                py: 2,
-                fontSize: '0.875rem',
-                letterSpacing: '0.02em',
-                backgroundColor: 'white'
-              }}>
-                Date examen
-              </TableCell>
-              <TableCell sx={{ 
-                fontWeight: 700, 
-                color: '#1a1a1a', 
-                py: 2,
-                fontSize: '0.875rem',
-                letterSpacing: '0.02em',
-                backgroundColor: 'white'
-              }}>
-                Date d'envoi
-              </TableCell>
-              <TableCell sx={{ 
-                fontWeight: 700, 
-                color: '#1a1a1a', 
-                py: 2,
-                fontSize: '0.875rem',
-                letterSpacing: '0.02em',
-                backgroundColor: 'white'
-              }}>
-                Statut
-              </TableCell>
-              <TableCell align="right" sx={{ 
-                fontWeight: 700, 
-                color: '#1a1a1a', 
-                py: 2,
-                fontSize: '0.875rem',
-                letterSpacing: '0.02em',
-                backgroundColor: 'white'
-              }}>
-                Actions
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {dossiers.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={8} sx={{ 
-                  py: 6, 
-                  textAlign: 'center', 
-                  backgroundColor: 'white',
-                  border: 'none'
-                }}>
-                  <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>
-                    Aucun dossier en attente de réception.
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            )}
-            {dossiers.map((dossier) => {
-              // Récupérer les informations de formation depuis details
-              const formationDetails = dossier.details?.formation_complete || dossier.details?.dossier?.formation;
-              const formationNom = formationDetails?.type_permis?.libelle || formationDetails?.nom || 'Formation';
-              
-              return (
-                <TableRow 
-                  key={dossier.id} 
-                  hover
-                  sx={{ 
-                    backgroundColor: 'white',
-                    borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-                    '&:hover': {
-                      backgroundColor: '#f8f9fa',
-                      transition: 'background-color 0.2s ease'
-                    },
-                    '&:last-child td': {
-                      borderBottom: 'none'
-                    }
-                  }}
-                >
-                  <TableCell sx={{ 
-                    py: 2, 
-                    backgroundColor: 'white',
-                    '&:hover': {
-                      backgroundColor: 'transparent'
-                    }
-                  }}>
-                    <Typography variant="body2" fontWeight={600} color="text.primary">
-                      {dossier.reference}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ 
-                    py: 2, 
-                    backgroundColor: 'white',
-                    '&:hover': {
-                      backgroundColor: 'transparent'
-                    }
-                  }}>
-                    <Typography variant="body2" color="text.primary" sx={{ fontWeight: 500 }}>
-                      {dossier.candidatNom} {dossier.candidatPrenom}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ 
-                    py: 2, 
-                    backgroundColor: 'white',
-                    '&:hover': {
-                      backgroundColor: 'transparent'
-                    }
-                  }}>
-                    <Box>
-                      <Typography variant="body2" fontWeight={600} color="primary.main">
-                        {formationNom}
-                      </Typography>
-                      {formationDetails?.description && (
-                        <Typography 
-                          variant="caption" 
-                          color="text.secondary" 
-                          display="block" 
-                          sx={{ 
-                            mt: 0.5,
-                            fontSize: '0.75rem',
-                            lineHeight: 1.4
-                          }}
-                        >
-                          {formationDetails.description.substring(0, 40)}...
+      <Paper sx={{ p: 2 }}>
+        {dossiers.length === 0 ? (
+          <Box sx={{ py: 6, textAlign: 'center' }}>
+            <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>
+              Aucun dossier en attente de réception.
+            </Typography>
+          </Box>
+        ) : (
+          <>
+            <Tabs
+              value={currentTab}
+              onChange={handleTabChange}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
+            >
+              {dossiers.map((dossier, index) => {
+                const epreuveStatut = epreuvesMap.get(dossier.id) || dossier.epreuves?.general;
+                const statutInfo = getStatutEpreuveInfo(epreuveStatut);
+                return (
+                  <Tab
+                    key={dossier.id}
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {dossier.reference}
                         </Typography>
-                      )}
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{ 
-                    py: 2, 
-                    backgroundColor: 'white',
-                    '&:hover': {
-                      backgroundColor: 'transparent'
-                    }
-                  }}>
-                    <Typography variant="body2" color="text.primary" sx={{ fontWeight: 500 }}>
-                      {dossier.autoEcoleNom}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ 
-                    py: 2, 
-                    backgroundColor: 'white',
-                    '&:hover': {
-                      backgroundColor: 'transparent'
-                    }
-                  }}>
-                    <Typography variant="body2" color="text.primary" sx={{ fontSize: '0.875rem' }}>
-                      {dossier.dateExamen ? new Date(dossier.dateExamen).toLocaleDateString('fr-FR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) : '-'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ 
-                    py: 2, 
-                    backgroundColor: 'white',
-                    '&:hover': {
-                      backgroundColor: 'transparent'
-                    }
-                  }}>
-                    <Typography variant="body2" color="text.primary" sx={{ fontSize: '0.875rem' }}>
-                      {new Date(dossier.dateEnvoi).toLocaleDateString('fr-FR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ 
-                    py: 2, 
-                    backgroundColor: 'white',
-                    '&:hover': {
-                      backgroundColor: 'transparent'
-                    }
-                  }}>
-                    {(() => {
-                      const epreuveStatut = epreuvesMap.get(dossier.id) || dossier.epreuves?.general;
-                      const statutInfo = getStatutEpreuveInfo(epreuveStatut);
-                      return (
                         <Chip
                           label={statutInfo.label}
                           color={statutInfo.color}
                           size="small"
                           variant={epreuveStatut === 'non_saisi' ? 'outlined' : 'filled'}
                           sx={{ 
-                            fontWeight: 600,
-                            fontSize: '0.75rem',
-                            height: 24,
+                            height: 20,
+                            fontSize: '0.7rem',
                             '& .MuiChip-label': {
-                              px: 1.5
+                              px: 1
                             }
                           }}
                         />
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell align="right" sx={{ 
-                    py: 2, 
-                    backgroundColor: 'white',
-                    '&:hover': {
-                      backgroundColor: 'transparent'
+                      </Box>
                     }
-                  }}>
-                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<EyeIcon className="w-4 h-4" />}
-                        onClick={() => handleOpenDetails(dossier)}
-                        sx={{
-                          textTransform: 'none',
-                          borderColor: 'rgba(0, 0, 0, 0.23)',
-                          color: '#333',
-                          fontWeight: 500,
-                          px: 2,
-                          py: 0.75,
-                          '&:hover': {
-                            borderColor: '#1976d2',
-                            backgroundColor: 'rgba(25, 118, 210, 0.04)',
-                            color: '#1976d2'
-                          }
-                        }}
-                      >
-                        Détails
-                      </Button>
-                      {onOpenDocuments && (
+                    value={index}
+                  />
+                );
+              })}
+            </Tabs>
+
+            {currentDossier && (() => {
+              const formationDetails = currentDossier.details?.formation_complete || currentDossier.details?.dossier?.formation;
+              const formationNom = formationDetails?.type_permis?.libelle || formationDetails?.nom || 'Formation';
+              const epreuveStatut = epreuvesMap.get(currentDossier.id) || currentDossier.epreuves?.general;
+              const statutInfo = getStatutEpreuveInfo(epreuveStatut);
+
+              return (
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+                      <Box>
+                        <Typography variant="h5" gutterBottom sx={{ fontWeight: 700 }}>
+                          {currentDossier.reference}
+                        </Typography>
+                        <Typography variant="h6" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
+                          {currentDossier.candidatNom} {currentDossier.candidatPrenom}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+                          <Chip
+                            label={statutInfo.label}
+                            color={statutInfo.color}
+                            size="medium"
+                            variant={epreuveStatut === 'non_saisi' ? 'outlined' : 'filled'}
+                            sx={{ fontWeight: 600 }}
+                          />
+                        </Box>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                         <Button
                           variant="outlined"
                           size="small"
-                          startIcon={<Description />}
-                          onClick={() => onOpenDocuments(dossier)}
+                          startIcon={<EyeIcon className="w-4 h-4" />}
+                          onClick={() => handleOpenDetails(currentDossier)}
                           sx={{
                             textTransform: 'none',
                             borderColor: 'rgba(0, 0, 0, 0.23)',
@@ -539,42 +346,131 @@ const ReceptionDossiersTable: React.FC<ReceptionDossiersTableProps> = ({ dossier
                             px: 2,
                             py: 0.75,
                             '&:hover': {
-                              borderColor: '#9c27b0',
-                              backgroundColor: 'rgba(156, 39, 176, 0.04)',
-                              color: '#9c27b0'
+                              borderColor: '#1976d2',
+                              backgroundColor: 'rgba(25, 118, 210, 0.04)',
+                              color: '#1976d2'
                             }
                           }}
                         >
-                          Documents
+                          Détails
                         </Button>
-                      )}
-                      <Button
-                        variant="contained"
-                        size="small"
-                        onClick={() => handleOpenEpreuve(dossier)}
-                        sx={{
-                          textTransform: 'none',
-                          backgroundColor: '#1976d2',
-                          fontWeight: 600,
-                          px: 2,
-                          py: 0.75,
-                          boxShadow: '0 2px 4px rgba(25, 118, 210, 0.2)',
-                          '&:hover': {
-                            backgroundColor: '#1565c0',
-                            boxShadow: '0 4px 8px rgba(25, 118, 210, 0.3)'
-                          }
-                        }}
-                      >
-                        Épreuves
-                      </Button>
+                        {onOpenDocuments && (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<Description />}
+                            onClick={() => onOpenDocuments(currentDossier)}
+                            sx={{
+                              textTransform: 'none',
+                              borderColor: 'rgba(0, 0, 0, 0.23)',
+                              color: '#333',
+                              fontWeight: 500,
+                              px: 2,
+                              py: 0.75,
+                              '&:hover': {
+                                borderColor: '#9c27b0',
+                                backgroundColor: 'rgba(156, 39, 176, 0.04)',
+                                color: '#9c27b0'
+                              }
+                            }}
+                          >
+                            Documents
+                          </Button>
+                        )}
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={() => handleOpenEpreuve(currentDossier)}
+                          sx={{
+                            textTransform: 'none',
+                            backgroundColor: '#1976d2',
+                            fontWeight: 600,
+                            px: 2,
+                            py: 0.75,
+                            boxShadow: '0 2px 4px rgba(25, 118, 210, 0.2)',
+                            '&:hover': {
+                              backgroundColor: '#1565c0',
+                              boxShadow: '0 4px 8px rgba(25, 118, 210, 0.3)'
+                            }
+                          }}
+                        >
+                          Épreuves
+                        </Button>
+                      </Box>
                     </Box>
-                  </TableCell>
-                </TableRow>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          Formation
+                        </Typography>
+                        <Typography variant="body1" fontWeight={600} color="primary.main">
+                          {formationNom}
+                        </Typography>
+                        {formationDetails?.description && (
+                          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                            {formationDetails.description}
+                          </Typography>
+                        )}
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          Auto-école
+                        </Typography>
+                        <Typography variant="body1" fontWeight={500}>
+                          {currentDossier.autoEcoleNom}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          Date d'examen
+                        </Typography>
+                        <Typography variant="body1">
+                          {currentDossier.dateExamen ? new Date(currentDossier.dateExamen).toLocaleDateString('fr-FR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : '-'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          Date d'envoi
+                        </Typography>
+                        <Typography variant="body1">
+                          {new Date(currentDossier.dateEnvoi).toLocaleDateString('fr-FR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          Statut des épreuves
+                        </Typography>
+                        <Chip
+                          label={statutInfo.label}
+                          color={statutInfo.color}
+                          size="medium"
+                          variant={epreuveStatut === 'non_saisi' ? 'outlined' : 'filled'}
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
               );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            })()}
+          </>
+        )}
+      </Paper>
       <EpreuveSheet
         open={openEpreuve}
         onClose={() => setOpenEpreuve(false)}
