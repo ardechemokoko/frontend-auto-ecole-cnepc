@@ -11,6 +11,7 @@ export interface CircuitEtapesCardProps {
   isDocumentValidated: (typeDocumentId: string) => boolean;
   isDocumentValidatedForPiece?: (piece: any) => boolean;
   dossierId?: string;
+  dossierComplet?: any; // Données complètes du dossier avec candidat.personne.email
   onDocumentUploaded?: () => void;
   uploading?: boolean;
   onUpdateDocument?: (documentId: string, data: { valide: boolean; commentaires?: string }) => Promise<void>;
@@ -18,6 +19,7 @@ export interface CircuitEtapesCardProps {
   epreuvesStatus?: string;
   loadingEpreuves?: boolean;
   onSendToCNEDDT?: () => void;
+  pieceJustificationTypeMap?: Map<string, { libelle: string }>; // Map piece_justification_id -> { libelle }
 }
 
 export interface ValidationDialogState {

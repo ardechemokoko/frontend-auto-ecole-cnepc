@@ -15,8 +15,18 @@ export function useEpreuvesStatus(dossiers: ReceptionDossier[]) {
 
       const newMap = new Map<string, EpreuveStatut>();
       
+      // Charger d'abord depuis localStorage pour maintenir le statut après les résultats
       dossiers.forEach(dossier => {
-        if (dossier.epreuves?.general) {
+        const storageKey = `epreuve_status_${dossier.id}`;
+        const storedStatus = localStorage.getItem(storageKey);
+        if (storedStatus && (storedStatus === 'reussi' || storedStatus === 'echoue' || storedStatus === 'absent' || storedStatus === 'non_saisi')) {
+          newMap.set(dossier.id, storedStatus as EpreuveStatut);
+        }
+      });
+      
+      // Ensuite, utiliser le statut depuis le dossier si disponible et pas déjà dans localStorage
+      dossiers.forEach(dossier => {
+        if (!newMap.has(dossier.id) && dossier.epreuves?.general) {
           newMap.set(dossier.id, dossier.epreuves.general);
         }
       });
@@ -82,6 +92,10 @@ export function useEpreuvesStatus(dossiers: ReceptionDossier[]) {
               const generalStatus = computeGeneral(creneauxStatus, codeStatus, villeStatus);
               
               newMap.set(dossier.id, generalStatus);
+              
+              // Sauvegarder dans localStorage pour maintenir le statut après les résultats
+              const storageKey = `epreuve_status_${dossier.id}`;
+              localStorage.setItem(storageKey, generalStatus);
             } catch (err: any) {
               if (err?.response?.status === 404) {
                 newMap.set(dossier.id, 'non_saisi');
@@ -106,6 +120,10 @@ export function useEpreuvesStatus(dossiers: ReceptionDossier[]) {
       newMap.set(dossierId, status);
       return newMap;
     });
+    
+    // Sauvegarder dans localStorage pour maintenir le statut après les résultats
+    const storageKey = `epreuve_status_${dossierId}`;
+    localStorage.setItem(storageKey, status);
   }, []);
 
   return { epreuvesMap, updateEpreuveStatus };

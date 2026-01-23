@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Table,
   TableBody,
@@ -38,6 +39,7 @@ import { autoEcoleService } from '../../cnepc/services/auto-ecole.service';
 import { typeDemandeService } from '../../cnepc/services';
 import { TypeDemande } from '../../cnepc/types/type-demande';
 import ValidationService from '../services/validationService';
+import { ROUTES } from '../../../shared/constants';
 
 interface DemandesInscriptionTableProps {
   onCandidatSelect?: (candidat: DemandeInscription) => void;
@@ -54,6 +56,7 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
   autoEcoleId,
   formationId 
 }) => {
+  const navigate = useNavigate();
   const [demandes, setDemandes] = useState<DemandeInscription[]>([]);
   const [statistiques, setStatistiques] = useState<StatistiquesDemandes | null>(null);
   const [loading, setLoading] = useState(true);
@@ -551,9 +554,16 @@ const DemandesInscriptionTable: React.FC<DemandesInscriptionTableProps> = ({
   const handleVoirDetails = (demande: DemandeInscription) => {
     console.log('📋 Détails du dossier sélectionné:', demande);
     
+    // Appeler le callback si fourni (pour compatibilité)
     if (onCandidatSelect) {
       onCandidatSelect(demande);
     }
+    
+    // Naviguer vers la page de détails du candidat pour le suivi du circuit
+    // Passer un état pour indiquer qu'on vient de DemandesInscriptionTable
+    navigate(ROUTES.RECEPTION_CANDIDAT_DETAILS.replace(':id', demande.id), {
+      state: { from: 'demandes-inscription' }
+    });
   };
 
   if (loading) {

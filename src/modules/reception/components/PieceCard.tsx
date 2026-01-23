@@ -9,7 +9,7 @@ import {
   IconButton,
   CircularProgress
 } from '@mui/material';
-import { CloudArrowUpIcon, CheckBadgeIcon } from '@heroicons/react/24/outline';
+import { CloudArrowUpIcon, CheckBadgeIcon, BeakerIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
 import { PieceEtape, EtapeCircuit } from '../services/circuit-suivi.service';
 
 interface PieceCardProps {
@@ -20,12 +20,15 @@ interface PieceCardProps {
   isValidated: boolean;
   isUploading: boolean;
   isEtapeAccessible: boolean;
+  authorized?: boolean;
   dossierId?: string;
   onUpdateDocument?: (documentId: string, data: { valide: boolean; commentaires?: string }) => Promise<void>;
   onOpenValidationDialog: (doc: any) => void;
   onUploadClick: () => void;
   onFileSelect: (event: React.ChangeEvent<HTMLInputElement>) => void;
   fileInputRef: (el: HTMLInputElement | null) => void;
+  onSimulateUpload?: () => void;
+  isSimulating?: boolean;
 }
 
 export const PieceCard: React.FC<PieceCardProps> = ({
@@ -36,13 +39,30 @@ export const PieceCard: React.FC<PieceCardProps> = ({
   isValidated,
   isUploading,
   isEtapeAccessible,
+  authorized = true,
   dossierId,
   onUpdateDocument,
   onOpenValidationDialog,
   onUploadClick,
   onFileSelect,
-  fileInputRef
+  fileInputRef,
+  onSimulateUpload,
+  isSimulating = false
 }) => {
+  // Log pour déboguer l'affichage du bouton d'upload
+  React.useEffect(() => {
+    const shouldShowButton = dossierId && authorized && isEtapeAccessible;
+    console.log('📤 PieceCard - Affichage bouton upload:', {
+      pieceType: typeDocName,
+      etapeId: etape.id,
+      etapeLibelle: etape.libelle,
+      etapeRoles: etape.roles,
+      dossierId: !!dossierId,
+      authorized,
+      isEtapeAccessible,
+      shouldShowButton
+    });
+  }, [dossierId, authorized, isEtapeAccessible, etape.id, etape.libelle, etape.roles, typeDocName]);
   return (
     <Box
       sx={{
@@ -101,7 +121,7 @@ export const PieceCard: React.FC<PieceCardProps> = ({
                       />
                     )}
                   </Box>
-                  {onUpdateDocument && (
+                  {onUpdateDocument && authorized && (
                     <Tooltip title={isEtapeAccessible ? "Modifier le statut de validation" : "Complétez d'abord l'étape précédente"}>
                       <span>
                         <IconButton
@@ -128,7 +148,13 @@ export const PieceCard: React.FC<PieceCardProps> = ({
             </Typography>
           )}
         </Box>
-        {dossierId && !etape.roles?.includes('ROLE_CANDIDAT') && (
+        {/* Afficher le bouton d'upload si :
+            - dossierId existe
+            - l'utilisateur est autorisé (authorized)
+            - l'étape est accessible (isEtapeAccessible)
+            - L'étape n'est pas réservée uniquement aux candidats OU l'utilisateur est autorisé pour cette étape
+        */}
+        {dossierId && authorized && isEtapeAccessible && (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
             <input
               ref={fileInputRef}
@@ -138,26 +164,57 @@ export const PieceCard: React.FC<PieceCardProps> = ({
               onChange={onFileSelect}
               disabled={!isEtapeAccessible}
             />
-            <Tooltip title={isEtapeAccessible ? `Uploader un document pour ${typeDocName}` : "Complétez d'abord l'étape précédente"}>
-              <span>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={isUploading ? <CircularProgress size={14} /> : <CloudArrowUpIcon className="w-4 h-4" />}
-                  onClick={onUploadClick}
-                  disabled={!isEtapeAccessible || isUploading || !dossierId}
-                  sx={{ 
-                    textTransform: 'none',
-                    fontSize: '0.75rem',
-                    minWidth: 'auto',
-                    px: 1.5,
-                    opacity: isEtapeAccessible ? 1 : 0.6
-                  }}
-                >
-                  {isUploading ? 'Upload...' : 'Upload'}
-                </Button>
-              </span>
-            </Tooltip>
+            <Box sx={{ display: 'flex', gap: 0.5 }}>
+              <Tooltip title={isEtapeAccessible ? `Uploader un document pour ${typeDocName}` : "Complétez d'abord l'étape précédente"}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={isUploading ? <CircularProgress size={14} /> : <CloudArrowUpIcon className="w-4 h-4" />}
+                    onClick={onUploadClick}
+                    disabled={!isEtapeAccessible || isUploading || !dossierId}
+                    sx={{ 
+                      textTransform: 'none',
+                      fontSize: '0.75rem',
+                      minWidth: 'auto',
+                      px: 1.5,
+                      opacity: isEtapeAccessible ? 1 : 0.6
+                    }}
+                  >
+                    {isUploading ? 'Upload...' : 'Upload'}
+                  </Button>
+                </span>
+              </Tooltip>
+              {onSimulateUpload && (
+                <Tooltip title="Agent Televersement">
+                  <span>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="warning"
+                      startIcon={isSimulating ? <CircularProgress size={14} /> : <WrenchScrewdriverIcon className="w-4 h-4" />}
+                      onClick={onSimulateUpload}
+                      disabled={!isEtapeAccessible || isSimulating || isUploading || !dossierId}
+                      sx={{ 
+                        textTransform: 'none',
+                        fontSize: '0.75rem',
+                        minWidth: 'auto',
+                        px: 1.5,
+                        opacity: isEtapeAccessible ? 1 : 0.6,
+                        borderColor: 'warning.main',
+                        color: 'warning.main',
+                        '&:hover': {
+                          borderColor: 'warning.dark',
+                          backgroundColor: 'warning.50'
+                        }
+                      }}
+                    >
+                      {isSimulating ? 'Téléversement...' : 'Agent Televersement'}
+                    </Button>
+                  </span>
+                </Tooltip>
+              )}
+            </Box>
           </Box>
         )}
       </Box>

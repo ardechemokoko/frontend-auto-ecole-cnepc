@@ -15,6 +15,8 @@ import {
   FolderOpen,
   Search,
   FilterList,
+  ManageAccounts,
+  AdminPanelSettings,
 } from '@mui/icons-material';
 import { ROUTES } from '../../../shared/constants';
 import { ModuleCardProps } from '../types';
@@ -160,6 +162,28 @@ export const getModulesConfig = (
       onClick: () => navigate(ROUTES.PIECES_JUSTIFICATIVES),
     },
     avatarColor: 'warning',
+  },
+  {
+    title: 'Gestion d\'utilisateur',
+    description:
+      'Gérez les utilisateurs du système, leurs rôles et permissions. Créez, modifiez et supprimez les comptes utilisateurs, assignez les rôles appropriés et gérez les accès aux différents modules.',
+    icon: <ManageAccounts />,
+    badge: {
+      label: 'Module Disponible',
+      color: 'info',
+    },
+    chips: [
+      { icon: <People />, label: 'Utilisateurs' },
+      { icon: <AdminPanelSettings />, label: 'Rôles' },
+      { icon: <Settings />, label: 'Permissions' },
+      { icon: <AutoAwesome />, label: 'Gestion' },
+    ],
+    primaryAction: {
+      label: 'Accéder au Module',
+      icon: <ManageAccounts />,
+      onClick: () => navigate(ROUTES.USER_MANAGEMENT),
+    },
+    avatarColor: 'info',
   },
 ];
 

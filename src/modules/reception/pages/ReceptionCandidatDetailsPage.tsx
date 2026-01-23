@@ -50,7 +50,8 @@ const ReceptionCandidatDetailsPage: React.FC = () => {
     getDocumentsByType,
     getDocumentsForPiece,
     isDocumentValidated,
-    isDocumentValidatedForPiece
+    isDocumentValidatedForPiece,
+    pieceJustificationTypeMap
   } = useReceptionCandidatDetails(id);
 
   const { uploading, fileInputRef, handleUploadNewDocument, handleFileSelect: handleFileSelectUpload } = useDocumentUpload({
@@ -141,7 +142,7 @@ const ReceptionCandidatDetailsPage: React.FC = () => {
             onClick={() => navigate(ROUTES.RECEPTION || '/reception')}
             sx={{ textDecoration: 'none', cursor: 'pointer' }}
           >
-            Réception des dossiersss
+            Réception des dossiers
           </Link>
           <Typography color="text.primary">
             Détails du candidat
@@ -238,6 +239,7 @@ const ReceptionCandidatDetailsPage: React.FC = () => {
                   formatFileSize={formatFileSize}
                   circuit={circuit}
                   typeDocuments={typeDocuments}
+                  pieceJustificationTypeMap={pieceJustificationTypeMap}
                 />
            
               </Box>
@@ -262,6 +264,7 @@ const ReceptionCandidatDetailsPage: React.FC = () => {
                 isDocumentValidated={isDocumentValidated}
                 isDocumentValidatedForPiece={isDocumentValidatedForPiece}
                 dossierId={id}
+                dossierComplet={dossierComplet}
                 onDocumentUploaded={chargerDocuments}
                 uploading={uploading}
                 onUpdateDocument={handleUpdateDocument}
@@ -273,6 +276,7 @@ const ReceptionCandidatDetailsPage: React.FC = () => {
                     chargerDocuments();
                   }
                 }}
+                pieceJustificationTypeMap={pieceJustificationTypeMap}
               />
             </Box>
           </Box>

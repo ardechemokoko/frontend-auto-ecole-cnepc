@@ -22,6 +22,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { Switch, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
 import { CircuitSuivi, EtapeCircuit, PieceEtape } from '../services/circuit-suivi.service';
+import { useDocumentPieceMapping } from '../hooks/useDocumentPieceMapping';
+import axiosClient from '../../../shared/environment/envdev';
 
 interface DocumentsCardProps {
   documentsFromApi: any[];
@@ -37,6 +39,7 @@ interface DocumentsCardProps {
   formatFileSize: (bytes: number) => string;
   circuit?: CircuitSuivi | null;
   typeDocuments?: any[];
+  pieceJustificationTypeMap?: Map<string, { libelle: string }>; // Map piece_justification_id -> { libelle }
 }
 
 const DocumentsCard: React.FC<DocumentsCardProps> = ({
@@ -52,7 +55,8 @@ const DocumentsCard: React.FC<DocumentsCardProps> = ({
   onUpdateDocument,
   formatFileSize,
   circuit,
-  typeDocuments = []
+  typeDocuments = [],
+  pieceJustificationTypeMap = new Map()
 }) => {
   const [validationDialog, setValidationDialog] = React.useState<{
     open: boolean;
@@ -66,6 +70,11 @@ const DocumentsCard: React.FC<DocumentsCardProps> = ({
     commentaires: ''
   });
   const [updatingDocument, setUpdatingDocument] = React.useState<string | null>(null);
+  const [piecesJustificativesMap, setPiecesJustificativesMap] = React.useState<Map<string, any>>(new Map());
+  
+  // Le hook est toujours utilisé pour maintenir la compatibilité avec d'autres parties du code
+  // mais on utilise directement localStorage dans getDocumentPieceId (comme RequiredDocumentsSection.tsx)
+  useDocumentPieceMapping();
 
   // Filtrer les documents pour ne garder que ceux du dossier actuel
   // Le champ documentable_id correspond à l'ID du dossier
@@ -93,15 +102,139 @@ const DocumentsCard: React.FC<DocumentsCardProps> = ({
       return matches;
     });
     
-    console.log('📋 Documents filtrés pour le dossier:', {
+    console.log('📋 DocumentsCard - Documents filtrés pour le dossier:', {
       dossierId,
       totalDocuments: documentsFromApi.length,
       filteredDocuments: filtered.length,
-      filteredOut: documentsFromApi.length - filtered.length
+      filteredOut: documentsFromApi.length - filtered.length,
+      documents: filtered.map(doc => ({
+        id: doc.id,
+        nom: doc.nom || doc.nom_fichier,
+        piece_justification_id: doc.piece_justification_id || 'N/A',
+        type_document_id: doc.type_document_id || 'N/A',
+        documentable_id: doc.documentable_id || 'N/A',
+        valide: doc.valide || false,
+        taille: doc.taille || 'N/A'
+      }))
     });
     
     return filtered;
   }, [documentsFromApi, dossierId]);
+
+  // Effect pour récupérer les pièces justificatives avec un seul GET
+  React.useEffect(() => {
+    const fetchPiecesJustificatives = async () => {
+      // Extraire tous les piece_justification_id uniques des documents
+      const pieceJustificationIds = new Set<string>();
+      documentsForCurrentDossier.forEach(doc => {
+        if (doc.piece_justification_id && doc.piece_justification_id !== 'N/A') {
+          pieceJustificationIds.add(doc.piece_justification_id);
+        }
+      });
+
+      if (pieceJustificationIds.size === 0) {
+        console.log('📋 DocumentsCard - Aucun piece_justification_id trouvé dans les documents');
+        setPiecesJustificativesMap(new Map());
+        return;
+      }
+
+      console.log(`🔄 DocumentsCard - Récupération de ${pieceJustificationIds.size} pièce(s) justificative(s) unique(s)...`);
+      console.log('📋 DocumentsCard - IDs des pièces justificatives à récupérer:', Array.from(pieceJustificationIds));
+
+      try {
+        // Faire un seul GET /pieces-justificatives
+        console.log('📡 DocumentsCard - Appel API GET /pieces-justificatives');
+        const response = await axiosClient.get('/pieces-justificatives');
+        
+        console.log('🔍 DocumentsCard - Réponse brute de GET /pieces-justificatives:', {
+          status: response.status,
+          dataType: Array.isArray(response.data) ? 'array' : typeof response.data,
+          isArray: Array.isArray(response.data),
+          arrayLength: Array.isArray(response.data) ? response.data.length : null
+        });
+        
+        // Extraire les données de la réponse (peut être dans response.data.data ou response.data)
+        let allPieces: any[] = [];
+        
+        if (response.data) {
+          if (Array.isArray(response.data)) {
+            allPieces = response.data;
+          } else if (response.data.data && Array.isArray(response.data.data)) {
+            allPieces = response.data.data;
+          } else if (response.data.data && !Array.isArray(response.data.data)) {
+            allPieces = [response.data.data];
+          } else {
+            allPieces = [response.data];
+          }
+        }
+        
+        console.log(`📊 DocumentsCard - ${allPieces.length} pièce(s) justificative(s) récupérée(s) au total`);
+
+        // Filtrer pour ne garder que les pièces dont l'ID correspond aux piece_justification_id des documents
+        const filteredPieces = allPieces.filter(piece => {
+          const pieceId = piece.id;
+          const matches = pieceJustificationIds.has(pieceId);
+          
+          if (matches) {
+            console.log(`✅ DocumentsCard - Pièce justificative trouvée:`, {
+              pieceId: piece.id,
+              libelle: piece.libelle,
+              type_document_id: piece.type_document_id
+            });
+          }
+          
+          return matches;
+        });
+
+        console.log(`✅ DocumentsCard - ${filteredPieces.length} pièce(s) justificative(s) filtrée(s) correspondant aux documents`);
+
+        // Créer une Map pour un accès rapide : piece_justification_id -> données de la pièce
+        const piecesMap = new Map<string, any>();
+        filteredPieces.forEach(piece => {
+          // Formater la réponse selon le format attendu
+          const formattedPiece = {
+            id: piece.id || null,
+            type_document_id: piece.type_document_id || null,
+            code: piece.code || null,
+            libelle: piece.libelle || null,
+            format_attendu: piece.format_attendu || null,
+            obligatoire: piece.obligatoire ?? null,
+            delivery_date: piece.delivery_date || null,
+            expiration_date: piece.expiration_date || null,
+            created_at: piece.created_at || null,
+            updated_at: piece.updated_at || null,
+            etape_id: piece.etape_id || null
+          };
+          
+          piecesMap.set(piece.id, formattedPiece);
+        });
+
+        console.log('📊 DocumentsCard - Map des pièces justificatives créée:', {
+          totalPieces: piecesMap.size,
+          pieces: Array.from(piecesMap.entries()).map(([id, data]) => ({
+            id,
+            libelle: data.libelle,
+            type_document_id: data.type_document_id
+          }))
+        });
+
+        setPiecesJustificativesMap(piecesMap);
+      } catch (error: any) {
+        console.error('❌ DocumentsCard - Erreur lors de la récupération des pièces justificatives:', {
+          error: error.response?.data || error.message,
+          errorStatus: error.response?.status
+        });
+        setPiecesJustificativesMap(new Map());
+      }
+    };
+
+    // Exécuter uniquement si on a des documents
+    if (documentsForCurrentDossier.length > 0) {
+      fetchPiecesJustificatives();
+    } else {
+      setPiecesJustificativesMap(new Map());
+    }
+  }, [documentsForCurrentDossier]);
 
   // Fonction pour ouvrir le dialogue de validation
   const handleOpenValidationDialog = (doc: any) => {
@@ -135,7 +268,7 @@ const DocumentsCard: React.FC<DocumentsCardProps> = ({
       });
       handleCloseValidationDialog();
     } catch (error: any) {
-      console.error('❌ Erreur lors de la mise à jour du document:', error);
+      // Erreur silencieuse
     } finally {
       setUpdatingDocument(null);
     }
@@ -148,7 +281,7 @@ const DocumentsCard: React.FC<DocumentsCardProps> = ({
   };
 
   // Fonction pour résoudre l'ID du type de document selon CORRELATION_DOCUMENTS_PIECES.md
-  const getTypeDocumentId = (typeDocumentIdentifier: string): string | null => {
+  const getTypeDocumentId = React.useCallback((typeDocumentIdentifier: string): string | null => {
     if (!typeDocumentIdentifier) return null;
 
     // 1. Si c'est déjà un UUID, l'utiliser directement
@@ -166,80 +299,87 @@ const DocumentsCard: React.FC<DocumentsCardProps> = ({
     );
     
     return typeDoc?.id || null;
-  };
+  }, [typeDocuments]);
 
   // Fonction pour trouver la pièce et l'étape correspondant à un document
-  // Selon LIAISON_PIECE_DOCUMENT.md : liaison principale par piece_justification_id
-  const findDocumentCorrelation = (doc: any): { etape: EtapeCircuit | null; piece: PieceEtape | null; typeDoc: any } => {
+  // MÊME LOGIQUE QUE RequiredDocumentsSection.tsx mais SANS localStorage
+  // (car frontend-auto-ecole et frontend-candidat sont deux applications séparées)
+  // On utilise uniquement les données de l'API : piece_justification_id et etape_id
+  const findDocumentCorrelation = React.useCallback((doc: any): { etape: EtapeCircuit | null; piece: PieceEtape | null; typeDoc: any } => {
     if (!circuit) {
       return { etape: null, piece: null, typeDoc: null };
     }
 
-    // Méthode principale : par piece_justification_id (recommandée selon LIAISON_PIECE_DOCUMENT.md)
-    if (doc.piece_justification_id) {
-      for (const etape of circuit.etapes || []) {
-        if (etape.pieces) {
-          for (const piece of etape.pieces) {
-            // Selon LIAISON_PIECE_DOCUMENT.md : piece.type_document = PieceJustificative.id
-            // Comparer directement et aussi via getTypeDocumentId pour gérer les cas où piece.type_document est un UUID ou un libellé
-            const pieceTypeDocumentId = getTypeDocumentId(piece.type_document);
-            if (piece.type_document === doc.piece_justification_id || 
-                pieceTypeDocumentId === doc.piece_justification_id) {
-              const docTypeDoc = typeDocuments.find(td => td.id === doc.type_document_id);
-              // Chercher aussi le typeDoc par piece_justification_id dans les référentiels
-              const pieceTypeDoc = typeDocuments.find(td => td.id === doc.piece_justification_id);
-              console.log('✅ Corrélation trouvée par piece_justification_id:', {
-                doc: doc.nom || doc.nom_fichier,
-                piece_justification_id: doc.piece_justification_id,
-                etape: etape.libelle,
-                piece: piece.libelle || piece.type_document,
-                pieceTypeDoc: pieceTypeDoc?.libelle || pieceTypeDoc?.name
-              });
-              return { etape, piece, typeDoc: pieceTypeDoc || docTypeDoc };
-            }
-          }
+    if (!circuit.etapes || circuit.etapes.length === 0) {
+      return { etape: null, piece: null, typeDoc: null };
+    }
+
+    // Utiliser directement piece_justification_id de l'API (pas de localStorage car application séparée)
+    const docPieceId = doc.piece_justification_id;
+    // IMPORTANT: piece.type_document dans le circuit contient le type_document_id (référentiel),
+    // pas l'ID de la PieceJustificative. On doit comparer pieceJustificative.type_document_id avec piece.type_document
+    // Récupérer les données de la PieceJustificative depuis la map locale (piecesJustificativesMap)
+    const pieceJustificativeData = docPieceId ? piecesJustificativesMap.get(docPieceId) : null;
+    const docPieceJustificationLibelle = pieceJustificativeData?.libelle || null;
+
+    // Collecter tous les piece.type_document du circuit pour comparaison et logs
+    const allPieceTypeDocuments: Array<{etapeId: string; etapeLibelle: string; pieceLibelle: string; pieceTypeDocument: string}> = [];
+    for (const etape of circuit.etapes || []) {
+      if (etape.pieces) {
+        for (const piece of etape.pieces) {
+          allPieceTypeDocuments.push({
+            etapeId: etape.id,
+            etapeLibelle: etape.libelle,
+            pieceLibelle: piece.libelle || 'N/A',
+            pieceTypeDocument: piece.type_document
+          });
         }
       }
     }
 
-    // Méthode secondaire (fallback) : par type_document_id
-    if (doc.type_document_id) {
-      const docTypeDoc = typeDocuments.find(td => td.id === doc.type_document_id);
+    // Parcourir toutes les étapes et leurs pièces
+    // IMPORTANT: piece.type_document contient le type_document_id (référentiel),
+    // pas l'ID de la PieceJustificative. On compare donc pieceJustificative.type_document_id avec piece.type_document
+    for (const etape of circuit.etapes || []) {
+      // Filtrer par etape_id si disponible (optimisation)
+      if (doc.etape_id && doc.etape_id !== etape.id) {
+        continue; // Le document appartient à une autre étape
+      }
       
-      for (const etape of circuit.etapes || []) {
-        if (etape.pieces) {
-          for (const piece of etape.pieces) {
-            // Résoudre l'ID du type de document de la pièce
-            const pieceTypeDocumentId = getTypeDocumentId(piece.type_document);
+      if (etape.pieces) {
+        for (const piece of etape.pieces) {
+          const pieceTypeDocument = piece.type_document; // C'est le type_document_id (référentiel)
+          
+          // Récupérer le Referentiel correspondant à pieceTypeDocument pour obtenir son libelle
+          const referentiel = typeDocuments.find(td => td.id === pieceTypeDocument);
+          const referentielLibelle = referentiel?.libelle || referentiel?.name || null;
+          
+          // Comparaison UNIQUEMENT par libelle : PieceJustificative.libelle === Referentiel.libelle
+          if (docPieceJustificationLibelle && referentielLibelle && 
+              docPieceJustificationLibelle.toLowerCase().trim() === referentielLibelle.toLowerCase().trim()) {
+            const docTypeDoc = typeDocuments.find(td => td.id === doc.type_document_id);
+            const pieceTypeDoc = typeDocuments.find(td => td.id === pieceTypeDocument);
             
-            // Corrélation : doc.type_document_id === pieceTypeDocumentId
-            if (pieceTypeDocumentId && doc.type_document_id === pieceTypeDocumentId) {
-              console.log('✅ Corrélation trouvée par type_document_id (fallback):', {
-                doc: doc.nom,
-                docTypeId: doc.type_document_id,
-                pieceType: piece.type_document,
-                pieceTypeResolved: pieceTypeDocumentId,
-                etape: etape.libelle,
-                piece: piece.libelle || piece.type_document
-              });
-              return { etape, piece, typeDoc: docTypeDoc };
-            }
+            return { etape, piece, typeDoc: pieceTypeDoc || docTypeDoc };
           }
         }
       }
     }
 
-    console.log('⚠️ Aucune corrélation trouvée pour le document:', doc.id, doc.nom, {
-      piece_justification_id: doc.piece_justification_id || 'N/A',
-      type_document_id: doc.type_document_id || 'N/A'
-    });
+    // Aucune correspondance trouvée
     return { etape: null, piece: null, typeDoc: null };
-  };
+  }, [circuit, typeDocuments, piecesJustificativesMap]);
 
   // Fonction pour obtenir le nom de la pièce à partir du piece_justification_id ou type_document_id
   const getPieceNameFromDocument = React.useCallback((doc: any): string | null => {
-    // 1. Priorité : chercher par piece_justification_id dans les référentiels (typeDocuments)
+    // 1. Priorité : chercher par piece_justification_id dans piecesJustificativesMap
     if (doc.piece_justification_id) {
+      const pieceJustificative = piecesJustificativesMap.get(doc.piece_justification_id);
+      if (pieceJustificative?.libelle) {
+        return pieceJustificative.libelle;
+      }
+      
+      // Fallback : chercher dans les référentiels (typeDocuments)
       const pieceDoc = typeDocuments.find(td => td.id === doc.piece_justification_id);
       if (pieceDoc) {
         return pieceDoc.libelle || pieceDoc.name || pieceDoc.code || null;
@@ -252,17 +392,19 @@ const DocumentsCard: React.FC<DocumentsCardProps> = ({
             for (const piece of etape.pieces) {
               // piece.type_document devrait correspondre à piece_justification_id
               const pieceTypeDocumentId = getTypeDocumentId(piece.type_document);
-              if (pieceTypeDocumentId === doc.piece_justification_id || piece.type_document === doc.piece_justification_id) {
+              if ((pieceTypeDocumentId && String(pieceTypeDocumentId) === String(doc.piece_justification_id)) || 
+                  String(piece.type_document) === String(doc.piece_justification_id)) {
                 return piece.libelle || null;
               }
             }
           }
         }
       }
+      
     }
 
-    // 2. Fallback : chercher par type_document_id
-    if (doc.type_document_id) {
+    // 2. Fallback : chercher par type_document_id (si ce n'est pas "N/A")
+    if (doc.type_document_id && doc.type_document_id !== 'N/A') {
       const typeDoc = typeDocuments.find(td => td.id === doc.type_document_id);
       if (typeDoc) {
         return typeDoc.libelle || typeDoc.name || typeDoc.code || null;
@@ -274,7 +416,7 @@ const DocumentsCard: React.FC<DocumentsCardProps> = ({
           if (etape.pieces) {
             for (const piece of etape.pieces) {
               const pieceTypeDocumentId = getTypeDocumentId(piece.type_document);
-              if (pieceTypeDocumentId === doc.type_document_id) {
+              if (pieceTypeDocumentId && String(pieceTypeDocumentId) === String(doc.type_document_id)) {
                 return piece.libelle || null;
               }
             }
@@ -284,44 +426,110 @@ const DocumentsCard: React.FC<DocumentsCardProps> = ({
     }
 
     return null;
-  }, [typeDocuments, circuit]);
+  }, [typeDocuments, circuit, getTypeDocumentId, piecesJustificativesMap]);
 
   // Grouper les documents par étape (utiliser les documents filtrés)
+  // IMPORTANT: Attendre que le circuit soit chargé avant de corréler les documents
   const documentsByEtape = React.useMemo(() => {
     const grouped = new Map<string, { etape: EtapeCircuit; documents: any[] }>();
     const uncorrelated: any[] = [];
 
+    // Si le circuit n'est pas encore chargé, ne pas essayer de corréler
+    // Cela évite les erreurs "Circuit absent pour document"
+    if (!circuit || !circuit.etapes || circuit.etapes.length === 0) {
+      console.log('⏳ DocumentsCard - Circuit non chargé, documents non corrélés pour l\'instant:', {
+        circuitPresent: !!circuit,
+        hasEtapes: (circuit?.etapes?.length || 0) > 0,
+        totalDocuments: documentsForCurrentDossier.length
+      });
+      
+      // Retourner tous les documents comme non corrélés pour l'instant
+      documentsForCurrentDossier.forEach(doc => {
+        const pieceName = getPieceNameFromDocument(doc);
+        uncorrelated.push({ ...doc, pieceName });
+      });
+      
+      return { grouped, uncorrelated };
+    }
+
+    console.log('📋 DocumentsCard - Groupement des documents par étape:', {
+      totalDocuments: documentsForCurrentDossier.length,
+      circuitId: circuit.id,
+      circuitLibelle: circuit.libelle,
+      etapesCount: circuit.etapes?.length || 0
+    });
+
     documentsForCurrentDossier.forEach(doc => {
+      console.log('🔍 DocumentsCard - Analyse du document:', {
+        docId: doc.id,
+        docNom: doc.nom || doc.nom_fichier,
+        piece_justification_id: doc.piece_justification_id || 'N/A',
+        type_document_id: doc.type_document_id || 'N/A',
+        etape_id: doc.etape_id || 'N/A',
+        documentable_id: doc.documentable_id || 'N/A',
+        valide: doc.valide || false
+      });
+      
       const { etape, piece } = findDocumentCorrelation(doc);
       
       if (etape && piece) {
+        console.log('✅ DocumentsCard - Document corrélé avec étape et pièce:', {
+          docId: doc.id,
+          docNom: doc.nom || doc.nom_fichier,
+          etapeId: etape.id,
+          etapeLibelle: etape.libelle,
+          pieceLibelle: piece.libelle,
+          pieceObligatoire: piece.obligatoire
+        });
+        
         const key = etape.id;
         if (!grouped.has(key)) {
           grouped.set(key, { etape, documents: [] });
         }
         grouped.get(key)!.documents.push({ ...doc, piece });
       } else {
+        console.log('⚠️ DocumentsCard - Document non corrélé:', {
+          docId: doc.id,
+          docNom: doc.nom || doc.nom_fichier,
+          piece_justification_id: doc.piece_justification_id || 'N/A',
+          type_document_id: doc.type_document_id || 'N/A'
+        });
+        
         // Même pour les documents non corrélés, essayer de trouver le nom de la pièce
         // Utiliser piece_justification_id en priorité, puis type_document_id
         const pieceName = getPieceNameFromDocument(doc);
         uncorrelated.push({ ...doc, pieceName });
-        
-        // Log pour débogage si pas de nom trouvé
-        if (!pieceName && (doc.piece_justification_id || doc.type_document_id)) {
-          console.warn('⚠️ Document non corrélé et nom de pièce non trouvé:', {
-            docId: doc.id,
-            docNom: doc.nom || doc.nom_fichier,
-            piece_justification_id: doc.piece_justification_id || 'N/A',
-            type_document_id: doc.type_document_id || 'N/A',
-            circuit: circuit ? 'présent' : 'absent',
-            typeDocumentsCount: typeDocuments.length
-          });
-        }
+      }
+    });
+
+    console.log('📊 DocumentsCard - Résultat du groupement:', {
+      etapesAvecDocuments: grouped.size,
+      documentsCorreles: Array.from(grouped.values()).reduce((sum, { documents }) => sum + documents.length, 0),
+      documentsNonCorreles: uncorrelated.length,
+      details: {
+        etapes: Array.from(grouped.entries()).map(([etapeId, { etape, documents }]) => ({
+          etapeId,
+          etapeLibelle: etape.libelle,
+          documentsCount: documents.length,
+          documents: documents.map(d => ({
+            id: d.id,
+            nom: d.nom || d.nom_fichier,
+            piece_justification_id: d.piece_justification_id,
+            valide: d.valide
+          }))
+        })),
+        nonCorreles: uncorrelated.map(d => ({
+          id: d.id,
+          nom: d.nom || d.nom_fichier,
+          piece_justification_id: d.piece_justification_id,
+          pieceName: d.pieceName || 'N/A',
+          valide: d.valide
+        }))
       }
     });
 
     return { grouped, uncorrelated };
-  }, [documentsForCurrentDossier, circuit, typeDocuments, getPieceNameFromDocument]);
+  }, [documentsForCurrentDossier, circuit, typeDocuments, getPieceNameFromDocument, findDocumentCorrelation]);
   return (
     <Card>
       <CardContent>

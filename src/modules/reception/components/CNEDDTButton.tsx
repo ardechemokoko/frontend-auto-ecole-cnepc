@@ -4,9 +4,10 @@ import {
   Typography,
   Button,
   Tooltip,
-  CircularProgress
+  CircularProgress,
+  Alert
 } from '@mui/material';
-import { PaperAirplaneIcon } from '@heroicons/react/24/outline';
+import { PaperAirplaneIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
 
 interface CNEDDTButtonProps {
   allEtapesCompleted: boolean;
@@ -14,6 +15,7 @@ interface CNEDDTButtonProps {
   epreuvesStatus?: string;
   loadingEpreuves: boolean;
   sendingToCNEDDT: boolean;
+  sentToCNEDDT?: boolean;
   onSendToCNEDDT: () => void;
 }
 
@@ -23,6 +25,7 @@ export const CNEDDTButton: React.FC<CNEDDTButtonProps> = ({
   epreuvesStatus,
   loadingEpreuves,
   sendingToCNEDDT,
+  sentToCNEDDT = false,
   onSendToCNEDDT
 }) => {
   // Vérifier si les épreuves sont requises
@@ -32,6 +35,30 @@ export const CNEDDTButton: React.FC<CNEDDTButtonProps> = ({
   const isButtonDisabled = sendingToCNEDDT || !dossierId || !allEtapesCompleted || !epreuvesValid || loadingEpreuves;
   
   if (!allEtapesCompleted) return null;
+  
+  // Si le dossier a été envoyé avec succès, afficher le message de succès
+  if (sentToCNEDDT) {
+    return (
+      <Box sx={{ mt: 4, pt: 3, borderTop: '2px solid', borderColor: 'divider' }}>
+        <Alert 
+          severity="success" 
+          icon={<CheckCircleIcon className="w-6 h-6" />}
+          sx={{
+            '& .MuiAlert-message': {
+              width: '100%'
+            }
+          }}
+        >
+          <Typography variant="h6" fontWeight="bold" className="font-display" gutterBottom>
+            DOSSIER ENVOYÉ POUR IMPRESSION DE LA CARTE
+          </Typography>
+          <Typography variant="body2" className="font-primary">
+            Le dossier a été envoyé avec succès à la CNEDDT pour l'impression de la carte.
+          </Typography>
+        </Alert>
+      </Box>
+    );
+  }
   
   return (
     <Box sx={{ mt: 4, pt: 3, borderTop: '2px solid', borderColor: 'divider' }}>
