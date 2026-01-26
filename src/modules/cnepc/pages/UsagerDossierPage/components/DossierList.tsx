@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Grid, CircularProgress } from '@mui/material';
+import { Box, Typography, Grid, Skeleton, Fade } from '@mui/material';
 import { Dossier } from '../../../types/auto-ecole';
 import DossierCard from './DossierCard';
 
@@ -33,9 +33,15 @@ const DossierList: React.FC<DossierListProps> = React.memo(({
       </Typography>
       
       {loadingDossiers ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <CircularProgress />
-        </Box>
+        <Fade in={true} timeout={300}>
+          <Grid container spacing={2}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Grid item xs={12} sm={6} md={4} key={i}>
+                <Skeleton variant="rectangular" height={200} sx={{ borderRadius: 1 }} />
+              </Grid>
+            ))}
+          </Grid>
+        </Fade>
       ) : (
         <Grid container spacing={2}>
           {candidatDossiers.map((d) => (

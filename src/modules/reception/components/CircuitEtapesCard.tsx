@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Card, 
   CardContent, 
   Box, 
   Typography, 
   Stack, 
-  CircularProgress,
   Chip,
   LinearProgress,
-  Alert
+  Alert,
+  Skeleton,
+  Fade
 } from '@mui/material';
 import { AcademicCapIcon } from '@heroicons/react/24/outline';
 import { EtapeCircuit } from '../services/circuit-suivi.service';
@@ -107,6 +108,10 @@ const CircuitEtapesCard: React.FC<CircuitEtapesCardProps> = ({
   
   // État pour suivre les statuts des épreuves par étape
   const [epreuvesStatusMap, setEpreuvesStatusMap] = useState<Map<string, { status: string | null; loading: boolean }>>(new Map());
+
+  // État pour gérer l'expansion des accordions
+  const [expandedEtapeId, setExpandedEtapeId] = useState<string | null>(null);
+  const previousCompletedEtapesRef = useRef<Set<string>>(new Set());
 
   // Hook pour gérer la complétion des étapes
   const {
@@ -437,6 +442,59 @@ const CircuitEtapesCard: React.FC<CircuitEtapesCardProps> = ({
     }
   }, [allEtapesCompleted, onAllEtapesCompletedChange]);
 
+  // Initialiser l'expansion sur la première étape non complétée
+  useEffect(() => {
+    if (etapes.length === 0) return;
+    
+    // Si aucune étape n'est ouverte, ouvrir la première étape non complétée
+    if (expandedEtapeId === null) {
+      const firstIncompleteEtape = etapes.find(etape => 
+        !computedCompletedEtapes.has(etape.id) && !completedEtapes.has(etape.id)
+      );
+      
+      if (firstIncompleteEtape) {
+        setExpandedEtapeId(firstIncompleteEtape.id);
+      } else if (etapes.length > 0) {
+        // Si toutes les étapes sont complétées, ouvrir la dernière
+        setExpandedEtapeId(etapes[etapes.length - 1].id);
+      }
+    }
+  }, [etapes, computedCompletedEtapes, completedEtapes, expandedEtapeId]);
+
+  // Détecter quand une étape est complétée et ouvrir l'étape suivante
+  useEffect(() => {
+    if (etapes.length === 0 || !circuit) return;
+
+    // Créer un Set combiné des étapes complétées
+    const allCompletedEtapes = new Set<string>();
+    computedCompletedEtapes.forEach(id => allCompletedEtapes.add(id));
+    completedEtapes.forEach(id => allCompletedEtapes.add(id));
+
+    // Trouver l'étape qui vient d'être complétée (était dans previousCompletedEtapesRef mais n'est plus, ou vice versa)
+    // En fait, on cherche les étapes qui sont maintenant complétées mais qui ne l'étaient pas avant
+    const newlyCompletedEtape = etapes.find(etape => {
+      const isNowCompleted = allCompletedEtapes.has(etape.id);
+      const wasPreviouslyCompleted = previousCompletedEtapesRef.current.has(etape.id);
+      return isNowCompleted && !wasPreviouslyCompleted;
+    });
+
+    // Mettre à jour la référence
+    previousCompletedEtapesRef.current = new Set(allCompletedEtapes);
+
+    if (newlyCompletedEtape) {
+      // Trouver l'étape suivante
+      const nextEtape = getNextEtape(newlyCompletedEtape, circuit);
+      
+      if (nextEtape) {
+        // Ouvrir l'étape suivante
+        setExpandedEtapeId(nextEtape.id);
+      } else {
+        // C'est la dernière étape, la garder ouverte
+        setExpandedEtapeId(newlyCompletedEtape.id);
+      }
+    }
+  }, [computedCompletedEtapes, completedEtapes, etapes, circuit]);
+
   // Handlers pour le dialogue de validation
   const handleOpenValidationDialog = (doc: any) => {
     setValidationDialog({
@@ -502,16 +560,22 @@ const CircuitEtapesCard: React.FC<CircuitEtapesCardProps> = ({
   // États de chargement
   if (loadingCircuit || loadingTypeDocuments) {
     return (
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2 }}>
-            <CircularProgress size={24} sx={{ mr: 2 }} />
-            <Typography variant="body2" color="text.secondary" className="font-primary">
-              Chargement du circuit et des types de documents...
-            </Typography>
-          </Box>
-        </CardContent>
-      </Card>
+      <Fade in={true} timeout={300}>
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+              <Skeleton variant="text" width="40%" height={32} />
+              <Skeleton variant="rectangular" width={120} height={32} sx={{ borderRadius: 1 }} />
+            </Box>
+            <Skeleton variant="rectangular" height={8} sx={{ mb: 3, borderRadius: 1 }} />
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} variant="rectangular" height={80} sx={{ borderRadius: 1 }} />
+              ))}
+            </Box>
+          </CardContent>
+        </Card>
+      </Fade>
     );
   }
 
@@ -541,16 +605,22 @@ const CircuitEtapesCard: React.FC<CircuitEtapesCardProps> = ({
   // Chargement des étapes
   if (loadingEtapes) {
     return (
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2 }}>
-            <CircularProgress size={24} sx={{ mr: 2 }} />
-            <Typography variant="body2" color="text.secondary" className="font-primary">
-              Chargement des étapes du circuit...
-            </Typography>
-          </Box>
-        </CardContent>
-      </Card>
+      <Fade in={true} timeout={300}>
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+              <Skeleton variant="text" width="40%" height={32} />
+              <Skeleton variant="rectangular" width={120} height={32} sx={{ borderRadius: 1 }} />
+            </Box>
+            <Skeleton variant="rectangular" height={8} sx={{ mb: 3, borderRadius: 1 }} />
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} variant="rectangular" height={80} sx={{ borderRadius: 1 }} />
+              ))}
+            </Box>
+          </CardContent>
+        </Card>
+      </Fade>
     );
   }
 
@@ -736,6 +806,14 @@ const CircuitEtapesCard: React.FC<CircuitEtapesCardProps> = ({
                 onCompleteLastEtape={handleCompleteLastEtape}
                 onTransmitToNextEtape={handleTransmitToNextEtape}
                 pieceJustificationTypeMap={pieceJustificationTypeMap}
+                expanded={expandedEtapeId === etape.id}
+                onChange={(_event, isExpanded) => {
+                  if (isExpanded) {
+                    setExpandedEtapeId(etape.id);
+                  } else {
+                    setExpandedEtapeId(null);
+                  }
+                }}
               />
             );
           })}

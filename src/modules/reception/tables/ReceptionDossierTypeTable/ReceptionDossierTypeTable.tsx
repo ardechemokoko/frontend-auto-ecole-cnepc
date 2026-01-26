@@ -18,10 +18,11 @@ import {
   Divider,
   Chip,
   Typography,
-  CircularProgress,
   IconButton,
   Tooltip,
-  TablePagination
+  TablePagination,
+  Skeleton,
+  Fade
 } from '@mui/material';
 import { Delete } from '@mui/icons-material';
 import { EyeIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
@@ -176,12 +177,11 @@ const ReceptionDossierTypeTable: React.FC<ReceptionDossierTypeTableProps> = ({
                               sx={{ fontWeight: 600 }}
                             />
                           ) : loadingSuivi ? (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <CircularProgress size={16} />
-                              <Typography variant="caption" color="text.secondary">
-                                Chargement...
-                              </Typography>
-                            </Box>
+                            <Fade in={true} timeout={300}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Skeleton variant="rectangular" width={60} height={24} sx={{ borderRadius: 1 }} />
+                              </Box>
+                            </Fade>
                           ) : suivi ? (
                             <Chip
                               label={`${suivi.progress}%`}
@@ -250,12 +250,9 @@ const ReceptionDossierTypeTable: React.FC<ReceptionDossierTypeTableProps> = ({
                             Type de permis
                           </Typography>
                           {loadingReferentiels ? (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <CircularProgress size={16} />
-                              <Typography variant="body2" color="text.secondary">
-                                Chargement...
-                              </Typography>
-                            </Box>
+                            <Fade in={true} timeout={300}>
+                              <Skeleton variant="text" width={120} height={24} />
+                            </Fade>
                           ) : (
                             <Typography variant="body1" fontWeight={600} color="primary.main">
                               {typePermisLabel}

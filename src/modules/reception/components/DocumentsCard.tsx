@@ -7,10 +7,11 @@ import {
   Button,
   Stack,
   Tooltip,
-  LinearProgress,
   IconButton,
   Chip,
-  Divider
+  Divider,
+  Skeleton,
+  Fade
 } from '@mui/material';
 import {
   DocumentTextIcon,
@@ -559,17 +560,16 @@ const DocumentsCard: React.FC<DocumentsCardProps> = ({
           />
         </Box>
 
-        {(loadingDocuments || uploading) && (
-          <Box sx={{ mb: 2 }}>
-            <LinearProgress />
-            <Typography variant="caption" color="text.secondary" className="font-primary">
-              {uploading ? 'Upload en cours...' : 'Chargement des documents...'}
-            </Typography>
-          </Box>
-        )}
-
         {/* Documents existants groupés par étape */}
-        {documentsForCurrentDossier.length > 0 ? (
+        {loadingDocuments ? (
+          <Fade in={true} timeout={300}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} variant="rectangular" height={60} sx={{ borderRadius: 1 }} />
+              ))}
+            </Box>
+          </Fade>
+        ) : documentsForCurrentDossier.length > 0 ? (
           <Stack spacing={3}>
             {/* Documents corrélés avec les étapes */}
             {Array.from(documentsByEtape.grouped.entries()).map(([etapeId, { etape, documents }]) => (
@@ -809,6 +809,17 @@ const DocumentsCard: React.FC<DocumentsCardProps> = ({
               Aucun document disponible
             </Typography>
           </Box>
+        )}
+
+        {/* Indicateur d'upload en cours */}
+        {uploading && (
+          <Fade in={true} timeout={300}>
+            <Box sx={{ mt: 2, p: 2, border: '1px dashed', borderColor: 'primary.main', borderRadius: 1, bgcolor: 'primary.50' }}>
+              <Typography variant="body2" color="primary.main" className="font-primary">
+                Upload en cours...
+              </Typography>
+            </Box>
+          </Fade>
         )}
 
         {/* Dialogue de validation */}

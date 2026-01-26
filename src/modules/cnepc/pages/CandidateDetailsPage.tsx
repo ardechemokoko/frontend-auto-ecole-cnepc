@@ -15,7 +15,6 @@ import {
   ListItemIcon,
   ListItemText,
   Alert,
-  CircularProgress,
   IconButton,
   Dialog,
   DialogTitle,
@@ -27,6 +26,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Skeleton,
+  Fade,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -118,6 +119,10 @@ const CandidateDetailsPage: React.FC = () => {
 
   // Fonction pour enrichir les données de formation
   const enrichFormationData = async (dossier: Dossier) => {
+    if (!dossier.formation || !dossier.formation.id || !dossier.auto_ecole_id) {
+      return;
+    }
+    
     try {
       console.log('🔄 Enrichissement des données de formation pour:', dossier.formation.id);
       
@@ -125,7 +130,7 @@ const CandidateDetailsPage: React.FC = () => {
       const formations = await autoEcoleService.getFormationsByAutoEcole(dossier.auto_ecole_id);
       
       // Trouver la formation correspondante avec les relations complètes
-      const enrichedFormation = formations.find(f => f.id === dossier.formation.id);
+      const enrichedFormation = formations.find(f => f.id === dossier.formation!.id);
       
       if (enrichedFormation) {
         console.log('✅ Formation enrichie trouvée:', enrichedFormation);
@@ -397,12 +402,87 @@ const CandidateDetailsPage: React.FC = () => {
     return <Warning color="warning" />;
   };
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-        <CircularProgress />
+  // Composants Skeleton pour le chargement transparent
+  const CandidateDetailsSkeleton = () => (
+    <Fade in={true} timeout={300}>
+      <Box sx={{ p: 3 }}>
+        {/* Skeleton pour l'en-tête */}
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <Skeleton variant="circular" width={40} height={40} sx={{ mr: 2 }} />
+          <Skeleton variant="text" width={200} height={40} />
+        </Box>
+
+        <Grid container spacing={3}>
+          {/* Skeleton pour les informations personnelles */}
+          <Grid item xs={12} md={6}>
+            <Card elevation={3}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                  <Skeleton variant="circular" width={80} height={80} sx={{ mr: 2 }} />
+                  <Box>
+                    <Skeleton variant="text" width={200} height={32} sx={{ mb: 1 }} />
+                    <Skeleton variant="text" width={150} height={24} sx={{ mb: 1 }} />
+                    <Skeleton variant="rectangular" width={80} height={24} sx={{ borderRadius: 1 }} />
+                  </Box>
+                </Box>
+                <Divider sx={{ my: 2 }} />
+                <Skeleton variant="text" width={180} height={28} sx={{ mb: 2 }} />
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                    <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Skeleton variant="circular" width={24} height={24} />
+                      <Box sx={{ flex: 1 }}>
+                        <Skeleton variant="text" width="60%" height={20} />
+                        <Skeleton variant="text" width="80%" height={16} />
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Skeleton pour la formation et documents */}
+          <Grid item xs={12} md={6}>
+            {/* Skeleton pour la formation */}
+            <Card elevation={3} sx={{ mb: 3 }}>
+              <CardContent>
+                <Skeleton variant="text" width={150} height={28} sx={{ mb: 2 }} />
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Skeleton variant="circular" width={24} height={24} sx={{ mr: 1 }} />
+                  <Skeleton variant="text" width={200} height={28} />
+                </Box>
+                <Skeleton variant="text" width="100%" height={20} sx={{ mb: 2 }} />
+                <Grid container spacing={2}>
+                  {[1, 2, 3, 4].map((i) => (
+                    <Grid item xs={6} key={i}>
+                      <Skeleton variant="text" width="70%" height={16} sx={{ mb: 0.5 }} />
+                      <Skeleton variant="text" width="90%" height={20} />
+                    </Grid>
+                  ))}
+                </Grid>
+              </CardContent>
+            </Card>
+
+            {/* Skeleton pour les documents */}
+            <Card elevation={3}>
+              <CardContent>
+                <Skeleton variant="text" width={200} height={28} sx={{ mb: 2 }} />
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} variant="rectangular" height={60} sx={{ borderRadius: 1 }} />
+                  ))}
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
       </Box>
-    );
+    </Fade>
+  );
+
+  if (loading) {
+    return <CandidateDetailsSkeleton />;
   }
 
   if (error) {
@@ -593,6 +673,10 @@ const CandidateDetailsPage: React.FC = () => {
                     // Logique d'affichage du nom de formation
                     const formation = dossier.formation;
                     
+                    if (!formation) {
+                      return 'Formation non disponible';
+                    }
+                    
                     // 1. Nom direct de la formation
                     if (formation.nom && formation.nom.trim()) {
                       return formation.nom;
@@ -635,73 +719,77 @@ const CandidateDetailsPage: React.FC = () => {
                 </Typography>
               </Box>
               
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                {dossier.formation.description}
-              </Typography>
-              
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Type de permis:
+              {dossier.formation && (
+                <>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    {dossier.formation.description}
                   </Typography>
-                  <Typography variant="body1" fontWeight="medium">
-                    {getTypePermisLabel(dossier.formation)}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Durée:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="medium">
-                    {dossier.formation.duree_jours ? `${dossier.formation.duree_jours} jours` : 'Non spécifiée'}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Montant:
-                  </Typography>
-                  <Typography variant="body1" fontWeight="medium" color="primary">
-                    {dossier.formation.montant_formate}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Statut:
-                  </Typography>
-                  <Chip
-                    label={dossier.formation.statut_libelle}
-                    color={dossier.formation.statut ? 'success' : 'error'}
-                    size="small"
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <Divider sx={{ my: 1 }} />
-                </Grid>
-                <Grid item xs={12}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Category color="action" />
-                    <Typography variant="body2" color="text.secondary">
-                      Type de demande:
-                    </Typography>
-                    {dossier.type_demande ? (
+                  
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Type de permis:
+                      </Typography>
+                      <Typography variant="body1" fontWeight="medium">
+                        {getTypePermisLabel(dossier.formation)}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Durée:
+                      </Typography>
+                      <Typography variant="body1" fontWeight="medium">
+                        {dossier.formation.duree_jours ? `${dossier.formation.duree_jours} jours` : 'Non spécifiée'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Montant:
+                      </Typography>
+                      <Typography variant="body1" fontWeight="medium" color="primary">
+                        {dossier.formation.montant_formate}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Statut:
+                      </Typography>
                       <Chip
-                        label={dossier.type_demande.name}
+                        label={dossier.formation.statut_libelle}
+                        color={dossier.formation.statut ? 'success' : 'error'}
                         size="small"
-                        variant="outlined"
-                        color="primary"
                       />
-                    ) : dossier.type_demande_id ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Chargement...
-                      </Typography>
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">
-                        Non spécifié
-                      </Typography>
-                    )}
-                  </Box>
-                </Grid>
-              </Grid>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Divider sx={{ my: 1 }} />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Category color="action" />
+                        <Typography variant="body2" color="text.secondary">
+                          Type de demande:
+                        </Typography>
+                        {dossier.type_demande ? (
+                          <Chip
+                            label={dossier.type_demande.name}
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                          />
+                        ) : dossier.type_demande_id ? (
+                          <Typography variant="body2" color="text.secondary">
+                            Chargement...
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            Non spécifié
+                          </Typography>
+                        )}
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </>
+              )}
             </CardContent>
           </Card>
 

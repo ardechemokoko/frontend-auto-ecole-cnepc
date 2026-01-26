@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -6,12 +6,15 @@ import {
   IconButton,
   Divider,
   Button,
-  CircularProgress,
   Container,
   Breadcrumbs,
   Link,
   Snackbar,
-  Alert
+  Alert,
+  Card,
+  CardContent,
+  Skeleton,
+  Fade
 } from '@mui/material';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { ROUTES } from '../../../shared/constants';
@@ -19,10 +22,76 @@ import { useReceptionCandidatDetails } from '../hooks/useReceptionCandidatDetail
 import { useDocumentUpload } from '../hooks/useDocumentUpload';
 import { handleViewDocument, handleDownloadDocument } from '../utils/documentHandlers';
 import { circuitSuiviService } from '../services/circuit-suivi.service';
-import CandidatInfoCard from '../components/CandidatInfoCard';
-import AutoEcoleInfoCard from '../components/AutoEcoleInfoCard';
-import CircuitEtapesCard from '../components/CircuitEtapesCard';
-import DocumentsCard from '../components/DocumentsCard';
+
+// Lazy loading des composants de cartes
+const CandidatInfoCard = lazy(() => import('../components/CandidatInfoCard'));
+const AutoEcoleInfoCard = lazy(() => import('../components/AutoEcoleInfoCard'));
+const CircuitEtapesCard = lazy(() => import('../components/CircuitEtapesCard'));
+const DocumentsCard = lazy(() => import('../components/DocumentsCard'));
+
+// Composants Skeleton pour le chargement transparent
+const CandidatInfoCardSkeleton = () => (
+  <Fade in={true} timeout={300}>
+    <Card sx={{ mb: 3 }}>
+      <CardContent>
+        <Skeleton variant="text" width="60%" height={32} sx={{ mb: 2 }} />
+        <Skeleton variant="rectangular" height={120} sx={{ mb: 2, borderRadius: 1 }} />
+        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+          <Skeleton variant="text" width="40%" height={24} />
+          <Skeleton variant="text" width="40%" height={24} />
+        </Box>
+        <Skeleton variant="text" width="50%" height={20} />
+      </CardContent>
+    </Card>
+  </Fade>
+);
+
+const AutoEcoleInfoCardSkeleton = () => (
+  <Fade in={true} timeout={300}>
+    <Card sx={{ mb: 3 }}>
+      <CardContent>
+        <Skeleton variant="text" width="50%" height={32} sx={{ mb: 2 }} />
+        <Skeleton variant="rectangular" height={100} sx={{ mb: 2, borderRadius: 1 }} />
+        <Skeleton variant="text" width="70%" height={24} sx={{ mb: 1 }} />
+        <Skeleton variant="text" width="60%" height={24} />
+      </CardContent>
+    </Card>
+  </Fade>
+);
+
+const DocumentsCardSkeleton = () => (
+  <Fade in={true} timeout={300}>
+    <Card sx={{ mb: 3 }}>
+      <CardContent>
+        <Skeleton variant="text" width="40%" height={32} sx={{ mb: 2 }} />
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} variant="rectangular" height={60} sx={{ borderRadius: 1 }} />
+          ))}
+        </Box>
+      </CardContent>
+    </Card>
+  </Fade>
+);
+
+const CircuitEtapesCardSkeleton = () => (
+  <Fade in={true} timeout={300}>
+    <Card sx={{ mb: 3 }}>
+      <CardContent>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+          <Skeleton variant="text" width="40%" height={32} />
+          <Skeleton variant="rectangular" width={120} height={32} sx={{ borderRadius: 1 }} />
+        </Box>
+        <Skeleton variant="rectangular" height={8} sx={{ mb: 3, borderRadius: 1 }} />
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} variant="rectangular" height={80} sx={{ borderRadius: 1 }} />
+          ))}
+        </Box>
+      </CardContent>
+    </Card>
+  </Fade>
+);
 
 const ReceptionCandidatDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -168,19 +237,52 @@ const ReceptionCandidatDetailsPage: React.FC = () => {
 
         {/* Contenu principal */}
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
-            <CircularProgress />
-            <Typography variant="body1" sx={{ ml: 2 }}>Chargement des données...</Typography>
-          </Box>
+          <Fade in={true} timeout={300}>
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                flexDirection: { xs: 'column', lg: 'row' },
+                gap: 3, 
+                alignItems: 'flex-start' 
+              }}
+            >
+              {/* Colonne gauche - Skeletons */}
+              <Box 
+                sx={{ 
+                  flex: { xs: '1 1 100%', lg: '1 1 40%' }, 
+                  minWidth: 0,
+                  width: { xs: '100%', lg: 'auto' }
+                }}
+              >
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <CandidatInfoCardSkeleton />
+                  <AutoEcoleInfoCardSkeleton />
+                  <DocumentsCardSkeleton />
+                </Box>
+              </Box>
+              
+              {/* Colonne droite - Skeleton */}
+              <Box 
+                sx={{ 
+                  flex: { xs: '1 1 100%', lg: '1 1 60%' }, 
+                  minWidth: 0,
+                  width: { xs: '100%', lg: 'auto' }
+                }}
+              >
+                <CircuitEtapesCardSkeleton />
+              </Box>
+            </Box>
+          </Fade>
         ) : (
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              flexDirection: { xs: 'column', lg: 'row' },
-              gap: 3, 
-              alignItems: 'flex-start' 
-            }}
-          >
+          <Fade in={true} timeout={500}>
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                flexDirection: { xs: 'column', lg: 'row' },
+                gap: 3, 
+                alignItems: 'flex-start' 
+              }}
+            >
             {/* Colonne gauche - Cartes d'informations */}
             <Box 
               sx={{ 
@@ -191,10 +293,20 @@ const ReceptionCandidatDetailsPage: React.FC = () => {
             >
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {/* Informations de base */}
-                <CandidatInfoCard candidatData={candidatData} personne={personne} />
+                <Suspense fallback={<CandidatInfoCardSkeleton />}>
+                  <CandidatInfoCard candidatData={candidatData} personne={personne} />
+                </Suspense>
 
-                {/* Informations de l'auto-école - Masquer si pas de données */}
+                {/* Informations de l'auto-école - Masquer si pas de données ou si le circuit n'est pas NOUVEAUPERMIS */}
                 {(() => {
+                  // Vérifier si le circuit est de type NOUVEAUPERMIS
+                  const isNouveauPermis = circuit?.nom_entite === 'NOUVEAUPERMIS';
+                  
+                  // Si le circuit n'est pas NOUVEAUPERMIS, ne pas afficher la carte
+                  if (!isNouveauPermis) {
+                    return null;
+                  }
+                  
                   // Vérifier si on a des données valides pour l'auto-école
                   const hasAutoEcole = autoEcole && (
                     autoEcole.nom_auto_ecole || 
@@ -215,32 +327,36 @@ const ReceptionCandidatDetailsPage: React.FC = () => {
                   }
                   
                   return (
-                    <AutoEcoleInfoCard 
-                      autoEcole={autoEcole}
-                      formation={formation}
-                      dossier={dossier}
-                      dossierId={id}
-                    />
+                    <Suspense fallback={<AutoEcoleInfoCardSkeleton />}>
+                      <AutoEcoleInfoCard 
+                        autoEcole={autoEcole}
+                        formation={formation}
+                        dossier={dossier}
+                        dossierId={id}
+                      />
+                    </Suspense>
                   );
                 })()}
 
-                {/* Documents      */}
-                <DocumentsCard
-                  documentsFromApi={documentsFromApi}
-                  loadingDocuments={loadingDocuments}
-                  uploading={uploading}
-                  dossierId={id}
-                  fileInputRef={fileInputRef}
-                  onUploadClick={handleUploadNewDocument}
-                  onFileSelect={handleFileSelectUpload}
-                  onViewDocument={handleViewDocument}
-                  onDownloadDocument={handleDownloadDocument}
-                  onUpdateDocument={handleUpdateDocument}
-                  formatFileSize={formatFileSize}
-                  circuit={circuit}
-                  typeDocuments={typeDocuments}
-                  pieceJustificationTypeMap={pieceJustificationTypeMap}
-                />
+                {/* Documents */}
+                <Suspense fallback={<DocumentsCardSkeleton />}>
+                  <DocumentsCard
+                    documentsFromApi={documentsFromApi}
+                    loadingDocuments={loadingDocuments}
+                    uploading={uploading}
+                    dossierId={id}
+                    fileInputRef={fileInputRef}
+                    onUploadClick={handleUploadNewDocument}
+                    onFileSelect={handleFileSelectUpload}
+                    onViewDocument={handleViewDocument}
+                    onDownloadDocument={handleDownloadDocument}
+                    onUpdateDocument={handleUpdateDocument}
+                    formatFileSize={formatFileSize}
+                    circuit={circuit}
+                    typeDocuments={typeDocuments}
+                    pieceJustificationTypeMap={pieceJustificationTypeMap}
+                  />
+                </Suspense>
            
               </Box>
             </Box>
@@ -253,33 +369,36 @@ const ReceptionCandidatDetailsPage: React.FC = () => {
                 width: { xs: '100%', lg: 'auto' }
               }}
             >
-              <CircuitEtapesCard
-                circuit={circuit}
-                loadingCircuit={loadingCircuit}
-                loadingTypeDocuments={loadingTypeDocuments}
-                typeDocuments={typeDocuments}
-                documentsFromApi={documentsFromApi}
-                getDocumentsByType={getDocumentsByType}
-                getDocumentsForPiece={getDocumentsForPiece}
-                isDocumentValidated={isDocumentValidated}
-                isDocumentValidatedForPiece={isDocumentValidatedForPiece}
-                dossierId={id}
-                dossierComplet={dossierComplet}
-                onDocumentUploaded={chargerDocuments}
-                uploading={uploading}
-                onUpdateDocument={handleUpdateDocument}
-                epreuvesStatus={epreuvesStatus || undefined}
-                loadingEpreuves={loadingEpreuves}
-                onSendToCNEDDT={() => {
-                  // Optionnel: recharger les données après l'envoi
-                  if (chargerDocuments) {
-                    chargerDocuments();
-                  }
-                }}
-                pieceJustificationTypeMap={pieceJustificationTypeMap}
-              />
+              <Suspense fallback={<CircuitEtapesCardSkeleton />}>
+                <CircuitEtapesCard
+                  circuit={circuit}
+                  loadingCircuit={loadingCircuit}
+                  loadingTypeDocuments={loadingTypeDocuments}
+                  typeDocuments={typeDocuments}
+                  documentsFromApi={documentsFromApi}
+                  getDocumentsByType={getDocumentsByType}
+                  getDocumentsForPiece={getDocumentsForPiece}
+                  isDocumentValidated={isDocumentValidated}
+                  isDocumentValidatedForPiece={isDocumentValidatedForPiece}
+                  dossierId={id}
+                  dossierComplet={dossierComplet}
+                  onDocumentUploaded={chargerDocuments}
+                  uploading={uploading}
+                  onUpdateDocument={handleUpdateDocument}
+                  epreuvesStatus={epreuvesStatus || undefined}
+                  loadingEpreuves={loadingEpreuves}
+                  onSendToCNEDDT={() => {
+                    // Optionnel: recharger les données après l'envoi
+                    if (chargerDocuments) {
+                      chargerDocuments();
+                    }
+                  }}
+                  pieceJustificationTypeMap={pieceJustificationTypeMap}
+                />
+              </Suspense>
             </Box>
           </Box>
+          </Fade>
         )}
       </Container>
 
