@@ -1,38 +1,87 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { 
   Box, 
   Button, 
-  CircularProgress, 
   Stack, 
   Typography, 
   TextField, 
-  FormControl, 
-  InputLabel, 
-  Select, 
-  MenuItem, 
   Card, 
   CardContent, 
   Grid,
   Chip,
   InputAdornment,
-  Divider,
   Dialog,
   DialogTitle,
   DialogContent,
   IconButton,
   Tabs,
   Tab,
-  Paper
+  Paper,
+  Skeleton,
+  Fade
 } from '@mui/material';
 import { Search, Refresh, Close } from '@mui/icons-material';
 import axiosClient from '../../../shared/environment/envdev';
 import { receptionService } from '../services/reception.service';
 import { ReceptionDossier } from '../types';
-import ReceptionDossierTypeTable from '../tables/ReceptionDossierTypeTable';
 import { circuitSuiviService, CircuitSuivi } from '../services/circuit-suivi.service';
-import CircuitEtapesView from '../components/CircuitEtapesView';
 import { typeDemandeService } from '../../cnepc/services';
 import { TypeDemande } from '../../cnepc/types/type-demande';
+
+// Lazy loading des composants
+const ReceptionDossierTypeTable = lazy(() => import('../tables/ReceptionDossierTypeTable'));
+const CircuitEtapesView = lazy(() => import('../components/CircuitEtapesView'));
+
+// Composants Skeleton pour le chargement transparent
+const ReceptionDossierTableSkeleton = () => (
+  <Fade in={true} timeout={300}>
+    <Card>
+      <CardContent>
+        <Box sx={{ mb: 2 }}>
+          <Skeleton variant="text" width="30%" height={40} />
+        </Box>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} variant="rectangular" height={80} sx={{ borderRadius: 1 }} />
+          ))}
+        </Box>
+      </CardContent>
+    </Card>
+  </Fade>
+);
+
+const CircuitEtapesViewSkeleton = () => (
+  <Fade in={true} timeout={300}>
+    <Box>
+      <Skeleton variant="text" width="40%" height={32} sx={{ mb: 2 }} />
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} variant="rectangular" height={100} sx={{ borderRadius: 1 }} />
+        ))}
+      </Box>
+    </Box>
+  </Fade>
+);
+
+const MainContentSkeleton = () => (
+  <Fade in={true} timeout={300}>
+    <Box>
+      {/* Skeleton pour les onglets */}
+      <Paper sx={{ mb: 3, borderRadius: 0 }}>
+        <Box sx={{ p: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} variant="rectangular" width={150} height={40} sx={{ borderRadius: 1 }} />
+            ))}
+          </Box>
+        </Box>
+      </Paper>
+      
+      {/* Skeleton pour le tableau */}
+      <ReceptionDossierTableSkeleton />
+    </Box>
+  </Fade>
+);
 
 const ReceptionDossiersPage: React.FC = () => {
   const [loading, setLoading] = React.useState<boolean>(false);
@@ -651,9 +700,7 @@ const ReceptionDossiersPage: React.FC = () => {
 
       {/* Onglets pour chaque type de demande */}
       {loading ? (
-        <Stack alignItems="center" sx={{ py: 4 }}>
-          <CircularProgress />
-        </Stack>
+        <MainContentSkeleton />
       ) : (
         <Box>
           {dossiersParCircuit.size > 0 ? (
@@ -744,14 +791,16 @@ const ReceptionDossiersPage: React.FC = () => {
                       />
                     )}
                   </Box>
-                  <ReceptionDossierTypeTable 
-                    dossiers={currentTypeDemandeData.dossiers} 
-                    typeDemandeName={currentTypeDemandeData.circuit.nom_entite || currentTypeDemandeData.circuit.libelle}
-                    typeDemandeId={currentTypeDemandeData.circuit.id}
-                    circuit={currentTypeDemandeData.circuit}
-                    onReceive={handleReceive}
-                    onOpenDocuments={handleOpenDocumentsDialog}
-                  />
+                  <Suspense fallback={<ReceptionDossierTableSkeleton />}>
+                    <ReceptionDossierTypeTable 
+                      dossiers={currentTypeDemandeData.dossiers} 
+                      typeDemandeName={currentTypeDemandeData.circuit.nom_entite || currentTypeDemandeData.circuit.libelle}
+                      typeDemandeId={currentTypeDemandeData.circuit.id}
+                      circuit={currentTypeDemandeData.circuit}
+                      onReceive={handleReceive}
+                      onOpenDocuments={handleOpenDocumentsDialog}
+                    />
+                  </Suspense>
                 </Box>
               ) : (
                 <Card>
@@ -814,17 +863,17 @@ const ReceptionDossiersPage: React.FC = () => {
         </DialogTitle>
         <DialogContent>
           {loadingCircuit ? (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight={200}>
-              <CircularProgress />
-            </Box>
+            <CircuitEtapesViewSkeleton />
           ) : circuit ? (
-            <CircuitEtapesView
-              circuit={circuit}
-              dossierId={selectedDossierForDocuments?.id}
-              onEtapeChange={(etape) => {
-                console.log('Étape changée:', etape);
-              }}
-            />
+            <Suspense fallback={<CircuitEtapesViewSkeleton />}>
+              <CircuitEtapesView
+                circuit={circuit}
+                dossierId={selectedDossierForDocuments?.id}
+                onEtapeChange={(etape) => {
+                  console.log('Étape changée:', etape);
+                }}
+              />
+            </Suspense>
           ) : (
             <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
               Aucun circuit trouvé pour ce dossier.

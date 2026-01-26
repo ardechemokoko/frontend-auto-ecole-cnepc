@@ -58,6 +58,8 @@ interface EtapeAccordionProps {
   onCompleteLastEtape: (etape: EtapeCircuit) => void;
   onTransmitToNextEtape: (etape: EtapeCircuit) => void;
   pieceJustificationTypeMap?: Map<string, { libelle: string }>; // Map piece_justification_id -> { libelle }
+  expanded?: boolean;
+  onChange?: (event: React.SyntheticEvent, isExpanded: boolean) => void;
 }
 
 export const EtapeAccordion: React.FC<EtapeAccordionProps> = ({
@@ -91,10 +93,11 @@ export const EtapeAccordion: React.FC<EtapeAccordionProps> = ({
   fileInputRefs,
   onCompleteLastEtape,
   onTransmitToNextEtape,
-  pieceJustificationTypeMap = new Map()
+  pieceJustificationTypeMap = new Map(),
+  expanded = false,
+  onChange
 }) => {
   const previousEtape = getPreviousEtape(etape, circuit);
-  const isExpanded = index === 0;
   const [piecesJustificativesMap, setPiecesJustificativesMap] = React.useState<Map<string, any>>(new Map());
   const userRole = useUserRole();
   const authorized = isUserAuthorized(userRole, etape.roles);
@@ -482,7 +485,8 @@ export const EtapeAccordion: React.FC<EtapeAccordionProps> = ({
   return (
     <Accordion 
       key={etape.id} 
-      defaultExpanded={isExpanded}
+      expanded={expanded}
+      onChange={onChange}
       sx={{
         border: '1px solid',
         borderColor: etapeStatus.status === 'completed' ? 'success.main' : 
@@ -851,10 +855,18 @@ export const EtapeAccordion: React.FC<EtapeAccordionProps> = ({
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
                 <Box>
                   <Typography variant="body2" fontWeight="bold" className="font-display" gutterBottom>
-                    {isButtonEnabled ? (isLastEtape ? 'Toutes les pièces sont validées - Dernière étape' : 'Toutes les pièces sont validées') : 'En attente de validation des pièces'}
+                    {(isEtapeCompleted || computedCompletedEtapes.has(etape.id) || completedEtapes.has(etape.id)) 
+                      ? 'Étape terminée' 
+                      : isButtonEnabled 
+                        ? (isLastEtape ? 'Toutes les pièces sont validées - Dernière étape' : 'Toutes les pièces sont validées') 
+                        : 'En attente de validation des pièces'}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" className="font-primary">
-                    {isLastEtape ? 'Finaliser cette étape' : 'Passer à l\'étape suivante'}
+                    {(isEtapeCompleted || computedCompletedEtapes.has(etape.id) || completedEtapes.has(etape.id))
+                      ? 'Cette étape est déjà complétée'
+                      : isLastEtape 
+                        ? 'Finaliser cette étape' 
+                        : 'Passer à l\'étape suivante'}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -865,7 +877,14 @@ export const EtapeAccordion: React.FC<EtapeAccordionProps> = ({
                       color="primary"
                       startIcon={transmittingEtape === etape.id ? <CircularProgress size={16} /> : <CheckCircleIcon className="w-5 h-5" />}
                       onClick={() => onTransmitToNextEtape(etape)}
-                      disabled={transmittingEtape === etape.id || !dossierId || !circuit?.id}
+                      disabled={
+                        transmittingEtape === etape.id || 
+                        !dossierId || 
+                        !circuit?.id ||
+                        isEtapeCompleted ||
+                        computedCompletedEtapes.has(etape.id) ||
+                        completedEtapes.has(etape.id)
+                      }
                       sx={{ 
                         textTransform: 'none',
                         fontWeight: 600
@@ -892,12 +911,15 @@ export const EtapeAccordion: React.FC<EtapeAccordionProps> = ({
                       transmittingEtape === etape.id || 
                       !dossierId || 
                       !circuit?.id ||
+                      isEtapeCompleted ||
+                      computedCompletedEtapes.has(etape.id) ||
+                      completedEtapes.has(etape.id) ||
                       (isEnvoiDossierExamen && (!programmeSessionCreated || epreuvesStatus !== 'reussi'))
                     }
                     sx={{ 
                       textTransform: 'none',
                       fontWeight: 600,
-                      opacity: (isButtonEnabled && (!isEnvoiDossierExamen || (programmeSessionCreated && epreuvesStatus === 'reussi'))) ? 1 : 0.6
+                      opacity: (isButtonEnabled && !isEtapeCompleted && !computedCompletedEtapes.has(etape.id) && !completedEtapes.has(etape.id) && (!isEnvoiDossierExamen || (programmeSessionCreated && epreuvesStatus === 'reussi'))) ? 1 : 0.6
                     }}
                   >
                     {transmittingEtape === etape.id 

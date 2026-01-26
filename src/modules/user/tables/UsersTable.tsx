@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -7,8 +7,8 @@ import {
   TableBody,
   TableCell,
   TableContainer,
-  TableHead,
   TableRow,
+  TablePagination,
   IconButton,
   Chip,
   Button,
@@ -28,10 +28,10 @@ import {
   Avatar,
   Card,
   CardContent,
-  Pagination,
   FormControl,
   InputLabel,
   Select,
+  Stack,
 } from '@mui/material';
 import {
   Search,
@@ -42,6 +42,8 @@ import {
   Visibility,
   Phone,
   LocationOn,
+  FilterList,
+  Clear,
 } from '@mui/icons-material';
 import { useUsers } from '../hooks';
 import { User } from '../types';
@@ -61,12 +63,23 @@ const UsersTable: React.FC<UsersTableProps> = ({ refreshTrigger }) => {
   const [userFormOpen, setUserFormOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(15);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [displayedUsers, setDisplayedUsers] = useState<User[]>([]);
+  const [total, setTotal] = useState(0);
+
+  // États locaux pour les filtres
+  const [localFilters, setLocalFilters] = useState({
+    search: '',
+    role: '',
+  });
 
   // Menu contextuel
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
 
-  const { users, loading, error, pagination, stats, refresh, setPage } = useUsers({
+  const { users, loading, error, stats, refresh } = useUsers({
     filters: {
       search: searchTerm || undefined,
       role: roleFilter || undefined,
@@ -74,23 +87,91 @@ const UsersTable: React.FC<UsersTableProps> = ({ refreshTrigger }) => {
   });
 
   // Rafraîchir quand refreshTrigger change
-  React.useEffect(() => {
+  useEffect(() => {
     if (refreshTrigger !== undefined) {
       refresh();
     }
-  }, [refreshTrigger]);
+  }, [refreshTrigger, refresh]);
 
-  // Filtrer les utilisateurs par terme de recherche
-  const filteredUsers = users.filter(user => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      user.email.toLowerCase().includes(searchLower) ||
-      user.personne?.nom.toLowerCase().includes(searchLower) ||
-      user.personne?.prenom.toLowerCase().includes(searchLower) ||
-      user.personne?.contact.toLowerCase().includes(searchLower)
-    );
-  });
+  // Stocker tous les utilisateurs chargés
+  useEffect(() => {
+    setAllUsers(users);
+  }, [users]);
+
+  // Filtrer et paginer les utilisateurs côté client
+  useEffect(() => {
+    let filteredUsers = [...allUsers];
+
+    // Filtrer par terme de recherche (si le serveur ne le fait pas complètement)
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filteredUsers = filteredUsers.filter(user => 
+        user.email.toLowerCase().includes(searchLower) ||
+        user.personne?.nom?.toLowerCase().includes(searchLower) ||
+        user.personne?.prenom?.toLowerCase().includes(searchLower) ||
+        user.personne?.contact?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Appliquer la pagination côté client
+    const startIndex = page * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+
+    setDisplayedUsers(paginatedUsers);
+    setTotal(filteredUsers.length);
+  }, [allUsers, searchTerm, roleFilter, page, rowsPerPage]);
+
+  // Réinitialiser à la page 0 quand les filtres changent
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, roleFilter]);
+
+  // Synchroniser les filtres locaux avec les filtres réels au montage
+  useEffect(() => {
+    setLocalFilters({
+      search: searchTerm,
+      role: roleFilter,
+    });
+  }, []);
+
+  // Gestion de la pagination
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Gestion des filtres locaux
+  const handleFilterChange = (key: string, value: any) => {
+    setLocalFilters({ ...localFilters, [key]: value });
+  };
+
+  const handleApplyFilters = () => {
+    setSearchTerm(localFilters.search);
+    setRoleFilter(localFilters.role);
+    setPage(0);
+  };
+
+  const handleClearFilters = () => {
+    const clearedFilters = {
+      search: '',
+      role: '',
+    };
+    setLocalFilters(clearedFilters);
+    setSearchTerm('');
+    setRoleFilter('');
+    setPage(0);
+  };
+
+  const getActiveFiltersCount = () => {
+    return Object.values(localFilters).filter(
+      (value) => value !== undefined && value !== null && value !== ''
+    ).length;
+  };
 
   // Gestion du menu contextuel
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, userId: string) => {
@@ -105,7 +186,7 @@ const UsersTable: React.FC<UsersTableProps> = ({ refreshTrigger }) => {
 
   // Actions du menu
   const handleView = () => {
-    const user = users.find(u => u.id === selectedRowId);
+    const user = displayedUsers.find(u => u.id === selectedRowId);
     if (user) {
       // Naviguer vers la page de détails
       navigate(`/candidat/${user.id}`);
@@ -114,7 +195,7 @@ const UsersTable: React.FC<UsersTableProps> = ({ refreshTrigger }) => {
   };
 
   const handleEdit = () => {
-    const user = users.find(u => u.id === selectedRowId);
+    const user = displayedUsers.find(u => u.id === selectedRowId);
     if (user) {
       setSelectedUser(user);
       setUserFormOpen(true);
@@ -123,7 +204,7 @@ const UsersTable: React.FC<UsersTableProps> = ({ refreshTrigger }) => {
   };
 
   const handleDelete = () => {
-    const user = users.find(u => u.id === selectedRowId);
+    const user = displayedUsers.find(u => u.id === selectedRowId);
     if (user) {
       setUserToDelete(user);
       setDeleteDialogOpen(true);
@@ -192,125 +273,175 @@ const UsersTable: React.FC<UsersTableProps> = ({ refreshTrigger }) => {
 
   return (
     <Box>
-      {/* En-tête */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ mb: 2 }}>
-          Gestion des Utilisateurs
-        </Typography>
-      </Box>
+      <Paper sx={{ p: 2, mb: 2, backgroundColor: 'transparent' }} elevation={0}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6">Gestion des Utilisateurs</Typography>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => {
+              setSelectedUser(undefined);
+              setUserFormOpen(true);
+            }}
+          >
+            Nouvel Utilisateur
+          </Button>
+        </Box>
 
-      {/* Statistiques */}
-      {stats && (
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="overline" color="text.secondary">
-                  Total
-                </Typography>
-                <Typography variant="h4" fontWeight="bold" color="primary.main">
-                  {stats.total}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          {Object.entries(stats.by_role || {}).map(([role, count]) => (
-            <Grid item xs={12} sm={6} md={3} key={role}>
+        {/* Statistiques */}
+        {stats && (
+          <Grid container spacing={2} sx={{ mb: 2 }}>
+            <Grid item xs={12} sm={6} md={3}>
               <Card variant="outlined">
                 <CardContent>
                   <Typography variant="overline" color="text.secondary">
-                    {getRoleLabel(role)}
+                    Total
                   </Typography>
                   <Typography variant="h4" fontWeight="bold" color="primary.main">
-                    {count}
+                    {stats.total}
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
-          ))}
-        </Grid>
-      )}
+            {Object.entries(stats.by_role || {}).map(([role, count]) => (
+              <Grid item xs={12} sm={6} md={3} key={role}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="overline" color="text.secondary">
+                      {getRoleLabel(role)}
+                    </Typography>
+                    <Typography variant="h4" fontWeight="bold" color="primary.main">
+                      {count}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
 
-      {/* Barres de recherche et filtres */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        <TextField
-          placeholder="Rechercher un utilisateur..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-          }}
-          sx={{ minWidth: 300 }}
-        />
-        <FormControl sx={{ minWidth: 200 }}>
-          <InputLabel>Filtrer par rôle</InputLabel>
-          <Select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            label="Filtrer par rôle"
-          >
-            <MenuItem value="">Tous les rôles</MenuItem>
-            <MenuItem value="ROLE_ADMIN">Administrateur</MenuItem>
-            <MenuItem value="ROLE_AUTO_ECOLE">Auto-École</MenuItem>
-            <MenuItem value="ROLE_CNEPC">CNEPC</MenuItem>
-            <MenuItem value="ROLE_CNEDDT">CNEDDT</MenuItem>
-            <MenuItem value="candidat">Candidat</MenuItem>
-          </Select>
-        </FormControl>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => {
-            setSelectedUser(undefined);
-            setUserFormOpen(true);
-          }}
-        >
-          Nouvel Utilisateur
-        </Button>
-      </Box>
+        {/* Panel de filtres */}
+        <Card elevation={1} sx={{ mb: 2 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <FilterList sx={{ mr: 1 }} />
+                <Typography variant="h6">
+                  Filtres
+                </Typography>
+                {getActiveFiltersCount() > 0 && (
+                  <Chip
+                    label={getActiveFiltersCount()}
+                    color="primary"
+                    size="small"
+                    sx={{ ml: 1 }}
+                  />
+                )}
+              </Box>
+              <Stack direction="row" spacing={1}>
+                <Button
+                  size="small"
+                  startIcon={<Clear />}
+                  onClick={handleClearFilters}
+                  disabled={getActiveFiltersCount() === 0}
+                >
+                  Effacer
+                </Button>
+                <Button
+                  size="small"
+                  variant="contained"
+                  startIcon={<Search />}
+                  onClick={handleApplyFilters}
+                >
+                  Appliquer
+                </Button>
+              </Stack>
+            </Box>
 
-      {/* Message d'erreur */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Rechercher"
+                  value={localFilters.search || ''}
+                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                  placeholder="Email, nom, prénom, contact..."
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Search />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
 
-      {/* Table */}
-      <Paper>
+              <Grid item xs={12} sm={6} md={4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Rôle</InputLabel>
+                  <Select
+                    value={localFilters.role || ''}
+                    onChange={(e) => handleFilterChange('role', e.target.value)}
+                    label="Rôle"
+                  >
+                    <MenuItem value="">Tous les rôles</MenuItem>
+                    <MenuItem value="ROLE_ADMIN">Administrateur</MenuItem>
+                    <MenuItem value="ROLE_AUTO_ECOLE">Auto-École</MenuItem>
+                    <MenuItem value="ROLE_CNEPC">CNEPC</MenuItem>
+                    <MenuItem value="ROLE_CNEDDT">CNEDDT</MenuItem>
+                    <MenuItem value="candidat">Candidat</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
         <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Utilisateur</TableCell>
-                <TableCell>Contact</TableCell>
-                <TableCell>Rôle</TableCell>
-                <TableCell>Date de création</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
+          <Table sx={{ borderCollapse: 'separate', borderSpacing: '0 8px' }}>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={5} align="center">
                     <CircularProgress />
                   </TableCell>
                 </TableRow>
-              ) : filteredUsers.length === 0 ? (
+              ) : displayedUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={5} align="center">
                     <Typography variant="body2" color="text.secondary">
                       Aucun utilisateur trouvé
                     </Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredUsers.map((user) => (
-                  <TableRow key={user.id} hover>
+                displayedUsers.map((user) => (
+                  <TableRow 
+                    key={user.id}
+                    hover
+                    sx={{
+                      boxShadow: 1,
+                      backgroundColor: 'white',
+                      transition: 'background-color 0.2s ease',
+                      border: 'none',
+                      '& td': {
+                        border: 'none',
+                        borderBottom: 'none',
+                      },
+                      '&:hover': {
+                        boxShadow: 3,
+                        backgroundColor: 'white',
+                        cursor: 'pointer',
+                      },
+                    }}
+                  >
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Avatar sx={{ bgcolor: 'primary.main' }}>
@@ -359,8 +490,8 @@ const UsersTable: React.FC<UsersTableProps> = ({ refreshTrigger }) => {
                     </TableCell>
                     <TableCell align="right">
                       <IconButton
-                        onClick={(e) => handleMenuOpen(e, user.id)}
                         size="small"
+                        onClick={(e) => handleMenuOpen(e, user.id)}
                       >
                         <MoreVert />
                       </IconButton>
@@ -372,17 +503,16 @@ const UsersTable: React.FC<UsersTableProps> = ({ refreshTrigger }) => {
           </Table>
         </TableContainer>
 
-        {/* Pagination */}
-        {pagination.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-            <Pagination
-              count={pagination.totalPages}
-              page={pagination.page}
-              onChange={(_, page) => setPage(page)}
-              color="primary"
-            />
-          </Box>
-        )}
+        <TablePagination
+          component="div"
+          count={total}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[5, 10, 15, 25, 50]}
+          labelRowsPerPage="Lignes par page:"
+        />
       </Paper>
 
       {/* Menu contextuel */}

@@ -7,6 +7,7 @@ import { TypeDemande } from '../../../types/type-demande';
 import { PieceJustificative } from '../types';
 import { getEtapeStatus, getPreviousEtape, areAllPiecesValidated } from '../../../../reception/utils/etapeHelpers';
 import axiosClient from '../../../../../shared/environment/envdev';
+import { referentielService } from '../../../services';
 
 interface CircuitToastProps {
   dossier: Dossier;
@@ -261,25 +262,62 @@ export const showCircuitToast = async ({ dossier, typeDemandeCache }: CircuitToa
     const tempCompletedEtapes = new Set([...storedCompleted, ...tempCompletedFromStatut]);
     const tempComputedCompletedEtapes = new Set([...tempCompletedFromStatut, ...tempCompletedEtapes]);
     
+    // 3. Vérifier les étapes stockées dans localStorage sont toujours valides
+    // PRIORITÉ: Si une étape a un statut_libelle indiquant qu'elle est complétée, elle reste toujours complétée
+    // (c'est la source de vérité côté serveur)
     const validatedFromDocuments = new Set<string>();
-    if (circuit.etapes && circuit.etapes.length > 0 && documents.length > 0) {
+    if (circuit.etapes && circuit.etapes.length > 0) {
       storedCompleted.forEach(etapeId => {
         const etape = circuit.etapes!.find(e => e.id === etapeId);
         if (etape) {
-          // Vérifier si toutes les pièces de cette étape sont toujours validées
-          // Utiliser areAllPiecesValidated comme dans useEtapeCompletion
-          // IMPORTANT: Passer les Sets complets, pas seulement l'ID de l'étape
-          const allValidated = areAllPiecesValidated(
-            etape,
-            documents,
-            tempCompletedEtapes,
-            tempComputedCompletedEtapes,
-            typeDocuments,
-            piecesMap
+          // PRIORITÉ ABSOLUE: Si l'étape a un statut_libelle indiquant qu'elle est complétée,
+          // elle reste toujours complétée (source de vérité côté serveur)
+          const isCompletedFromStatut = etape.statut_libelle && (
+            etape.statut_libelle.toLowerCase().includes('complété') ||
+            etape.statut_libelle.toLowerCase().includes('complete') ||
+            etape.statut_libelle.toLowerCase().includes('terminé') ||
+            etape.statut_libelle.toLowerCase().includes('termine')
           );
           
-          if (allValidated) {
+          if (isCompletedFromStatut) {
+            // Si l'étape est marquée comme complétée côté serveur, la garder toujours
             validatedFromDocuments.add(etapeId);
+            console.log(`✅ CircuitToast - Étape ${etape.libelle} toujours complétée (statut_libelle: ${etape.statut_libelle})`);
+          } else if (documents.length > 0) {
+            // Sinon, vérifier si toutes les pièces de cette étape sont toujours validées
+            const allValidated = areAllPiecesValidated(
+              etape,
+              documents,
+              tempCompletedEtapes,
+              tempComputedCompletedEtapes,
+              typeDocuments,
+              piecesMap
+            );
+            
+            if (allValidated) {
+              validatedFromDocuments.add(etapeId);
+              console.log(`✅ CircuitToast - Étape ${etape.libelle} toujours complétée (documents validés présents)`);
+            } else {
+              // Si l'étape n'a pas de statut_libelle complété ET que les documents ne sont pas validés,
+              // on peut la retirer UNIQUEMENT si elle a des pièces ET que les documents sont chargés
+              // (si les documents ne sont pas encore chargés, on garde l'étape pour éviter de perdre le statut)
+              if (!etape.pieces || etape.pieces.length === 0) {
+                // Les étapes sans pièces restent complétées si elles étaient dans localStorage
+                validatedFromDocuments.add(etapeId);
+                console.log(`✅ CircuitToast - Étape ${etape.libelle} sans pièces reste complétée`);
+              } else {
+                // Pour les étapes avec pièces, on garde le statut si l'étape était dans localStorage
+                // (pour éviter de perdre le statut si la vérification échoue temporairement)
+                // Seul le statut_libelle côté serveur peut vraiment indiquer si l'étape est complétée
+                validatedFromDocuments.add(etapeId);
+                console.log(`⚠️ CircuitToast - Étape ${etape.libelle} conservée malgré documents non validés (sera vérifiée au prochain chargement)`);
+              }
+            }
+          } else {
+            // Si pas encore de documents chargés, garder l'étape si elle était dans localStorage
+            // (pour éviter de perdre le statut pendant le chargement)
+            validatedFromDocuments.add(etapeId);
+            console.log(`⏳ CircuitToast - Étape ${etape.libelle} conservée (documents en cours de chargement)`);
           }
         } else {
           // Si l'étape n'existe plus dans le circuit, la conserver quand même
@@ -287,7 +325,7 @@ export const showCircuitToast = async ({ dossier, typeDemandeCache }: CircuitToa
         }
       });
     } else {
-      // Si pas encore de documents ou d'étapes, utiliser celles de localStorage
+      // Si pas encore d'étapes, utiliser celles de localStorage
       storedCompleted.forEach(id => validatedFromDocuments.add(id));
     }
     
@@ -460,6 +498,23 @@ export const showCircuitToast = async ({ dossier, typeDemandeCache }: CircuitToa
     
     // 5. Fusionner toutes les sources (localStorage validées + circuit statut + toutes étapes validées)
     const completedEtapes = new Set([...validatedFromDocuments, ...completedFromStatut, ...validatedFromAllEtapes]);
+    
+    // Charger les informations du référentiel et du type de demande pour l'affichage
+    let referentielName: string | null = null;
+    const referencielId = (dossier as any).referenciel_id;
+    if (referencielId) {
+      try {
+        const referentiel = await referentielService.getReferentielById(referencielId);
+        referentielName = referentiel?.libelle || referentiel?.code || null;
+      } catch (err) {
+        console.warn('⚠️ Erreur lors du chargement du référentiel:', err);
+      }
+    }
+    
+    // Obtenir le nom du type de demande depuis le cache
+    const typeDemandeName = dossier.type_demande?.name || 
+                           (dossier.type_demande_id ? typeDemandeCache.get(dossier.type_demande_id)?.name : null) ||
+                           null;
     
     // 6. Calculer computedCompletedEtapes (comme dans useEtapeCompletion)
     // D'abord, calculer depuis statut_libelle uniquement (comme getCompletedEtapesForDossier)
@@ -662,7 +717,16 @@ export const showCircuitToast = async ({ dossier, typeDemandeCache }: CircuitToa
         }
         
         // Vérifier si l'étape est complétée (même logique que CircuitEtapesCard.tsx ligne 627)
-        const isEtapeCompleted = computedCompletedEtapes.has(etape.id) || completedEtapes.has(etape.id);
+        // PRIORITÉ: Vérifier d'abord le statut_libelle de l'étape elle-même (source de vérité côté serveur)
+        const isCompletedFromStatut = etape.statut_libelle && (
+          etape.statut_libelle.toLowerCase().includes('complété') ||
+          etape.statut_libelle.toLowerCase().includes('complete') ||
+          etape.statut_libelle.toLowerCase().includes('terminé') ||
+          etape.statut_libelle.toLowerCase().includes('termine')
+        );
+        const isEtapeCompleted = isCompletedFromStatut || 
+                                  computedCompletedEtapes.has(etape.id) || 
+                                  completedEtapes.has(etape.id);
         
         // Vérifier si toutes les pièces justificatives de l'étape sont validées
         // Utiliser la même logique que ReceptionCandidatDetailsPage.tsx (isDocumentValidatedForPiece)
@@ -861,10 +925,20 @@ export const showCircuitToast = async ({ dossier, typeDemandeCache }: CircuitToa
           allPiecesValidated = allPiecesValidatedByHelper;
         }
         
-        // IMPORTANT: Si toutes les pièces justificatives sont validées ET l'étape précédente est complétée,
-        // l'étape est complétée. On force le statut à "completed" AVANT d'appeler getEtapeStatus
+        // IMPORTANT: PRIORITÉ ABSOLUE - Si l'étape est dans completedEtapes ou computedCompletedEtapes,
+        // elle est complétée indépendamment de la validation des pièces
+        // (c'est la source de vérité - l'étape a été marquée comme complétée via le bouton)
         let etapeStatus;
-        if (allPiecesValidated && isPreviousEtapeCompleted) {
+        if (isEtapeCompleted) {
+          // L'étape est déjà marquée comme complétée (dans les Sets ou via statut_libelle)
+          etapeStatus = {
+            status: 'completed',
+            label: 'Complétée',
+            color: 'success'
+          };
+        } else if (allPiecesValidated && isPreviousEtapeCompleted) {
+          // Si toutes les pièces sont validées ET l'étape précédente est complétée,
+          // l'étape peut être considérée comme complétée
           etapeStatus = {
             status: 'completed',
             label: 'Complétée',
@@ -879,17 +953,6 @@ export const showCircuitToast = async ({ dossier, typeDemandeCache }: CircuitToa
             completedEtapes,
             documents
           );
-          
-          // IMPORTANT: Si l'étape est dans completedEtapes ou computedCompletedEtapes,
-          // elle doit être considérée comme complétée, même si getEtapeStatus retourne "pending"
-          // (car getEtapeStatus vérifie d'abord isPreviousEtapeCompleted)
-          if (isEtapeCompleted && etapeStatus.status !== 'completed') {
-            etapeStatus = {
-              status: 'completed',
-              label: 'Complétée',
-              color: 'success'
-            };
-          }
         }
         
         // Log pour déboguer le calcul du statut
@@ -1194,6 +1257,77 @@ export const showCircuitToast = async ({ dossier, typeDemandeCache }: CircuitToa
               ✕
             </Button>
           </Box>
+          
+          {/* Informations du dossier */}
+          <Box sx={{ 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: 1.5, 
+            mb: 2, 
+            p: 1.5, 
+            bgcolor: 'grey.50', 
+            borderRadius: 1,
+            border: '1px solid',
+            borderColor: 'grey.200'
+          }}>
+            {typeDemandeName && (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                  Type de demande:
+                </Typography>
+                <Chip 
+                  label={typeDemandeName} 
+                  size="small" 
+                  variant="outlined"
+                  color="primary"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            )}
+            {referentielName && (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                  Référentiel:
+                </Typography>
+                <Chip 
+                  label={referentielName} 
+                  size="small" 
+                  variant="outlined"
+                  color="secondary"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            )}
+            {(dossier as any).numero_permis && (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                  Numéro permis:
+                </Typography>
+                <Chip 
+                  label={(dossier as any).numero_permis} 
+                  size="small" 
+                  variant="outlined"
+                  color="primary"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            )}
+            {(dossier as any).numero_origine_permis && (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                  Numéro origine permis:
+                </Typography>
+                <Chip 
+                  label={(dossier as any).numero_origine_permis} 
+                  size="small" 
+                  variant="outlined"
+                  color="secondary"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              </Box>
+            )}
+          </Box>
+          
           <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
             Statut des étapes et pièces justificatives ({timelineItems.length} élément(s))
           </Typography>

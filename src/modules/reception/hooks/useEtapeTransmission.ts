@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import axiosClient from '../../../shared/environment/envdev';
-import { EtapeCircuit, CircuitSuivi } from '../services/circuit-suivi.service';
+import { EtapeCircuit, CircuitSuivi, circuitSuiviService } from '../services/circuit-suivi.service';
 import { getNextEtape } from '../utils/etapeHelpers';
 import { ROUTES } from '../../../shared/constants';
 
@@ -62,11 +63,15 @@ export const useEtapeTransmission = (
         console.log('✅ Dernière étape marquée comme complétée:', etape.id);
       }
 
+      // IMPORTANT: Vider le cache du circuit pour forcer le rechargement avec les nouveaux statuts
+      circuitSuiviService.clearCache();
+      console.log('🗑️ Cache du circuit vidé pour forcer le rechargement (dernière étape)');
+
       if (onDocumentUploaded) {
         await onDocumentUploaded();
         // Attendre un peu pour laisser le temps au backend de mettre à jour le statut
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        // Recharger à nouveau pour récupérer le circuit mis à jour
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Recharger à nouveau pour récupérer le circuit mis à jour avec le nouveau statut_libelle
         await onDocumentUploaded();
       }
 
@@ -75,11 +80,17 @@ export const useEtapeTransmission = (
         detail: { dossierId, circuitId: circuit.id }
       }));
 
-      alert(`Dernière étape complétée avec succès: ${etape.libelle}`);
+      toast.success(`Dernière étape complétée avec succès: ${etape.libelle}`, {
+        position: 'bottom-right',
+        duration: 4000
+      });
     } catch (error: any) {
       console.error('❌ Erreur lors de la finalisation:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Erreur lors de la finalisation';
-      alert(`Erreur: ${errorMessage}`);
+      toast.error(`Erreur: ${errorMessage}`, {
+        position: 'bottom-right',
+        duration: 5000
+      });
     } finally {
       setTransmittingEtape(null);
     }
@@ -150,7 +161,10 @@ export const useEtapeTransmission = (
 
     if (!nextEtape.statut_id) {
       console.error('❌ L\'étape suivante n\'a pas de statut_id');
-      alert('Impossible de passer à l\'étape suivante: statut manquant');
+      toast.error('Impossible de passer à l\'étape suivante: statut manquant', {
+        position: 'bottom-right',
+        duration: 4000
+      });
       return;
     }
 
@@ -188,6 +202,7 @@ export const useEtapeTransmission = (
       }
 
       // Marquer l'étape actuelle comme complétée
+      // IMPORTANT: Le statut_libelle doit contenir "Complété" ou "Terminé" pour être détecté comme complété
       if (etape.statut_id) {
         try {
           const completedPayload = {
@@ -198,25 +213,64 @@ export const useEtapeTransmission = (
           };
 
           try {
-            await axiosClient.patch(`/workflow/statuts/${etape.statut_id}`, completedPayload);
-            console.log('✅ Statut de l\'étape précédente mis à jour');
+            const updateResponse = await axiosClient.patch(`/workflow/statuts/${etape.statut_id}`, completedPayload);
+            console.log('✅ Statut de l\'étape précédente mis à jour:', {
+              etapeId: etape.id,
+              etapeLibelle: etape.libelle,
+              newStatutLibelle: completedPayload.libelle,
+              response: updateResponse.data
+            });
           } catch (completedError: any) {
-            console.warn('⚠️ Impossible de mettre à jour le statut:', completedError);
+            console.warn('⚠️ Impossible de mettre à jour le statut avec PATCH:', completedError);
+            // Essayer avec PUT en fallback
+            try {
+              const updateResponse = await axiosClient.put(`/workflow/statuts/${etape.statut_id}`, completedPayload);
+              console.log('✅ Statut de l\'étape précédente mis à jour (PUT):', {
+                etapeId: etape.id,
+                etapeLibelle: etape.libelle,
+                newStatutLibelle: completedPayload.libelle,
+                response: updateResponse.data
+              });
+            } catch (putError: any) {
+              console.error('❌ Impossible de mettre à jour le statut avec PUT:', putError);
+            }
           }
         } catch (err: any) {
-          console.warn('⚠️ Erreur lors du marquage:', err);
+          console.error('❌ Erreur lors du marquage:', err);
         }
+      } else {
+        console.warn('⚠️ L\'étape n\'a pas de statut_id, impossible de mettre à jour le statut_libelle:', {
+          etapeId: etape.id,
+          etapeLibelle: etape.libelle
+        });
       }
 
       if (markEtapeAsCompleted) {
         markEtapeAsCompleted(etape.id);
+        console.log('✅ Étape marquée comme complétée:', etape.id);
       }
+
+      // IMPORTANT: Vider le cache du circuit pour forcer le rechargement avec les nouveaux statuts
+      circuitSuiviService.clearCache();
+      console.log('🗑️ Cache du circuit vidé pour forcer le rechargement');
 
       if (onDocumentUploaded) {
         await onDocumentUploaded();
+        // Attendre un peu pour laisser le temps au backend de mettre à jour le statut
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Recharger à nouveau pour récupérer le circuit mis à jour avec le nouveau statut_libelle
+        await onDocumentUploaded();
       }
 
-      alert(`Étape transmise avec succès. Passage à l'étape: ${nextEtape.libelle}`);
+      // Émettre un événement pour déclencher le rechargement du circuit
+      window.dispatchEvent(new CustomEvent('circuitReload', {
+        detail: { dossierId, circuitId: circuit.id }
+      }));
+
+      toast.success(`Étape transmise avec succès. Passage à l'étape: ${nextEtape.libelle}`, {
+        position: 'bottom-right',
+        duration: 4000
+      });
     } catch (error: any) {
       console.error('❌ Erreur lors de la transmission:', error);
       let errorMessage = 'Erreur lors de la transmission';
@@ -235,7 +289,10 @@ export const useEtapeTransmission = (
         errorMessage += ` (${validationErrors})`;
       }
       
-      alert(`Erreur: ${errorMessage}`);
+      toast.error(`Erreur: ${errorMessage}`, {
+        position: 'bottom-right',
+        duration: 5000
+      });
     } finally {
       setTransmittingEtape(null);
     }
@@ -248,7 +305,10 @@ export const useEtapeTransmission = (
     }
 
     if (!dateExamen) {
-      alert('La date d\'examen est obligatoire');
+      toast.error('La date d\'examen est obligatoire', {
+        position: 'bottom-right',
+        duration: 4000
+      });
       return;
     }
 
@@ -317,7 +377,10 @@ export const useEtapeTransmission = (
           }
         }));
 
-        alert('Dossier envoyé à l\'examen avec succès ! Vous pouvez maintenant passer à l\'étape suivante une fois les résultats validés.');
+        toast.success('Dossier envoyé à l\'examen avec succès ! Vous pouvez maintenant passer à l\'étape suivante une fois les résultats validés.', {
+          position: 'bottom-right',
+          duration: 5000
+        });
       } else {
         throw new Error('Format de réponse inattendu');
       }
@@ -401,8 +464,11 @@ export const useEtapeTransmission = (
         errorMessage = error.message;
       }
       
-      // Afficher l'erreur dans une alerte avec plus de détails
-      alert(`Erreur: ${errorMessage}\n\nCode d'erreur: ${error.response?.status || 'N/A'}`);
+      // Afficher l'erreur dans un toast avec plus de détails
+      toast.error(`Erreur: ${errorMessage}\n\nCode d'erreur: ${error.response?.status || 'N/A'}`, {
+        position: 'bottom-right',
+        duration: 6000
+      });
       
       throw error; // Re-lancer pour que le modal puisse gérer l'erreur
     } finally {

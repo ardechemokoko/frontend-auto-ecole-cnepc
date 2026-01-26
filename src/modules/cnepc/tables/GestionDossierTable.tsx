@@ -15,7 +15,6 @@ import {
   TextField,
   InputAdornment,
   Alert,
-  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -33,6 +32,7 @@ import {
   Grid,
   Stack,
   Collapse,
+  Skeleton,
 } from '@mui/material';
 import {
   Search,
@@ -763,11 +763,36 @@ const GestionDossierTable: React.FC<GestionDossierTableProps> = ({ refreshTrigge
              
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center">
-                    <CircularProgress />
-                  </TableCell>
-                </TableRow>
+                <>
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <TableRow key={i}>
+                      <TableCell>
+                        <Skeleton variant="circular" width={24} height={24} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="text" width={80} height={20} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="text" width={150} height={20} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="text" width={100} height={20} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="text" width={120} height={20} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="rectangular" width={80} height={24} sx={{ borderRadius: 1 }} />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton variant="text" width={100} height={20} />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Skeleton variant="circular" width={32} height={32} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </>
               ) : dossiers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} align="center">

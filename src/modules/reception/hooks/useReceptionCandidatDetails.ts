@@ -744,12 +744,16 @@ export const useReceptionCandidatDetails = (id: string | undefined) => {
       }
       
       if (id && dossierComplet) {
-        console.log('🔄 Rechargement du circuit après finalisation de la dernière étape');
+        console.log('🔄 Rechargement du circuit après mise à jour du statut');
+        // IMPORTANT: Vider le cache du circuit pour forcer le rechargement avec les nouveaux statuts
+        circuitSuiviService.clearCache();
+        console.log('🗑️ Cache du circuit vidé pour forcer le rechargement');
         // Attendre un peu pour laisser le temps au backend de mettre à jour le statut
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 1500));
         // Recharger le circuit et les documents
         await chargerCircuitEtTypesDocuments(dossierComplet);
         await chargerDocuments();
+        console.log('✅ Circuit et documents rechargés après mise à jour du statut');
       }
     };
 
