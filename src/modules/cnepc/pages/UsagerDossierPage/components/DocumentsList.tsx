@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, Card, CardContent, Chip, CircularProgress, Button, Dialog, DialogTitle, DialogContent, IconButton } from '@mui/material';
+import { Box, Typography, Paper, Card, CardContent, Chip, Button, Dialog, DialogTitle, DialogContent, IconButton, Skeleton, Fade } from '@mui/material';
 import { Description, Download, Close } from '@mui/icons-material';
 import { Dossier } from '../../../types/auto-ecole';
 import { Document, PieceJustificative } from '../types';
@@ -60,9 +60,26 @@ const DocumentsList: React.FC<DocumentsListProps> = ({
       </Typography>
       
       {loadingDossiers ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <CircularProgress size={30} />
-        </Box>
+        <Fade in={true} timeout={300}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} elevation={5} sx={{ backgroundColor: 'transparent', borderRadius: 0 }}>
+                <CardContent sx={{ p: 1.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'start', gap: 1 }}>
+                    <Skeleton variant="circular" width={18} height={18} sx={{ mt: 0.5 }} />
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Skeleton variant="text" width="70%" height={20} sx={{ mb: 0.5 }} />
+                      <Skeleton variant="rectangular" width={100} height={20} sx={{ borderRadius: 1, mb: 0.5 }} />
+                      <Skeleton variant="text" width="50%" height={16} />
+                    </Box>
+                    <Skeleton variant="rectangular" width={60} height={20} sx={{ borderRadius: 1 }} />
+                  </Box>
+                  <Skeleton variant="rectangular" width={80} height={24} sx={{ borderRadius: 1, mt: 1 }} />
+                </CardContent>
+              </Card>
+            ))}
+          </Box>
+        </Fade>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {currentDossierId && (

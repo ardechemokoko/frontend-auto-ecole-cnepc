@@ -1,10 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, Card, CardContent, Paper, CircularProgress } from '@mui/material';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { Box, Typography, Button, Card, CardContent, Paper, Skeleton, Fade } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { Add } from '@mui/icons-material';
-import GestionDossierTable from '../tables/GestionDossierTable';
 import { gestionDossierService, typeDemandeService } from '../services';
 import { TypeDemande } from '../types/type-demande';
+
+// Lazy loading du composant table
+const GestionDossierTable = lazy(() => import('../tables/GestionDossierTable'));
+
+// Composants Skeleton pour le chargement transparent
+const StatsSkeleton = () => (
+  <Fade in={true} timeout={300}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {[1, 2, 3, 4].map((i) => (
+        <Card key={i}>
+          <CardContent>
+            <Skeleton variant="text" width="60%" height={24} sx={{ mb: 1 }} />
+            <Skeleton variant="text" width="40%" height={40} sx={{ mb: 0.5 }} />
+            <Skeleton variant="text" width="30%" height={16} />
+          </CardContent>
+        </Card>
+      ))}
+    </Box>
+  </Fade>
+);
+
+const GestionDossierTableSkeleton = () => (
+  <Fade in={true} timeout={300}>
+    <Paper sx={{ p: 3 }}>
+      <Skeleton variant="text" width="30%" height={40} sx={{ mb: 2 }} />
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Skeleton key={i} variant="rectangular" height={60} sx={{ borderRadius: 1 }} />
+        ))}
+      </Box>
+    </Paper>
+  </Fade>
+);
 
 interface TypeDemandeStats {
   typeDemande: TypeDemande;
@@ -95,7 +127,9 @@ const GestionDossierPage: React.FC = () => {
 
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Box sx={{ flexGrow: 1 }}>
-            <GestionDossierTable refreshTrigger={refreshTrigger} />
+            <Suspense fallback={<GestionDossierTableSkeleton />}>
+              <GestionDossierTable refreshTrigger={refreshTrigger} />
+            </Suspense>
           </Box>
 
           {/* Sidebar droite avec les statistiques */}
@@ -118,9 +152,7 @@ const GestionDossierPage: React.FC = () => {
         
 
         {loadingStats ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress size={40} />
-          </Box>
+          <StatsSkeleton />
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {typeDemandeStats.map((stat) => (

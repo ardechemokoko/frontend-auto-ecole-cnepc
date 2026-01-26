@@ -59,42 +59,100 @@ export const useEtapeCompletion = (
     const storedCompleted = loadCompletedEtapesFromStorage(dossierId);
     
     // 2. Charger depuis le circuit (statut_libelle)
+    // IMPORTANT: Le statut_libelle est la source de vérité côté serveur
     const completedFromStatut = new Set<string>();
     if (circuit && circuit.etapes) {
       circuit.etapes.forEach(etape => {
-        if (etape.statut_libelle && (
-          etape.statut_libelle.toLowerCase().includes('complété') ||
-          etape.statut_libelle.toLowerCase().includes('complete') ||
-          etape.statut_libelle.toLowerCase().includes('terminé') ||
-          etape.statut_libelle.toLowerCase().includes('termine')
-        )) {
-          completedFromStatut.add(etape.id);
+        if (etape.statut_libelle) {
+          const statutLower = etape.statut_libelle.toLowerCase();
+          const isCompleted = statutLower.includes('complété') ||
+                              statutLower.includes('complete') ||
+                              statutLower.includes('terminé') ||
+                              statutLower.includes('termine') ||
+                              statutLower.includes('complété') ||
+                              statutLower.includes('validé') ||
+                              statutLower.includes('valide');
+          
+          if (isCompleted) {
+            completedFromStatut.add(etape.id);
+            console.log(`✅ Étape complétée détectée depuis statut_libelle: ${etape.libelle} (${etape.statut_libelle})`);
+          }
         }
       });
     }
     
     // 3. Vérifier les étapes stockées dans localStorage sont toujours valides
-    // (basées sur les documents disponibles)
+    // PRIORITÉ: Si une étape a un statut_libelle indiquant qu'elle est complétée, elle reste toujours complétée
+    // (c'est la source de vérité côté serveur)
     const validatedFromDocuments = new Set<string>();
-    if (etapes.length > 0 && documentsForCurrentDossier.length > 0) {
+    if (etapes.length > 0) {
       storedCompleted.forEach(etapeId => {
         const etape = etapes.find(e => e.id === etapeId);
         if (etape) {
-          // Vérifier si toutes les pièces de cette étape sont toujours validées
-          const allValidated = areAllPiecesValidated(
-            etape,
-            documentsForCurrentDossier,
-            new Set([etapeId]),
-            new Set([etapeId]),
-            typeDocuments,
-            piecesJustificativesMap
-          );
+          // PRIORITÉ ABSOLUE: Si l'étape a un statut_libelle indiquant qu'elle est complétée,
+          // elle reste toujours complétée (source de vérité côté serveur)
+          // IMPORTANT: Vérifier plusieurs variations du format pour être sûr de détecter le statut
+          let isCompletedFromStatut = false;
+          if (etape.statut_libelle) {
+            const statutLower = etape.statut_libelle.toLowerCase();
+            isCompletedFromStatut = statutLower.includes('complété') ||
+                                    statutLower.includes('complete') ||
+                                    statutLower.includes('terminé') ||
+                                    statutLower.includes('termine') ||
+                                    statutLower.includes('validé') ||
+                                    statutLower.includes('valide');
+          }
           
-          if (allValidated) {
+          if (isCompletedFromStatut) {
+            // Si l'étape est marquée comme complétée côté serveur, la garder toujours
             validatedFromDocuments.add(etapeId);
-            console.log(`✅ Étape ${etape.libelle} toujours complétée (documents validés présents)`);
+            console.log(`✅ Étape ${etape.libelle} toujours complétée (statut_libelle: ${etape.statut_libelle})`);
           } else {
-            console.log(`⚠️ Étape ${etape.libelle} n'est plus complétée (documents manquants ou non validés)`);
+            // Log pour déboguer si le statut_libelle n'est pas détecté
+            console.log(`🔍 Étape ${etape.libelle} - Vérification statut_libelle:`, {
+              etapeId: etape.id,
+              statut_libelle: etape.statut_libelle,
+              isCompletedFromStatut,
+              hasPieces: !!(etape.pieces && etape.pieces.length > 0),
+              piecesCount: etape.pieces?.length || 0
+            });
+          }
+          
+          if (documentsForCurrentDossier.length > 0) {
+            // Sinon, vérifier si toutes les pièces de cette étape sont toujours validées
+            const allValidated = areAllPiecesValidated(
+              etape,
+              documentsForCurrentDossier,
+              new Set([etapeId]),
+              new Set([etapeId]),
+              typeDocuments,
+              piecesJustificativesMap
+            );
+            
+            if (allValidated) {
+              validatedFromDocuments.add(etapeId);
+              console.log(`✅ Étape ${etape.libelle} toujours complétée (documents validés présents)`);
+            } else {
+              // Si l'étape n'a pas de statut_libelle complété ET que les documents ne sont pas validés,
+              // on peut la retirer UNIQUEMENT si elle a des pièces ET que les documents sont chargés
+              // (si les documents ne sont pas encore chargés, on garde l'étape pour éviter de perdre le statut)
+              if (!etape.pieces || etape.pieces.length === 0) {
+                // Les étapes sans pièces restent complétées si elles étaient dans localStorage
+                validatedFromDocuments.add(etapeId);
+                console.log(`✅ Étape ${etape.libelle} sans pièces reste complétée`);
+              } else {
+                // Pour les étapes avec pièces, on garde le statut si l'étape était dans localStorage
+                // (pour éviter de perdre le statut si la vérification échoue temporairement)
+                // Seul le statut_libelle côté serveur peut vraiment indiquer si l'étape est complétée
+                validatedFromDocuments.add(etapeId);
+                console.log(`⚠️ Étape ${etape.libelle} conservée malgré documents non validés (sera vérifiée au prochain chargement)`);
+              }
+            }
+          } else {
+            // Si pas encore de documents chargés, garder l'étape si elle était dans localStorage
+            // (pour éviter de perdre le statut pendant le chargement)
+            validatedFromDocuments.add(etapeId);
+            console.log(`⏳ Étape ${etape.libelle} conservée (documents en cours de chargement)`);
           }
         } else {
           // Si l'étape n'existe plus dans le circuit, la conserver quand même
@@ -102,12 +160,26 @@ export const useEtapeCompletion = (
         }
       });
     } else {
-      // Si pas encore de documents ou d'étapes, utiliser celles de localStorage
+      // Si pas encore d'étapes, utiliser celles de localStorage
       storedCompleted.forEach(id => validatedFromDocuments.add(id));
     }
     
     // 4. Fusionner toutes les sources (localStorage validées + circuit)
+    // IMPORTANT: Les étapes avec statut_libelle complété doivent TOUJOURS être incluses,
+    // même si elles ne sont pas dans localStorage
     const merged = new Set([...validatedFromDocuments, ...completedFromStatut]);
+    
+    // Log détaillé pour déboguer
+    console.log('🔍 useEtapeCompletion - Fusion des étapes complétées:', {
+      validatedFromDocumentsSize: validatedFromDocuments.size,
+      validatedFromDocuments: Array.from(validatedFromDocuments),
+      completedFromStatutSize: completedFromStatut.size,
+      completedFromStatut: Array.from(completedFromStatut),
+      mergedSize: merged.size,
+      merged: Array.from(merged),
+      storedCompletedSize: storedCompleted.size,
+      storedCompleted: Array.from(storedCompleted)
+    });
     
     // 5. Ne mettre à jour que si les étapes complétées ont changé
     setCompletedEtapes(prev => {
@@ -118,8 +190,9 @@ export const useEtapeCompletion = (
         prevArray.some((id, idx) => id !== mergedArray[idx]);
       
       if (hasChanged) {
-        console.log(`📋 Étapes complétées fusionnées: ${merged.size} (${validatedFromDocuments.size} depuis localStorage validées, ${completedFromStatut.size} depuis circuit)`);
-        // Sauvegarder la version fusionnée
+        console.log(`📋 Étapes complétées fusionnées: ${merged.size} (${validatedFromDocuments.size} depuis localStorage validées, ${completedFromStatut.size} depuis circuit statut_libelle)`);
+        // IMPORTANT: Sauvegarder la version fusionnée pour persister les étapes complétées
+        // Cela inclut les étapes avec statut_libelle complété même si elles n'étaient pas dans localStorage
         saveCompletedEtapesToStorage(dossierId, merged);
         return merged;
       }
@@ -155,16 +228,20 @@ export const useEtapeCompletion = (
       
       // Vérifier si l'étape est déjà marquée comme complétée via statut_libelle
       // C'est la seule source de vérité pour déterminer si une étape est complétée
-      const isCompletedFromStatut = etape.statut_libelle && (
-        etape.statut_libelle.toLowerCase().includes('complété') ||
-        etape.statut_libelle.toLowerCase().includes('complete') ||
-        etape.statut_libelle.toLowerCase().includes('terminé') ||
-        etape.statut_libelle.toLowerCase().includes('termine')
-      );
-      
-      if (isCompletedFromStatut) {
-        completed.add(etape.id);
-        console.log(`✅ Étape complétée détectée depuis statut_libelle: ${etape.libelle} (${etape.statut_libelle})`);
+      // IMPORTANT: Vérifier plusieurs variations du format pour être sûr de détecter le statut
+      if (etape.statut_libelle) {
+        const statutLower = etape.statut_libelle.toLowerCase();
+        const isCompletedFromStatut = statutLower.includes('complété') ||
+                                      statutLower.includes('complete') ||
+                                      statutLower.includes('terminé') ||
+                                      statutLower.includes('termine') ||
+                                      statutLower.includes('validé') ||
+                                      statutLower.includes('valide');
+        
+        if (isCompletedFromStatut) {
+          completed.add(etape.id);
+          console.log(`✅ Étape complétée détectée depuis statut_libelle: ${etape.libelle} (${etape.statut_libelle})`);
+        }
       }
     }
 
