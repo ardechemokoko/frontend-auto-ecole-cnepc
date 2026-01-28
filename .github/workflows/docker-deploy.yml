@@ -1,0 +1,101 @@
+name: 🐳 Docker Build & Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔧 Normalize image name (lowercase)
+        run: |
+          IMAGE_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
+          echo "✅ Image name normalized: $IMAGE_NAME"
+
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔐 Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏷️ Compute repo & tags (main only)
+        id: tags
+        run: |
+          IMAGE_REPO="${{ env.REGISTRY }}/${IMAGE_NAME}"
+
+          {
+            echo "image_repo=$IMAGE_REPO"
+            echo "dev_tags<<EOF"
+            echo "${IMAGE_REPO}:dev-latest"
+            echo "EOF"
+            echo "prod_tags<<EOF"
+            echo "${IMAGE_REPO}:latest"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "✅ Image repo: $IMAGE_REPO"
+
+      # ---------- DEV ----------
+      - name: 📄 Copy .env.devops → .env (DEV)
+        run: |
+          test -f .env.devops || { echo "❌ Fichier .env.devops manquant"; exit 1; }
+          cp .env.devops .env
+
+      - name: 🏗️ Build & push DEV (Dockerfile-dev)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile-dev
+          push: true
+          tags: ${{ steps.tags.outputs.dev_tags }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # platforms: linux/amd64,linux/arm64  # décommente si besoin multi-arch
+
+      # ---------- PROD ----------
+      - name: 📄 Copy .env.devops → .env (PROD)
+        run: cp .env.devops .env
+
+      - name: 🏗️ Build & push PROD (Dockerfile-prod)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile-prod
+          push: true
+          tags: ${{ steps.tags.outputs.prod_tags }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # platforms: linux/amd64,linux/arm64  # décommente si besoin multi-arch
+
+      - name: 📝 Output
+        run: |
+          echo "✅ Pushed images to: ${{ steps.tags.outputs.image_repo }}"
+          echo "DEV tag : ${{ steps.tags.outputs.dev_tags }}"
+          echo "PROD tag: ${{ steps.tags.outputs.prod_tags }}"
