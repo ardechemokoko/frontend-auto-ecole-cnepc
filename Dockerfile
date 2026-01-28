@@ -5,7 +5,7 @@ ENV PORT='3000'
 
 WORKDIR /app
 
-# Activer corepack pour utiliser pnpm (intégré à Node.js, évite les problèmes SSL avec npm)
+# Activer corepack pour utiliser  ok pnpm (intégré à Node.js, évite les problèmes SSL avec npm)
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Copier les fichiers de dépendances d'abord pour optimiser le cache Docker
