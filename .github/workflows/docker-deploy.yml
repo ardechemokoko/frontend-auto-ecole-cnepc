@@ -68,11 +68,11 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile-dev
+          file: ./Dockerfile
           push: true
           tags: ${{ steps.tags.outputs.dev_tags }}
           build-args: |
-            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api' }}
+            VITE_API_URL=${{ secrets.VITE_API_URL || 'http://localhost:8000/api' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           # platforms: linux/amd64,linux/arm64  # décommente si besoin multi-arch
