@@ -23,13 +23,10 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
-  Divider,
 } from '@mui/material';
 import {
   Schedule,
   CheckCircle,
-  PlayArrow,
-  Stop,
   CalendarToday,
   AccessTime,
   Group,
@@ -54,7 +51,6 @@ const PlanificationPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { epreuvesSession } = useEpreuve();
   const { planifierCreneaux } = useCreneau();
   const { sessions } = useSessionExamen();
 
@@ -89,7 +85,8 @@ const PlanificationPage: React.FC = () => {
     }
   };
 
-  const steps = [
+  // Configuration des étapes de planification
+  const planificationSteps = [
     {
       label: 'Configuration de base',
       description: 'Définir les paramètres de base de la planification',
@@ -350,7 +347,7 @@ const PlanificationPage: React.FC = () => {
                               Aperçu des créneaux
                             </Typography>
                             <List dense>
-                              {resultat.creneaux_crees.slice(0, 5).map((creneau, index) => (
+                              {resultat.creneaux_crees.slice(0, 5).map((creneau) => (
                                 <ListItem key={creneau.id}>
                                   <ListItemIcon>
                                     <Schedule color="action" />

@@ -348,7 +348,7 @@ export class CreneauService {
         const pauseMs = data.pause_entre_creneaux_minutes * 60 * 1000;
 
         let creneauId = mockCreneaux.length + 1;
-        let dateActuelle = new Date(dateDebut);
+        const dateActuelle = new Date(dateDebut);
 
         while (dateActuelle <= dateFin) {
           const jourSemaine = dateActuelle.getDay();

@@ -221,7 +221,7 @@ const EpreuvePage: React.FC = () => {
 
         // Charger le dossier complet
         const dossierResponse = await axiosClient.get(`/dossiers/${dossierId}`);
-        let dossierComplet = dossierResponse.data?.data || dossierResponse.data;
+        const dossierComplet = dossierResponse.data?.data || dossierResponse.data;
 
         // Enrichir les données de formation si nécessaire (charger type_permis si seulement l'ID est présent)
         if (dossierComplet?.formation) {

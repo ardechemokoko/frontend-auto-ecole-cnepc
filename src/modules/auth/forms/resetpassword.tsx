@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TextField, Button, Box, Typography, Alert, Card, CardContent, Link } from '@mui/material';
+import { TextField, Button, Box, Typography, Alert, Card, CardContent } from '@mui/material';
 import { authService } from '../services';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants';
@@ -21,7 +21,6 @@ const ResetPasswordForm: React.FC = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [errors, setErrors] = useState<Partial<ResetPasswordFormData>>({});
-    const [isLoadingSendEmail, setIsLoadingSendEmail] = useState<boolean>(false);
   const navigate = useNavigate();
   const handleChange =
     (field: keyof ResetPasswordFormData) =>
@@ -64,7 +63,8 @@ const ResetPasswordForm: React.FC = () => {
         }, 1000);
       }
     } catch (e) {
-
+      const errorMessage = e instanceof Error ? e.message : 'Erreur lors de la réinitialisation';
+      setMessage({ type: 'error', text: errorMessage });
     }
   };
 

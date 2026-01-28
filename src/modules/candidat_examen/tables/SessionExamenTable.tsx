@@ -27,7 +27,6 @@ import {
   School,
   CalendarToday,
   LocationOn,
-  Group,
   PlayArrow,
   Stop,
 } from '@mui/icons-material';

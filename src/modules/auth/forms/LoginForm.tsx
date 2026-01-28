@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Card, CardContent, CircularProgress, Link, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, TextField, Typography } from '@mui/material';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants';
@@ -243,8 +243,9 @@ const LoginForm: React.FC = () => {
         //authService.logoutBackEnd();
       }
 
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || 'Erreur de connexion' });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
+      setMessage({ type: 'error', text: errorMessage });
     } finally {
       setLoading(false);
     }

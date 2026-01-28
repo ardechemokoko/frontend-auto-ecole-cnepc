@@ -54,7 +54,6 @@ const CandidatExamenTable: React.FC<CandidatExamenTableProps> = ({
   onView,
   onEdit,
   onDelete,
-  onUpdateStatut,
   selectedCandidats = [],
   onSelectionChange,
   selectable = false,
@@ -116,17 +115,6 @@ const CandidatExamenTable: React.FC<CandidatExamenTableProps> = ({
       day: 'numeric',
     });
   };
-
-  const statuts = [
-    { value: 'inscrit', label: 'Inscrit' },
-    { value: 'en_attente', label: 'En attente' },
-    { value: 'programme', label: 'Programmé' },
-    { value: 'present', label: 'Présent' },
-    { value: 'absent', label: 'Absent' },
-    { value: 'reussi', label: 'Réussi' },
-    { value: 'echoue', label: 'Échoué' },
-    { value: 'annule', label: 'Annulé' },
-  ];
 
   return (
     <>

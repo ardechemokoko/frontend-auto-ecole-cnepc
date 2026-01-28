@@ -13,7 +13,6 @@ import {
   LinearProgress,
 } from '@mui/material';
 import {
-  School,
   CalendarToday,
   LocationOn,
   Person,
