@@ -33,7 +33,7 @@ COPY --from=build /app/dist /usr/share/nginx/html
 # Copier la config Nginx (ou utiliser celle par défaut)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Exposer le port 80
+# Exposer le port 80 ok
 EXPOSE 80
 
 # Démarrer Nginx
